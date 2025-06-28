@@ -1,47 +1,58 @@
-# Svelte + TS + Vite
+# History Workflow Analyzer
 
-This template should help get you started developing with Svelte and TypeScript in Vite.
+This application analyzes your browser history to identify repetitive workflows and suggest optimizations. You can upload or paste your Chrome history export (JSON) or other browser history (as text) and the tool will use AI to find patterns.
 
-## Recommended IDE Setup
+## Features
 
-[VS Code](https://code.visualstudio.com/) + [Svelte](https://marketplace.visualstudio.com/items?itemName=svelte.svelte-vscode).
+*   **Analyze Browser History**: Supports Chrome history exports (JSON) and generic text-based history.
+*   **AI-Powered Analysis**: Uses either Google Gemini or OpenAI models to analyze your browsing patterns.
+*   **Privacy-Focused**: Your history data is processed in your browser. It is only sent to the selected AI provider for analysis and is not stored anywhere. You can use your own API key.
+*   **Identify Repetitive Workflows**: Discovers recurring sequences of browsing behavior that could be automated or made more efficient.
+*   **Customizable Prompts**: Advanced options to customize the prompts used for parsing and analysis.
 
-## Need an official Svelte framework?
+## Getting Started
 
-Check out [SvelteKit](https://github.com/sveltejs/kit#readme), which is also powered by Vite. Deploy anywhere with its serverless-first approach and adapt to various platforms, with out of the box support for TypeScript, SCSS, and Less, and easily-added support for mdsvex, GraphQL, PostCSS, Tailwind CSS, and more.
+1.  Open the application in your browser.
+2.  Select your preferred AI Provider (Google Gemini or OpenAI).
+3.  Enter your API key for the selected provider.
+4.  Upload your `history.json` file or paste your browsing history into the text area.
+5.  Click "Analyze" and wait for the results.
 
-## Technical considerations
+## Development
 
-**Why use this over SvelteKit?**
+This project is built with Svelte, TypeScript, and Vite.
 
-- It brings its own routing solution which might not be preferable for some users.
-- It is first and foremost a framework that just happens to use Vite under the hood, not a Vite app.
+### Prerequisites
 
-This template contains as little as possible to get started with Vite + TypeScript + Svelte, while taking into account the developer experience with regards to HMR and intellisense. It demonstrates capabilities on par with the other `create-vite` templates and is a good starting point for beginners dipping their toes into a Vite + Svelte project.
+*   Node.js
+*   pnpm
 
-Should you later need the extended capabilities and extensibility provided by SvelteKit, the template has been structured similarly to SvelteKit so that it is easy to migrate.
+### Installation
 
-**Why `global.d.ts` instead of `compilerOptions.types` inside `jsconfig.json` or `tsconfig.json`?**
+1.  Clone the repository.
+2.  Install dependencies:
+    ```bash
+    pnpm install
+    ```
 
-Setting `compilerOptions.types` shuts out all other types not explicitly listed in the configuration. Using triple-slash references keeps the default TypeScript setting of accepting type information from the entire workspace, while also adding `svelte` and `vite/client` type information.
+### Available Scripts
 
-**Why include `.vscode/extensions.json`?**
+*   `pnpm dev`: Starts the development server.
+*   `pnpm build`: Builds the application for production.
+*   `pnpm preview`: Previews the production build.
+*   `pnpm check`: Runs Svelte check and TypeScript compiler checks.
+*   `pnpm lint`: Lints the codebase using Biome.
+*   `pnpm format`: Formats the codebase using Biome.
+*   `pnpm test`: Runs tests with Vitest.
 
-Other templates indirectly recommend extensions via the README, but this file allows VS Code to prompt the user to install the recommended extension upon opening the project.
+## Privacy Notice
 
-**Why enable `allowJs` in the TS template?**
+Your privacy is important. All processing of your browsing history is done locally in your browser. The data is sent directly to the AI service you choose (Google or OpenAI) for analysis and is never stored on any server. For maximum privacy, it is highly recommended to use your own API key.
 
-While `allowJs: false` would indeed prevent the use of `.js` files in the project, it does not prevent the use of JavaScript syntax in `.svelte` files. In addition, it would force `checkJs: false`, bringing the worst of both worlds: not being able to guarantee the entire codebase is TypeScript, and also having worse typechecking for the existing JavaScript. In addition, there are valid use cases in which a mixed codebase may be relevant.
+## Technology Stack
 
-**Why is HMR not preserving my local component state?**
-
-HMR state preservation comes with a number of gotchas! It has been disabled by default in both `svelte-hmr` and `@sveltejs/vite-plugin-svelte` due to its often surprising behavior. You can read the details [here](https://github.com/rixo/svelte-hmr#svelte-hmr).
-
-If you have state that's important to retain within a component, consider creating an external store which would not be replaced by HMR.
-
-```ts
-// store.ts
-// An extremely simple external store
-import { writable } from 'svelte/store'
-export default writable(0)
-```
+*   **Frontend**: Svelte, TypeScript, Tailwind CSS
+*   **Build Tool**: Vite
+*   **AI**: Google Gemini API, OpenAI API
+*   **Linting/Formatting**: Biome
+*   **Testing**: Vitest
