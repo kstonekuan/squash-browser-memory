@@ -105,11 +105,13 @@ function getPhaseStatus(phaseId: string): "pending" | "active" | "complete" {
 								<div class="text-xs text-gray-500 mt-1">
 									{phaseItem.description}
 								</div>
-								{#if phase === 'analyzing' && chunkProgress}
+								{#if chunkProgress && phase === 'analyzing'}
 									<div class="text-xs text-blue-600 font-medium mt-1">
 										Chunk {chunkProgress.current} of {chunkProgress.total}
 									</div>
-									<div class="text-xs text-gray-400">
+								{/if}
+								{#if chunkProgress?.description}
+									<div class="text-xs text-gray-600 mt-1 max-w-[200px] mx-auto">
 										{chunkProgress.description}
 									</div>
 								{/if}
@@ -135,6 +137,13 @@ function getPhaseStatus(phaseId: string): "pending" | "active" | "complete" {
 		{#if phase !== 'complete' && phase !== 'error'}
 			<div class="mt-6 flex flex-col items-center gap-3">
 				<div class="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+				
+				{#if chunkProgress?.description && phase !== 'analyzing'}
+					<div class="text-sm text-gray-600 text-center px-4">
+						{chunkProgress.description}
+					</div>
+				{/if}
+				
 				{#if onCancel}
 					<button
 						onclick={onCancel}

@@ -85,6 +85,17 @@ export async function createChromeAISession(
 
 					return await session.prompt(text, options);
 				} catch (error) {
+					// Log detailed error information
+					console.error("Chrome AI Error Details:", {
+						errorType:
+							error instanceof Error ? error.constructor.name : "Unknown",
+						errorName: error instanceof Error ? error.name : "Unknown",
+						errorMessage: error instanceof Error ? error.message : "No message",
+						errorStack: error instanceof Error ? error.stack : "No stack trace",
+						promptLength: text.length,
+						hasResponseConstraint: !!options?.responseConstraint,
+					});
+
 					// Check if it's a quota exceeded error
 					if (
 						error instanceof DOMException &&
@@ -107,6 +118,19 @@ export async function createChromeAISession(
 						console.error("Chrome AI quota exceeded.");
 						throw new Error(`Chrome AI quota exceeded: ${error.message}`);
 					}
+
+					// Handle UnknownError specifically
+					if (error instanceof Error && error.name === "UnknownError") {
+						console.error("Chrome AI UnknownError - possible causes:");
+						console.error("1. Chrome AI service temporarily unavailable");
+						console.error("2. Model not fully downloaded/initialized");
+						console.error("3. Invalid response constraint schema");
+						console.error("4. Internal Chrome AI error");
+						throw new Error(
+							`Chrome AI error: ${error.message}. Try refreshing the page or waiting a moment.`,
+						);
+					}
+
 					console.error("Error during Chrome AI prompt:", error);
 					throw error;
 				}

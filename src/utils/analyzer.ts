@@ -105,8 +105,12 @@ export async function analyzeHistoryItems(
 	}
 
 	// Notify that we're calculating statistics
-	if (onProgress) onProgress({ phase: "calculating" });
 	console.log("Starting analysis with", items.length, "items");
+	if (onProgress)
+		onProgress({
+			phase: "calculating",
+			chunkDescription: `Processing ${items.length} history items`,
+		});
 	const stats = calculateStats(items);
 
 	// Load existing memory
@@ -125,8 +129,12 @@ export async function analyzeHistoryItems(
 	}
 
 	// Identify chunks using AI
-	if (onProgress) onProgress({ phase: "chunking" });
 	console.log("Starting chunking phase");
+	if (onProgress)
+		onProgress({
+			phase: "chunking",
+			chunkDescription: `Analyzing ${items.length} items for time patterns`,
+		});
 	const chunkingResult = await identifyChunks(
 		items,
 		customPrompts?.chunkPrompt,
@@ -142,6 +150,12 @@ export async function analyzeHistoryItems(
 		chunkingResult.isFallback,
 	);
 	console.log("Created", chunks.length, "chunks for processing");
+	if (onProgress && chunks.length > 0) {
+		onProgress({
+			phase: "chunking",
+			chunkDescription: `Identified ${chunks.length} browsing sessions`,
+		});
+	}
 
 	if (chunks.length === 0) {
 		return {
@@ -190,7 +204,7 @@ export async function analyzeHistoryItems(
 				phase: "analyzing",
 				currentChunk: processedChunks,
 				totalChunks,
-				chunkDescription: `${chunk.startTime.toLocaleDateString()} - ${chunk.endTime.toLocaleDateString()}`,
+				chunkDescription: `${chunk.items.length} items from ${chunk.startTime.toLocaleDateString()} - ${chunk.endTime.toLocaleDateString()}`,
 			});
 		}
 
@@ -229,6 +243,23 @@ export async function analyzeHistoryItems(
 			}
 		} catch (error) {
 			console.error(`Failed to analyze chunk ${i + 1}:`, error);
+
+			// If it's an UnknownError, provide more context
+			if (error instanceof Error) {
+				if (
+					error.name === "UnknownError" ||
+					error.message.includes("UnknownError")
+				) {
+					console.error("Additional context for UnknownError:");
+					console.error("- Chunk had", chunk.items.length, "items");
+					console.error(
+						"- Memory has",
+						memory.totalItemsAnalyzed,
+						"previously analyzed items",
+					);
+					console.error("- This was chunk", i + 1, "of", totalChunks);
+				}
+			}
 
 			// Continue with next chunk even if one fails
 		}
@@ -612,7 +643,7 @@ async function analyzeChunkWithSubdivision(
 					phase: "analyzing",
 					currentChunk: chunkNumber || subChunkNum,
 					totalChunks: totalChunks || totalSubChunks,
-					chunkDescription: `${mainChunkInfo}Sub-chunk ${subChunkNum}/${totalSubChunks}`,
+					chunkDescription: `${mainChunkInfo}Processing ${subItems.length} items (sub-chunk ${subChunkNum}/${totalSubChunks})`,
 				});
 			}
 
@@ -738,6 +769,14 @@ async function analyzeChunk(
 					throw new Error("Analysis cancelled");
 				}
 				console.log("Sending analysis prompt to AI...");
+				console.log(
+					"Prompt preview (first 200 chars):",
+					`${prompt.substring(0, 200)}...`,
+				);
+				console.log(
+					"Using response schema:",
+					`${JSON.stringify(ANALYSIS_SCHEMA).substring(0, 100)}...`,
+				);
 				return await session.prompt(prompt, {
 					responseConstraint: ANALYSIS_SCHEMA,
 				});
