@@ -6,6 +6,7 @@
 	"scripts": {
 		"dev": "vite",
 		"build": "vite build",
+		"build:extension": "vite build --config vite.config.extension.ts",
 		"preview": "vite preview",
 		"check": "svelte-check --tsconfig ./tsconfig.app.json && tsc -p tsconfig.node.json",
 		"lint": "biome check --write .",
@@ -24,6 +25,8 @@
 		"@testing-library/jest-dom": "^6.6.3",
 		"@testing-library/svelte": "^5.2.8",
 		"@tsconfig/svelte": "^5.0.4",
+		"@types/chrome": "^0.0.328",
+		"@types/dom-chromium-ai": "^0.0.9",
 		"@vitest/ui": "^3.2.4",
 		"autoprefixer": "^10.4.21",
 		"jsdom": "^26.1.0",

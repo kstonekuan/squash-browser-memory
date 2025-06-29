@@ -1,4 +1,4 @@
-export type AIProvider = "openai" | "gemini";
+export type AIProvider = "openai" | "gemini" | "chrome";
 
 export interface ChromeHistoryItem {
 	id: string;

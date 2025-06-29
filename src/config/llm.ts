@@ -12,6 +12,13 @@ export const LLM_CONFIG = {
 		parseTemperature: 0.1,
 		analyzeTemperature: 0.7,
 	},
+	chrome: {
+		// Chrome AI uses a single model (Gemini Nano)
+		parseModel: "gemini-nano",
+		analyzeModel: "gemini-nano",
+		parseTemperature: 0.1,
+		analyzeTemperature: 0.7,
+	},
 } as const;
 
 export const DEFAULT_PARSING_PROMPT = `You are a data parser. Extract browsing history entries and return them as a JSON array.

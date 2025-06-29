@@ -13,6 +13,11 @@ import type {
 	StandardizedHistoryItem,
 	WorkflowPattern,
 } from "../types";
+import {
+	createChromeAISession,
+	createJSONPrompt,
+	parseAIResponse,
+} from "./chrome-ai";
 
 // Calculate statistics from standardized items
 export function calculateStats(
@@ -86,8 +91,10 @@ ${input}`;
 
 		if (provider === "openai") {
 			parsed = await parseWithOpenAI(apiKey, parsePrompt);
-		} else {
+		} else if (provider === "gemini") {
 			parsed = await parseWithGemini(apiKey, parsePrompt);
+		} else {
+			parsed = await parseWithChromeAI(parsePrompt);
 		}
 
 		// Calculate statistics from the parsed data
@@ -165,6 +172,23 @@ ${prompt}`,
 	return JSON.parse(response.text || '{"items": []}');
 }
 
+async function parseWithChromeAI(prompt: string) {
+	const session = await createChromeAISession(PARSING_SYSTEM_PROMPT);
+	
+	if (!session) {
+		throw new Error("Chrome AI is not available. Please use Chrome 131+ or select a different AI provider.");
+	}
+	
+	try {
+		const jsonPrompt = createJSONPrompt(prompt + "\n\nReturn as JSON with an 'items' array containing objects with timestamp, url, domain, and title fields.");
+		const response = await session.prompt(jsonPrompt);
+		
+		return parseAIResponse(response, { items: [] });
+	} finally {
+		session.destroy();
+	}
+}
+
 // Stage 2: Analyze standardized data for patterns
 export async function analyzeStandardizedData(
 	data: StandardizedHistoryData,
@@ -198,8 +222,10 @@ Focus on the most frequently visited sites and common workflows.`;
 
 		if (provider === "openai") {
 			analysis = await analyzeWithOpenAI(apiKey, prompt);
-		} else {
+		} else if (provider === "gemini") {
 			analysis = await analyzeWithGemini(apiKey, prompt);
+		} else {
+			analysis = await analyzeWithChromeAI(prompt);
 		}
 
 		// Ensure the response has the expected structure
@@ -333,4 +359,31 @@ async function analyzeWithGemini(apiKey: string, prompt: string) {
 	});
 
 	return JSON.parse(response.text || "{}");
+}
+
+async function analyzeWithChromeAI(prompt: string) {
+	const session = await createChromeAISession(ANALYSIS_SYSTEM_PROMPT);
+	
+	if (!session) {
+		throw new Error("Chrome AI is not available. Please use Chrome 131+ or select a different AI provider.");
+	}
+	
+	try {
+		const jsonPrompt = createJSONPrompt(prompt + `
+
+Return as JSON with a 'patterns' array. Each pattern object should have:
+- pattern: string (pattern name)
+- description: string (workflow description)
+- frequency: number (how often it occurs)
+- urls: array of strings (example URLs)
+- timePattern: string (optional, time-based pattern)
+- suggestion: string (automation suggestion)
+- automationPotential: "high", "medium", or "low"`);
+		
+		const response = await session.prompt(jsonPrompt);
+		
+		return parseAIResponse(response, { patterns: [] });
+	} finally {
+		session.destroy();
+	}
 }
