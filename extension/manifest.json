@@ -5,10 +5,7 @@
 	"description": "Analyze your browsing history to find repetitive workflows that can be automated",
 	"minimum_chrome_version": "131",
 	"permissions": ["history", "storage", "sidePanel"],
-	"host_permissions": [
-		"https://api.openai.com/*",
-		"https://generativelanguage.googleapis.com/*"
-	],
+	"host_permissions": [],
 	"background": {
 		"service_worker": "background.js"
 	},

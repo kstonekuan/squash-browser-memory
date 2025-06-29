@@ -1,7 +1,10 @@
 /// <reference types="@types/dom-chromium-ai" />
 
 export interface ChromeAISession {
-	prompt: (text: string) => Promise<string>;
+	prompt: (
+		text: string,
+		options?: { responseConstraint?: Record<string, unknown> },
+	) => Promise<string>;
 	destroy: () => void;
 }
 
@@ -72,9 +75,12 @@ export async function createChromeAISession(
 		});
 
 		return {
-			prompt: async (text: string) => {
+			prompt: async (
+				text: string,
+				options?: { responseConstraint?: Record<string, unknown> },
+			) => {
 				try {
-					return await session.prompt(text);
+					return await session.prompt(text, options);
 				} catch (error) {
 					console.error("Error during Chrome AI prompt:", error);
 					throw error;
@@ -92,33 +98,4 @@ export async function createChromeAISession(
 		console.error("Error creating Chrome AI session:", error);
 		return null;
 	}
-}
-
-/**
- * Parse JSON from Chrome AI response with error handling
- */
-export function parseAIResponse<T>(response: string, defaultValue: T): T {
-	try {
-		// Chrome AI might return markdown-wrapped JSON
-		const jsonMatch = response.match(/```json\n?([\s\S]*?)\n?```/);
-		if (jsonMatch) {
-			return JSON.parse(jsonMatch[1]);
-		}
-
-		// Try direct JSON parse
-		return JSON.parse(response);
-	} catch (error) {
-		console.error("Failed to parse Chrome AI response:", error);
-		console.debug("Raw response:", response);
-		return defaultValue;
-	}
-}
-
-/**
- * Generate a prompt that encourages JSON output
- */
-export function createJSONPrompt(prompt: string): string {
-	return `${prompt}
-
-IMPORTANT: Return your response as valid JSON only, with no additional text or markdown formatting.`;
 }

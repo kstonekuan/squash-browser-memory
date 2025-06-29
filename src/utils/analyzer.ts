@@ -13,11 +13,7 @@ import type {
 	StandardizedHistoryItem,
 	WorkflowPattern,
 } from "../types";
-import {
-	createChromeAISession,
-	createJSONPrompt,
-	parseAIResponse,
-} from "./chrome-ai";
+import { createChromeAISession } from "./chrome-ai";
 
 // Calculate statistics from standardized items
 export function calculateStats(
@@ -202,27 +198,46 @@ async function parseWithChromeAI(prompt: string) {
 	}
 
 	try {
-		const jsonPrompt = createJSONPrompt(
-			prompt +
-				"\n\nReturn as JSON with an 'items' array containing objects with timestamp, url, domain, and title fields. Even if there's only one history entry, ensure it's wrapped in an 'items' array.",
-		);
-		const response = await session.prompt(jsonPrompt);
+		// Define the JSON schema for structured output
+		const schema = {
+			type: "object",
+			properties: {
+				items: {
+					type: "array",
+					items: {
+						type: "object",
+						properties: {
+							timestamp: { type: "string" },
+							url: { type: "string" },
+							domain: { type: "string" },
+							title: { type: "string" },
+						},
+						required: ["timestamp", "url", "domain", "title"],
+					},
+				},
+			},
+			required: ["items"],
+		};
 
-		const parsed = parseAIResponse(response, { items: [] });
+		const response = await session.prompt(prompt, {
+			responseConstraint: schema,
+		});
 
-		// Additional validation for Chrome AI responses
-		if (!parsed || typeof parsed !== "object") {
-			console.error("Chrome AI returned invalid response:", response);
+		try {
+			const parsed = JSON.parse(response);
+
+			// Ensure items is an array
+			if (!parsed || !Array.isArray(parsed.items)) {
+				console.error("Chrome AI response missing items array:", parsed);
+				return { items: [] };
+			}
+
+			return parsed;
+		} catch (error) {
+			console.error("Failed to parse Chrome AI structured response:", error);
+			console.debug("Raw response:", response);
 			return { items: [] };
 		}
-
-		// Ensure items is an array
-		if (!Array.isArray(parsed.items)) {
-			console.error("Chrome AI response missing items array:", parsed);
-			return { items: [] };
-		}
-
-		return parsed;
 	} finally {
 		session.destroy();
 	}
@@ -268,8 +283,18 @@ Focus on the most frequently visited sites and common workflows.`;
 		}
 
 		// Ensure the response has the expected structure
-		if (!analysis.patterns || !Array.isArray(analysis.patterns)) {
-			throw new Error("Invalid analysis format received from AI");
+		if (!analysis || !analysis.patterns || !Array.isArray(analysis.patterns)) {
+			console.error("Invalid analysis format received from AI:", analysis);
+			// Return empty patterns instead of throwing
+			return {
+				patterns: [],
+				totalUrls: data.totalUrls,
+				dateRange: {
+					start: new Date(data.dateRange.start),
+					end: new Date(data.dateRange.end),
+				},
+				topDomains: data.topDomains,
+			};
 		}
 
 		return {
@@ -410,23 +435,65 @@ async function analyzeWithChromeAI(prompt: string) {
 	}
 
 	try {
-		const jsonPrompt = createJSONPrompt(
-			prompt +
-				`
+		// Define the JSON schema for structured output
+		const schema = {
+			type: "object",
+			properties: {
+				patterns: {
+					type: "array",
+					items: {
+						type: "object",
+						properties: {
+							pattern: { type: "string" },
+							description: { type: "string" },
+							frequency: { type: "number" },
+							urls: {
+								type: "array",
+								items: { type: "string" },
+							},
+							timePattern: { type: "string" },
+							suggestion: { type: "string" },
+							automationPotential: {
+								type: "string",
+								enum: ["high", "medium", "low"],
+							},
+						},
+						required: [
+							"pattern",
+							"description",
+							"frequency",
+							"urls",
+							"suggestion",
+							"automationPotential",
+						],
+					},
+				},
+			},
+			required: ["patterns"],
+		};
 
-Return as JSON with a 'patterns' array. Each pattern object should have:
-- pattern: string (pattern name)
-- description: string (workflow description)
-- frequency: number (how often it occurs)
-- urls: array of strings (example URLs)
-- timePattern: string (optional, time-based pattern)
-- suggestion: string (automation suggestion)
-- automationPotential: "high", "medium", or "low"`,
-		);
+		const response = await session.prompt(prompt, {
+			responseConstraint: schema,
+		});
 
-		const response = await session.prompt(jsonPrompt);
+		try {
+			const parsed = JSON.parse(response);
 
-		return parseAIResponse(response, { patterns: [] });
+			// Ensure patterns is an array
+			if (!parsed || !Array.isArray(parsed.patterns)) {
+				console.error(
+					"Chrome AI analysis response missing patterns array:",
+					parsed,
+				);
+				return { patterns: [] };
+			}
+
+			return { patterns: parsed.patterns };
+		} catch (error) {
+			console.error("Failed to parse Chrome AI analysis response:", error);
+			console.debug("Raw response:", response);
+			return { patterns: [] };
+		}
 	} finally {
 		session.destroy();
 	}
