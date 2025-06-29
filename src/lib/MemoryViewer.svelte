@@ -6,6 +6,19 @@ import { loadMemory } from "../utils/memory";
 const { autoExpand = false } = $props<{ autoExpand?: boolean }>();
 
 let showMemory = $state(false);
+let tooltip = $state<{
+	show: boolean;
+	text: string;
+	x: number;
+	y: number;
+	align: "center" | "left" | "right";
+}>({
+	show: false,
+	text: "",
+	x: 0,
+	y: 0,
+	align: "center",
+});
 let memory = $state<AnalysisMemory | null>(null);
 let loading = $state(false);
 let hasAttemptedLoad = $state(false);
@@ -89,6 +102,65 @@ function getAutomationPotentialColor(
 		default:
 			return "text-gray-600 bg-gray-50";
 	}
+}
+
+// Helper function to truncate text if it's too long
+function truncateText(text: string): string {
+	const words = text.split(" ");
+
+	// If text is longer than 36 characters OR more than 3 words, truncate it
+	if (text.length > 36 || words.length > 3) {
+		// Take first 2 words or first 24 characters, whichever is shorter
+		const firstTwoWords = words.slice(0, 2).join(" ");
+		if (firstTwoWords.length <= 24) {
+			return `${firstTwoWords}…`;
+		} else {
+			// If even 2 words are too long, truncate to 24 chars
+			return `${text.substring(0, 24)}…`;
+		}
+	}
+
+	return text;
+}
+
+// Tooltip functions
+function showTooltip(event: MouseEvent, text: string) {
+	const target = event.target as HTMLElement;
+	const rect = target.getBoundingClientRect();
+	const viewportWidth = window.innerWidth;
+
+	// Estimate tooltip width (rough calculation based on text length)
+	const estimatedTooltipWidth = Math.min(text.length * 8 + 16, 288); // max 288px (max-w-xs = 20rem = 320px - padding)
+
+	// Calculate ideal center position
+	const pillCenterX = rect.left + rect.width / 2;
+
+	// Determine positioning strategy
+	let tooltipX = pillCenterX;
+	let align: "center" | "left" | "right" = "center";
+
+	// Check if centered tooltip would go off the left edge
+	if (pillCenterX - estimatedTooltipWidth / 2 < 8) {
+		// Align to left edge with margin
+		tooltipX = 8;
+		align = "left";
+	}
+	// Check if centered tooltip would go off the right edge
+	else if (pillCenterX + estimatedTooltipWidth / 2 > viewportWidth - 8) {
+		// Align to right edge with margin
+		tooltipX = viewportWidth - 8;
+		align = "right";
+	}
+
+	tooltip.text = text;
+	tooltip.x = tooltipX;
+	tooltip.y = rect.top - 5;
+	tooltip.align = align;
+	tooltip.show = true;
+}
+
+function hideTooltip() {
+	tooltip.show = false;
 }
 
 // Load memory when showing for first time
@@ -226,9 +298,9 @@ $effect(() => {
 								<!-- Profession -->
 								<div class="mb-3">
 									<h4 class="text-sm font-medium text-gray-600 mb-1">Profession</h4>
-									<span class="inline-block px-3 py-1 text-sm bg-gray-200 text-gray-800 rounded-full">
+									<p class="text-sm text-gray-800">
 										{memory.userProfile.profession}
-									</span>
+									</p>
 								</div>
 
 								<!-- Personality Traits -->
@@ -237,8 +309,14 @@ $effect(() => {
 										<h4 class="text-sm font-medium text-gray-600 mb-2">Personality Traits</h4>
 										<div class="flex flex-wrap gap-1">
 											{#each memory.userProfile.personalityTraits as trait}
-												<span class="inline-block px-2 py-1 text-xs bg-gray-200 text-gray-700 rounded-full" title={trait.evidence}>
-													{trait.trait}
+												<span 
+													class="inline-block px-2 py-1 text-xs bg-gray-200 text-gray-700 rounded-full cursor-pointer hover:bg-gray-300 transition-colors" 
+													role="button"
+													tabindex="0"
+													onmouseenter={(e) => showTooltip(e, `${trait.trait} - ${trait.evidence}`)}
+													onmouseleave={hideTooltip}
+												>
+													{truncateText(trait.trait)}
 												</span>
 											{/each}
 										</div>
@@ -251,8 +329,14 @@ $effect(() => {
 										<h4 class="text-sm font-medium text-gray-600 mb-2">Technology Skills</h4>
 										<div class="flex flex-wrap gap-1">
 											{#each memory.userProfile.technologyUse as tech}
-												<span class="inline-block px-2 py-1 text-xs bg-gray-200 text-gray-700 rounded-full" title="{tech.level} - {tech.tools.join(', ')}">
-													{tech.category}
+												<span 
+													class="inline-block px-2 py-1 text-xs bg-gray-200 text-gray-700 rounded-full cursor-pointer hover:bg-gray-300 transition-colors" 
+													role="button"
+													tabindex="0"
+													onmouseenter={(e) => showTooltip(e, `${tech.category} (${tech.level}) - ${tech.tools.join(', ')}`)}
+													onmouseleave={hideTooltip}
+												>
+													{truncateText(tech.category)}
 												</span>
 											{/each}
 										</div>
@@ -265,8 +349,14 @@ $effect(() => {
 										<h4 class="text-sm font-medium text-gray-600 mb-2">Personal Preferences</h4>
 										<div class="flex flex-wrap gap-1">
 											{#each memory.userProfile.personalPreferences as pref}
-												<span class="inline-block px-2 py-1 text-xs bg-gray-200 text-gray-700 rounded-full" title="{pref.category}">
-													{pref.preference}
+												<span 
+													class="inline-block px-2 py-1 text-xs bg-gray-200 text-gray-700 rounded-full cursor-pointer hover:bg-gray-300 transition-colors" 
+													role="button"
+													tabindex="0"
+													onmouseenter={(e) => showTooltip(e, `${pref.category}: ${pref.preference}`)}
+													onmouseleave={hideTooltip}
+												>
+													{truncateText(pref.preference)}
 												</span>
 											{/each}
 										</div>
@@ -290,8 +380,14 @@ $effect(() => {
 										<h4 class="text-sm font-medium text-orange-700 mb-2">Goals</h4>
 										<div class="flex flex-wrap gap-1">
 											{#each memory.userProfile.currentGoals as goal}
-												<span class="inline-block px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded-full">
-													{goal}
+												<span 
+													class="inline-block px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded-full cursor-pointer hover:bg-blue-200 transition-colors" 
+													role="button"
+													tabindex="0"
+													onmouseenter={(e) => showTooltip(e, goal)}
+													onmouseleave={hideTooltip}
+												>
+													{truncateText(goal)}
 												</span>
 											{/each}
 										</div>
@@ -304,8 +400,14 @@ $effect(() => {
 										<h4 class="text-sm font-medium text-orange-700 mb-2">Recent Obsessions</h4>
 										<div class="flex flex-wrap gap-1">
 											{#each memory.userProfile.recentObsessions as obsession}
-												<span class="inline-block px-2 py-1 text-xs bg-red-100 text-red-800 rounded-full">
-													{obsession}
+												<span 
+													class="inline-block px-2 py-1 text-xs bg-red-100 text-red-800 rounded-full cursor-pointer hover:bg-red-200 transition-colors" 
+													role="button"
+													tabindex="0"
+													onmouseenter={(e) => showTooltip(e, obsession)}
+													onmouseleave={hideTooltip}
+												>
+													{truncateText(obsession)}
 												</span>
 											{/each}
 										</div>
@@ -318,8 +420,14 @@ $effect(() => {
 										<h4 class="text-sm font-medium text-orange-700 mb-2">Life Events</h4>
 										<div class="flex flex-wrap gap-1">
 											{#each memory.userProfile.lifecycleHints as hint}
-												<span class="inline-block px-2 py-1 text-xs bg-indigo-100 text-indigo-800 rounded-full">
-													{hint}
+												<span 
+													class="inline-block px-2 py-1 text-xs bg-indigo-100 text-indigo-800 rounded-full cursor-pointer hover:bg-indigo-200 transition-colors" 
+													role="button"
+													tabindex="0"
+													onmouseenter={(e) => showTooltip(e, hint)}
+													onmouseleave={hideTooltip}
+												>
+													{truncateText(hint)}
 												</span>
 											{/each}
 										</div>
@@ -332,8 +440,14 @@ $effect(() => {
 										<h4 class="text-sm font-medium text-orange-700 mb-2">Interests</h4>
 										<div class="flex flex-wrap gap-1">
 											{#each memory.userProfile.interests as interest}
-												<span class="inline-block px-2 py-1 text-xs bg-green-100 text-green-800 rounded-full">
-													{interest}
+												<span 
+													class="inline-block px-2 py-1 text-xs bg-green-100 text-green-800 rounded-full cursor-pointer hover:bg-green-200 transition-colors" 
+													role="button"
+													tabindex="0"
+													onmouseenter={(e) => showTooltip(e, interest)}
+													onmouseleave={hideTooltip}
+												>
+													{truncateText(interest)}
 												</span>
 											{/each}
 										</div>
@@ -346,8 +460,14 @@ $effect(() => {
 										<h4 class="text-sm font-medium text-orange-700 mb-2">Work Patterns</h4>
 										<div class="flex flex-wrap gap-1">
 											{#each memory.userProfile.workPatterns as pattern}
-												<span class="inline-block px-2 py-1 text-xs bg-yellow-100 text-yellow-800 rounded-full" title={pattern.description}>
-													{pattern.type}
+												<span 
+													class="inline-block px-2 py-1 text-xs bg-yellow-100 text-yellow-800 rounded-full cursor-pointer hover:bg-yellow-200 transition-colors" 
+													role="button"
+													tabindex="0"
+													onmouseenter={(e) => showTooltip(e, `${pattern.type} - ${pattern.description}`)}
+													onmouseleave={hideTooltip}
+												>
+													{truncateText(pattern.type)}
 												</span>
 											{/each}
 										</div>
@@ -414,3 +534,18 @@ $effect(() => {
 		</div>
 	{/if}
 </div>
+
+<!-- Custom Tooltip -->
+{#if tooltip.show}
+	{@const transformClass = 
+		tooltip.align === 'left' ? 'translateY(-100%)' :
+		tooltip.align === 'right' ? 'translateX(-100%) translateY(-100%)' :
+		'translateX(-50%) translateY(-100%)'
+	}
+	<div 
+		class="fixed z-50 px-3 py-2 text-xs text-white bg-gray-900 rounded-md shadow-lg pointer-events-none max-w-xs break-words"
+		style="left: {tooltip.x}px; top: {tooltip.y}px; transform: {transformClass}; margin-top: -8px;"
+	>
+		{tooltip.text}
+	</div>
+{/if}
