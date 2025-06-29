@@ -1,6 +1,5 @@
 <script lang="ts">
 import { createEventDispatcher } from "svelte";
-import type { ChromeHistoryItem } from "../types";
 
 let { isAnalyzing = $bindable(false) } = $props<{
 	isAnalyzing?: boolean;
@@ -14,7 +13,7 @@ let customStartDate = $state("");
 let customEndDate = $state("");
 let fetchProgress = $state(0);
 let isFetching = $state(false);
-let rawHistoryData = $state<ChromeHistoryItem[] | null>(null);
+let rawHistoryData = $state<chrome.history.HistoryItem[] | null>(null);
 let showRawData = $state(false);
 
 function getStartTime(): number {
@@ -75,25 +74,12 @@ async function fetchHistory() {
 			return;
 		}
 
-		// Convert to our ChromeHistoryItem format
-		const historyItems: ChromeHistoryItem[] = results
-			.filter((item) => item.url && item.lastVisitTime)
-			.map((item) => ({
-				id: item.id || "",
-				url: item.url || "",
-				title: item.title || "",
-				lastVisitTime: new Date(item.lastVisitTime || 0).toISOString(),
-				visitCount: item.visitCount || 1,
-				typedCount: item.typedCount || 0,
-			}));
-
 		// Store raw data for display
-		rawHistoryData = historyItems;
+		rawHistoryData = results;
 
-		// Emit the history data as JSON
+		// Emit the history data directly
 		dispatch("analysis-request", {
-			input: JSON.stringify(historyItems),
-			type: "json",
+			items: results,
 		});
 	} catch (err) {
 		console.error("Failed to fetch history:", err);
@@ -101,33 +87,15 @@ async function fetchHistory() {
 			err instanceof Error ? err.message : "Failed to fetch browsing history";
 	} finally {
 		isFetching = false;
-		fetchProgress = 0;
+		fetchProgress = 100;
 	}
 }
-
-function formatDateForInput(date: Date): string {
-	return date.toISOString().split("T")[0];
-}
-
-// Set default custom dates
-$effect(() => {
-	if (!customStartDate) {
-		customStartDate = formatDateForInput(
-			new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
-		);
-	}
-	if (!customEndDate) {
-		customEndDate = formatDateForInput(new Date());
-	}
-});
 </script>
 
 <div class="space-y-4">
 	<div>
-		<p class="block text-sm font-medium text-gray-700 mb-2">
-			Select Date Range
-		</p>
-		<div class="space-y-2">
+		<h3 class="text-sm font-medium text-gray-700 mb-2">Date Range</h3>
+		<div class="grid grid-cols-2 gap-2">
 			<label class="flex items-center">
 				<input
 					type="radio"
@@ -168,7 +136,7 @@ $effect(() => {
 				/>
 				<span class="text-sm">Last 90 days (Chrome limit)</span>
 			</label>
-			<label class="flex items-center">
+			<label class="flex items-center col-span-2">
 				<input
 					type="radio"
 					bind:group={dateRange}
@@ -179,49 +147,62 @@ $effect(() => {
 				<span class="text-sm">Custom range</span>
 			</label>
 		</div>
-		
+
 		{#if dateRange === "custom"}
-			<div class="mt-3 space-y-2 pl-6">
+			<div class="grid grid-cols-2 gap-2 mt-3">
 				<div>
-					<label for="start-date" class="block text-xs text-gray-600">Start date</label>
+					<label for="start-date" class="block text-xs text-gray-600 mb-1">
+						Start date
+					</label>
 					<input
 						id="start-date"
 						type="date"
 						bind:value={customStartDate}
-						max={customEndDate}
-						class="mt-1 block w-full px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+						class="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-blue-500 focus:border-blue-500"
 						disabled={isFetching || isAnalyzing}
 					/>
 				</div>
 				<div>
-					<label for="end-date" class="block text-xs text-gray-600">End date</label>
+					<label for="end-date" class="block text-xs text-gray-600 mb-1">
+						End date
+					</label>
 					<input
 						id="end-date"
 						type="date"
 						bind:value={customEndDate}
-						min={customStartDate}
-						max={formatDateForInput(new Date())}
-						class="mt-1 block w-full px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+						class="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-blue-500 focus:border-blue-500"
 						disabled={isFetching || isAnalyzing}
 					/>
 				</div>
 			</div>
 		{/if}
 	</div>
-	
+
+	{#if isFetching}
+		<div class="space-y-1">
+			<div class="flex justify-between text-sm text-gray-600">
+				<span>Fetching history...</span>
+				<span>{fetchProgress}%</span>
+			</div>
+			<div class="w-full bg-gray-200 rounded-full h-2">
+				<div
+					class="bg-blue-600 h-2 rounded-full transition-all duration-300"
+					style="width: {fetchProgress}%"
+				></div>
+			</div>
+		</div>
+	{/if}
+
 	<button
-		type="button"
 		onclick={fetchHistory}
 		disabled={isFetching || isAnalyzing}
-		class="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
+		class="w-full py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
 	>
 		{#if isFetching}
-			<div class="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-			Fetching history...
+			Fetching...
+		{:else if isAnalyzing}
+			Analyzing...
 		{:else}
-			<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-				<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-			</svg>
 			Analyze History
 		{/if}
 	</button>
@@ -234,7 +215,7 @@ $effect(() => {
 	
 	<div class="bg-blue-50 rounded-lg p-3">
 		<p class="text-xs text-blue-700">
-			Your browsing history never leaves your device. Analysis is performed using your API key.
+			Your browsing history never leaves your device. Analysis is performed using Chrome's built-in AI.
 		</p>
 	</div>
 	
@@ -263,7 +244,7 @@ $effect(() => {
 					</div>
 					<div class="border-t border-gray-200 px-4 py-2 bg-gray-50">
 						<p class="text-xs text-gray-600">
-							This is the raw Chrome history data that will be sent to the AI model for standardization and analysis.
+							This is the raw Chrome history data that will be sent to the AI model for analysis.
 						</p>
 					</div>
 				</div>

@@ -1,59 +1,33 @@
 <script lang="ts">
-import { setCustomPrompts } from "./config/llm";
 import AdvancedSettings from "./lib/AdvancedSettings.svelte";
-import AIProviderInput from "./lib/AIProviderInput.svelte";
 import type { AnalysisPhase } from "./lib/AnalysisProgress.svelte";
 import AnalysisProgress from "./lib/AnalysisProgress.svelte";
 import AnalysisResults from "./lib/AnalysisResults.svelte";
-import HistoryInput from "./lib/HistoryInput.svelte";
-import type {
-	AIProvider,
-	AnalysisResult,
-	StandardizedHistoryData,
-} from "./types";
-import {
-	analyzeStandardizedData,
-	parseToStandardFormat,
-} from "./utils/analyzer";
+import ChromeAIStatus from "./lib/ChromeAIStatus.svelte";
+import HistoryFetcher from "./lib/HistoryFetcher.svelte";
+import type { AnalysisResult } from "./types";
+import { analyzeHistoryItems } from "./utils/analyzer";
 
 let analysisResult: AnalysisResult | null = $state(null);
-let standardizedData: StandardizedHistoryData | null = $state(null);
 let isAnalyzing = $state(false);
-let apiKey = $state("");
-let provider: AIProvider = $state("chrome");
 let analysisPhase: AnalysisPhase = $state("idle");
+let rawHistoryData: chrome.history.HistoryItem[] | null = $state(null);
+let customAnalysisPrompt: string | undefined = $state(undefined);
 
 async function handleAnalysis(
-	event: CustomEvent<{ input: string; type: "text" | "json" }>,
+	event: CustomEvent<{ items: chrome.history.HistoryItem[] }>,
 ) {
-	const { input, type } = event.detail;
-
-	if (!apiKey && provider !== "chrome") {
-		alert("Please enter your API key first.");
-		return;
-	}
+	const { items } = event.detail;
 
 	isAnalyzing = true;
-	standardizedData = null;
 	analysisResult = null;
-	analysisPhase = "parsing";
+	analysisPhase = "analyzing";
+	rawHistoryData = items;
 
 	try {
-		// Stage 1: Parse to standardized format
-		const parsed = await parseToStandardFormat(input, apiKey, provider, type);
-
-		// Stage 2: Calculate statistics (this happens synchronously in parseToStandardFormat)
-		analysisPhase = "calculating";
-		standardizedData = parsed;
-
-		// Small delay to show the calculating phase
-		await new Promise((resolve) => setTimeout(resolve, 300));
-
-		// Stage 3: Analyze the standardized data
-		analysisPhase = "analyzing";
-		const result = await analyzeStandardizedData(parsed, apiKey, provider);
+		// Analyze the history items directly
+		const result = await analyzeHistoryItems(items, customAnalysisPrompt);
 		analysisResult = result;
-
 		analysisPhase = "complete";
 	} catch (error) {
 		console.error("Analysis error:", error);
@@ -73,54 +47,64 @@ async function handleAnalysis(
 }
 
 function handlePromptsChange(prompts: { parsing: string; analysis: string }) {
-	// Apply the custom prompts to the LLM config
-	setCustomPrompts(prompts);
+	// Since we only have analysis now, we'll just use the analysis prompt
+	customAnalysisPrompt = prompts.analysis || undefined;
 }
 </script>
 
 <main class="min-h-screen bg-gray-50">
-  <div class="container mx-auto px-4 py-12 max-w-6xl">
-    <header class="text-center mb-12">
-      <h1 class="text-4xl font-bold text-gray-900 mb-4">
-        Chrome History Workflow Analyzer
-      </h1>
-      <p class="text-lg text-gray-600 max-w-2xl mx-auto">
-        Upload or paste your Chrome history export and discover repetitive workflows that can be automated or optimized.
-      </p>
-    </header>
+	<div class="px-4 py-6">
+		<header class="mb-6">
+			<h1 class="text-2xl font-bold text-gray-900 mb-2">
+				History Analyzer
+			</h1>
+			<p class="text-sm text-gray-600">
+				Find repetitive workflows in your browsing history
+			</p>
+		</header>
 
-    <div class="bg-white rounded-lg shadow-md p-8 mb-8">
-      <div class="mb-8">
-        <h2 class="text-2xl font-semibold text-gray-900 mb-4">Privacy Notice</h2>
-        <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
-          <p class="text-sm text-blue-800">
-            Your browsing history is processed entirely in your browser. The data is only sent to the AI service for analysis and is not stored anywhere. We recommend using your own API key for maximum privacy.
-          </p>
-        </div>
-      </div>
+		<div class="bg-white rounded-lg shadow-sm p-4 mb-4">
+			<ChromeAIStatus />
 
-      <AIProviderInput bind:apiKey bind:provider />
+			<div class="mt-4 pt-4 border-t border-gray-200">
+				<HistoryFetcher 
+					bind:isAnalyzing 
+					on:analysis-request={handleAnalysis}
+				/>
+			</div>
+		</div>
 
-      <HistoryInput 
-        {apiKey}
-        {provider}
-        bind:isAnalyzing 
-        on:analysis-request={handleAnalysis}
-      />
-    </div>
+		<AnalysisProgress phase={analysisPhase} />
 
-    <AnalysisProgress phase={analysisPhase} />
+		{#if analysisResult}
+			<AnalysisResults result={analysisResult} />
+		{/if}
 
-    {#if analysisResult}
-      <AnalysisResults result={analysisResult} />
-    {/if}
-
-    <!-- Advanced Settings at the bottom -->
-    <div class="mt-8">
-      <AdvancedSettings 
-        {standardizedData}
-        onPromptsChange={handlePromptsChange}
-      />
-    </div>
-  </div>
+		<!-- Advanced Settings at the bottom -->
+		<div class="mt-4">
+			<AdvancedSettings 
+				onPromptsChange={handlePromptsChange}
+			/>
+		</div>
+	</div>
 </main>
+
+<style>
+	/* Optimize for side panel width */
+	:global(body) {
+		margin: 0;
+		padding: 0;
+		min-width: 320px;
+		overflow-x: hidden;
+	}
+	
+	/* Ensure content doesn't overflow */
+	:global(.prose) {
+		max-width: 100%;
+	}
+	
+	/* Adjust grid layouts for narrow width */
+	:global(.grid) {
+		grid-template-columns: 1fr !important;
+	}
+</style>

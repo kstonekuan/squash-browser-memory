@@ -1,104 +1,51 @@
 <script lang="ts">
-import {
-	DEFAULT_ANALYSIS_PROMPT,
-	DEFAULT_PARSING_PROMPT,
-	resetPrompts,
-	setCustomPrompts,
-} from "../config/llm";
-import type { StandardizedHistoryData } from "../types";
+// Default prompts for Chrome AI
+const DEFAULT_ANALYSIS_PROMPT = `You are an expert at analyzing browsing patterns and identifying repetitive workflows. 
 
-let { standardizedData = null, onPromptsChange } = $props<{
-	standardizedData: StandardizedHistoryData | null;
+When analyzing browsing history:
+1. Look for patterns where users visit the same sequence of sites repeatedly
+2. Identify time-based routines (daily, weekly, etc.)
+3. Find workflows that could be automated or optimized
+4. Focus on actionable insights
+
+For each pattern found, provide:
+- A clear, descriptive name for the workflow
+- A detailed description of what the user is doing
+- The frequency of occurrence
+- Example URLs that are part of this workflow
+- Time patterns if applicable (e.g., "Every weekday morning")
+- A practical suggestion for automation or optimization
+- An assessment of automation potential (high/medium/low)`;
+
+let { onPromptsChange } = $props<{
 	onPromptsChange?: (prompts: { parsing: string; analysis: string }) => void;
 }>();
 
-let showStandardFormat = $state(false);
 let showPrompts = $state(false);
-let editableParsingPrompt = $state(DEFAULT_PARSING_PROMPT);
 let editableAnalysisPrompt = $state(DEFAULT_ANALYSIS_PROMPT);
 
 function handlePromptChange() {
 	onPromptsChange?.({
-		parsing: editableParsingPrompt,
+		parsing: "", // Not used anymore
 		analysis: editableAnalysisPrompt,
 	});
+}
+
+function resetPrompts() {
+	editableAnalysisPrompt = DEFAULT_ANALYSIS_PROMPT;
+	handlePromptChange();
 }
 </script>
 
 <div class="space-y-4">
-	<!-- Standardized Format Section -->
-	{#if standardizedData}
-		<div class="border border-gray-200 rounded-lg">
-			<button
-				type="button"
-				onclick={() => showStandardFormat = !showStandardFormat}
-				class="w-full px-4 py-3 flex items-center justify-between bg-gray-50 hover:bg-gray-100 transition-colors rounded-t-lg"
-			>
-				<span class="font-medium text-gray-700">Intermediate Standardized Format</span>
-				<svg 
-					class={`w-5 h-5 text-gray-500 transition-transform ${showStandardFormat ? 'rotate-180' : ''}`}
-					fill="none" 
-					stroke="currentColor" 
-					viewBox="0 0 24 24"
-				>
-					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-				</svg>
-			</button>
-			
-			{#if showStandardFormat}
-				<div class="p-4 border-t border-gray-200">
-					<div class="space-y-4">
-						<div>
-							<h4 class="text-sm font-medium text-gray-700 mb-2">Statistics</h4>
-							<dl class="grid grid-cols-1 sm:grid-cols-3 gap-4">
-								<div class="bg-gray-50 p-3 rounded">
-									<dt class="text-xs text-gray-500">Total URLs</dt>
-									<dd class="text-lg font-semibold">{standardizedData.totalUrls}</dd>
-								</div>
-								<div class="bg-gray-50 p-3 rounded">
-									<dt class="text-xs text-gray-500">Date Range</dt>
-									<dd class="text-sm">
-										{new Date(standardizedData.dateRange.start).toLocaleDateString()} - 
-										{new Date(standardizedData.dateRange.end).toLocaleDateString()}
-									</dd>
-								</div>
-								<div class="bg-gray-50 p-3 rounded">
-									<dt class="text-xs text-gray-500">Unique Domains</dt>
-									<dd class="text-lg font-semibold">{standardizedData.topDomains.length}</dd>
-								</div>
-							</dl>
-						</div>
-						
-						<div>
-							<h4 class="text-sm font-medium text-gray-700 mb-2">Top Domains</h4>
-							<div class="bg-gray-50 rounded p-3 max-h-32 overflow-y-auto">
-								{#each standardizedData.topDomains as domain}
-									<div class="flex justify-between py-1">
-										<span class="text-sm">{domain.domain}</span>
-										<span class="text-sm text-gray-600">{domain.count} visits</span>
-									</div>
-								{/each}
-							</div>
-						</div>
-						
-						<div>
-							<h4 class="text-sm font-medium text-gray-700 mb-2">Raw Standardized Data</h4>
-							<pre class="bg-gray-50 rounded p-3 text-xs overflow-x-auto max-h-64 overflow-y-auto">{JSON.stringify(standardizedData, null, 2)}</pre>
-						</div>
-					</div>
-				</div>
-			{/if}
-		</div>
-	{/if}
-
-	<!-- Prompts Section -->
+	<!-- Prompt Customization Section -->
 	<div class="border border-gray-200 rounded-lg">
 		<button
 			type="button"
 			onclick={() => showPrompts = !showPrompts}
 			class="w-full px-4 py-3 flex items-center justify-between bg-gray-50 hover:bg-gray-100 transition-colors rounded-t-lg"
 		>
-			<span class="font-medium text-gray-700">Customize Prompts</span>
+			<span class="font-medium text-gray-700">Customize AI Prompts</span>
 			<svg 
 				class={`w-5 h-5 text-gray-500 transition-transform ${showPrompts ? 'rotate-180' : ''}`}
 				fill="none" 
@@ -110,42 +57,34 @@ function handlePromptChange() {
 		</button>
 		
 		{#if showPrompts}
-			<div class="p-4 border-t border-gray-200 space-y-4">
-				<div>
-					<label for="parsing-prompt" class="block text-sm font-medium text-gray-700 mb-2">
-						Parsing Prompt (Stage 1)
-					</label>
-					<textarea
-						id="parsing-prompt"
-						bind:value={editableParsingPrompt}
-						onchange={handlePromptChange}
-						class="w-full h-32 px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-					></textarea>
+			<div class="p-4 border-t border-gray-200">
+				<div class="space-y-4">
+					<div>
+						<label for="analysis-prompt" class="block text-sm font-medium text-gray-700 mb-2">
+							Analysis Prompt
+						</label>
+						<textarea
+							id="analysis-prompt"
+							bind:value={editableAnalysisPrompt}
+							oninput={handlePromptChange}
+							rows="8"
+							class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+							placeholder="Enter custom analysis prompt..."
+						></textarea>
+						<p class="mt-1 text-xs text-gray-500">
+							This prompt is used when analyzing browsing patterns to identify workflows.
+						</p>
+					</div>
+					
+					<div class="flex justify-end">
+						<button
+							onclick={resetPrompts}
+							class="px-3 py-1 text-sm text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded-md transition-colors"
+						>
+							Reset to defaults
+						</button>
+					</div>
 				</div>
-				
-				<div>
-					<label for="analysis-prompt" class="block text-sm font-medium text-gray-700 mb-2">
-						Analysis Prompt (Stage 2)
-					</label>
-					<textarea
-						id="analysis-prompt"
-						bind:value={editableAnalysisPrompt}
-						onchange={handlePromptChange}
-						class="w-full h-48 px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-					></textarea>
-				</div>
-				
-				<button
-					type="button"
-					onclick={() => {
-						editableParsingPrompt = DEFAULT_PARSING_PROMPT;
-						editableAnalysisPrompt = DEFAULT_ANALYSIS_PROMPT;
-						handlePromptChange();
-					}}
-					class="px-4 py-2 text-sm bg-gray-200 text-gray-700 rounded hover:bg-gray-300 transition-colors"
-				>
-					Reset to Defaults
-				</button>
 			</div>
 		{/if}
 	</div>

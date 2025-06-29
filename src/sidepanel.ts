@@ -1,8 +1,8 @@
 import "./app.css";
 import { mount } from "svelte";
-import ExtensionApp from "./ExtensionApp.svelte";
+import App from "./App.svelte";
 
-const app = mount(ExtensionApp, {
+const app = mount(App, {
 	target: document.getElementById("app")!,
 });
 
