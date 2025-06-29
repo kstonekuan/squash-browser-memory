@@ -174,15 +174,20 @@ ${prompt}`,
 
 async function parseWithChromeAI(prompt: string) {
 	const session = await createChromeAISession(PARSING_SYSTEM_PROMPT);
-	
+
 	if (!session) {
-		throw new Error("Chrome AI is not available. Please use Chrome 131+ or select a different AI provider.");
+		throw new Error(
+			"Chrome AI is not available. Please use Chrome 131+ or select a different AI provider.",
+		);
 	}
-	
+
 	try {
-		const jsonPrompt = createJSONPrompt(prompt + "\n\nReturn as JSON with an 'items' array containing objects with timestamp, url, domain, and title fields.");
+		const jsonPrompt = createJSONPrompt(
+			prompt +
+				"\n\nReturn as JSON with an 'items' array containing objects with timestamp, url, domain, and title fields.",
+		);
 		const response = await session.prompt(jsonPrompt);
-		
+
 		return parseAIResponse(response, { items: [] });
 	} finally {
 		session.destroy();
@@ -363,13 +368,17 @@ async function analyzeWithGemini(apiKey: string, prompt: string) {
 
 async function analyzeWithChromeAI(prompt: string) {
 	const session = await createChromeAISession(ANALYSIS_SYSTEM_PROMPT);
-	
+
 	if (!session) {
-		throw new Error("Chrome AI is not available. Please use Chrome 131+ or select a different AI provider.");
+		throw new Error(
+			"Chrome AI is not available. Please use Chrome 131+ or select a different AI provider.",
+		);
 	}
-	
+
 	try {
-		const jsonPrompt = createJSONPrompt(prompt + `
+		const jsonPrompt = createJSONPrompt(
+			prompt +
+				`
 
 Return as JSON with a 'patterns' array. Each pattern object should have:
 - pattern: string (pattern name)
@@ -378,10 +387,11 @@ Return as JSON with a 'patterns' array. Each pattern object should have:
 - urls: array of strings (example URLs)
 - timePattern: string (optional, time-based pattern)
 - suggestion: string (automation suggestion)
-- automationPotential: "high", "medium", or "low"`);
-		
+- automationPotential: "high", "medium", or "low"`,
+		);
+
 		const response = await session.prompt(jsonPrompt);
-		
+
 		return parseAIResponse(response, { patterns: [] });
 	} finally {
 		session.destroy();

@@ -1,6 +1,9 @@
 <script lang="ts">
 import { onMount } from "svelte";
-import { getAIModelStatus, type ChromeAIAvailability } from "../utils/chrome-ai";
+import {
+	type ChromeAIAvailability,
+	getAIModelStatus,
+} from "../utils/chrome-ai";
 
 let status: ChromeAIAvailability | null = $state(null);
 let checking = $state(true);
@@ -10,7 +13,7 @@ onMount(async () => {
 		status = await getAIModelStatus();
 	} catch (error) {
 		console.error("Error checking Chrome AI status:", error);
-		status = 'unavailable';
+		status = "unavailable";
 	} finally {
 		checking = false;
 	}
@@ -18,44 +21,44 @@ onMount(async () => {
 
 function getStatusColor(status: ChromeAIAvailability | null): string {
 	switch (status) {
-		case 'available':
-			return 'text-green-600';
-		case 'downloadable':
-			return 'text-yellow-600';
-		case 'downloading':
-			return 'text-blue-600';
-		case 'unavailable':
-		default:
-			return 'text-red-600';
+		case "available":
+			return "text-green-600";
+		case "downloadable":
+			return "text-yellow-600";
+		case "downloading":
+			return "text-blue-600";
+		case "unavailable":
+		case null:
+			return "text-red-600";
 	}
 }
 
 function getStatusIcon(status: ChromeAIAvailability | null): string {
 	switch (status) {
-		case 'available':
-			return '✓';
-		case 'downloadable':
-			return '↓';
-		case 'downloading':
-			return '⟳';
-		case 'unavailable':
-		default:
-			return '✗';
+		case "available":
+			return "✓";
+		case "downloadable":
+			return "↓";
+		case "downloading":
+			return "⟳";
+		case "unavailable":
+		case null:
+			return "✗";
 	}
 }
 
 function getStatusMessage(status: ChromeAIAvailability | null): string {
 	switch (status) {
-		case 'available':
-			return 'Chrome AI is ready to use';
-		case 'downloadable':
-			return 'Chrome AI model can be downloaded';
-		case 'downloading':
-			return 'Chrome AI model is downloading...';
-		case 'unavailable':
-			return 'Chrome AI is not available (requires Chrome 131+)';
+		case "available":
+			return "Chrome AI is ready to use";
+		case "downloadable":
+			return "Chrome AI model can be downloaded";
+		case "downloading":
+			return "Chrome AI model is downloading...";
+		case "unavailable":
+			return "Chrome AI is not available (requires Chrome 131+)";
 		default:
-			return 'Checking Chrome AI availability...';
+			return "Checking Chrome AI availability...";
 	}
 }
 </script>

@@ -1,6 +1,10 @@
 /// <reference types="@types/dom-chromium-ai" />
 
-export type ChromeAIAvailability = 'available' | 'unavailable' | 'downloadable' | 'downloading';
+export type ChromeAIAvailability =
+	| "available"
+	| "unavailable"
+	| "downloadable"
+	| "downloading";
 
 export interface ChromeAISession {
 	prompt: (text: string) => Promise<string>;
@@ -12,8 +16,8 @@ export interface ChromeAISession {
  */
 export async function isAIModelAvailable(): Promise<boolean> {
 	try {
-		if (typeof chrome === 'undefined') {
-			console.error('Chrome API is not available');
+		if (typeof chrome === "undefined") {
+			console.error("Chrome API is not available");
 			return false;
 		}
 
@@ -23,28 +27,30 @@ export async function isAIModelAvailable(): Promise<boolean> {
 		if (chromeMatch) {
 			const version = parseInt(chromeMatch[1], 10);
 			if (version < 131) {
-				console.error(`Chrome version ${version} is too old. Version 131+ required.`);
+				console.error(
+					`Chrome version ${version} is too old. Version 131+ required.`,
+				);
 				return false;
 			}
 		}
 
 		// @ts-ignore - LanguageModel may not be available
-		if (typeof self.ai?.languageModel === 'undefined') {
-			console.error('LanguageModel API is not available in this browser');
+		if (typeof self.ai?.languageModel === "undefined") {
+			console.error("LanguageModel API is not available in this browser");
 			return false;
 		}
 
 		// @ts-ignore
 		const available = await self.ai.languageModel.capabilities();
-		
-		if (available.available === 'no') {
-			console.error('AI model not available, status:', available.available);
+
+		if (available.available === "no") {
+			console.error("AI model not available, status:", available.available);
 			return false;
 		}
 
 		return true;
 	} catch (error) {
-		console.error('Error checking AI model availability:', error);
+		console.error("Error checking AI model availability:", error);
 		return false;
 	}
 }
@@ -55,32 +61,34 @@ export async function isAIModelAvailable(): Promise<boolean> {
 export async function getAIModelStatus(): Promise<ChromeAIAvailability> {
 	try {
 		// @ts-ignore
-		if (typeof self.ai?.languageModel === 'undefined') {
-			return 'unavailable';
+		if (typeof self.ai?.languageModel === "undefined") {
+			return "unavailable";
 		}
 
 		// @ts-ignore
 		const capabilities = await self.ai.languageModel.capabilities();
-		
+
 		switch (capabilities.available) {
-			case 'readily':
-				return 'available';
-			case 'after-download':
-				return 'downloadable';
-			case 'no':
+			case "readily":
+				return "available";
+			case "after-download":
+				return "downloadable";
+			case "no":
 			default:
-				return 'unavailable';
+				return "unavailable";
 		}
 	} catch (error) {
-		console.error('Error getting AI model status:', error);
-		return 'unavailable';
+		console.error("Error getting AI model status:", error);
+		return "unavailable";
 	}
 }
 
 /**
  * Create a Chrome AI session for generating content
  */
-export async function createChromeAISession(systemPrompt?: string): Promise<ChromeAISession | null> {
+export async function createChromeAISession(
+	systemPrompt?: string,
+): Promise<ChromeAISession | null> {
 	try {
 		const isAvailable = await isAIModelAvailable();
 		if (!isAvailable) {
@@ -89,7 +97,9 @@ export async function createChromeAISession(systemPrompt?: string): Promise<Chro
 
 		// @ts-ignore
 		const session = await self.ai.languageModel.create({
-			systemPrompt: systemPrompt || 'You are a helpful assistant that analyzes browsing patterns.',
+			systemPrompt:
+				systemPrompt ||
+				"You are a helpful assistant that analyzes browsing patterns.",
 		});
 
 		return {
@@ -97,7 +107,7 @@ export async function createChromeAISession(systemPrompt?: string): Promise<Chro
 				try {
 					return await session.prompt(text);
 				} catch (error) {
-					console.error('Error during Chrome AI prompt:', error);
+					console.error("Error during Chrome AI prompt:", error);
 					throw error;
 				}
 			},
@@ -105,12 +115,12 @@ export async function createChromeAISession(systemPrompt?: string): Promise<Chro
 				try {
 					session.destroy();
 				} catch (error) {
-					console.error('Error destroying Chrome AI session:', error);
+					console.error("Error destroying Chrome AI session:", error);
 				}
 			},
 		};
 	} catch (error) {
-		console.error('Error creating Chrome AI session:', error);
+		console.error("Error creating Chrome AI session:", error);
 		return null;
 	}
 }
@@ -125,12 +135,12 @@ export function parseAIResponse<T>(response: string, defaultValue: T): T {
 		if (jsonMatch) {
 			return JSON.parse(jsonMatch[1]);
 		}
-		
+
 		// Try direct JSON parse
 		return JSON.parse(response);
 	} catch (error) {
-		console.error('Failed to parse Chrome AI response:', error);
-		console.debug('Raw response:', response);
+		console.error("Failed to parse Chrome AI response:", error);
+		console.debug("Raw response:", response);
 		return defaultValue;
 	}
 }

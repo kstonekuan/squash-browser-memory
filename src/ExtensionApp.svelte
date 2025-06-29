@@ -1,10 +1,10 @@
 <script lang="ts">
 import { setCustomPrompts } from "./config/llm";
 import AdvancedSettings from "./lib/AdvancedSettings.svelte";
-import ExtensionAIProviderInput from "./lib/ExtensionAIProviderInput.svelte";
 import type { AnalysisPhase } from "./lib/AnalysisProgress.svelte";
 import AnalysisProgress from "./lib/AnalysisProgress.svelte";
 import AnalysisResults from "./lib/AnalysisResults.svelte";
+import ExtensionAIProviderInput from "./lib/ExtensionAIProviderInput.svelte";
 import HistoryFetcher from "./lib/HistoryFetcher.svelte";
 import type {
 	AIProvider,
@@ -38,7 +38,7 @@ async function handleAnalysis(
 ) {
 	const { input, type } = event.detail;
 
-	if (!apiKey && provider !== 'chrome') {
+	if (!apiKey && provider !== "chrome") {
 		alert("Please enter your API key first.");
 		return;
 	}

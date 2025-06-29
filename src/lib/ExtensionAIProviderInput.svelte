@@ -1,11 +1,8 @@
 <script lang="ts">
-import ChromeAIStatus from "./ChromeAIStatus.svelte";
 import type { AIProvider } from "../types";
+import ChromeAIStatus from "./ChromeAIStatus.svelte";
 
-let {
-	apiKey = $bindable(""),
-	provider = $bindable("gemini"),
-} = $props<{
+let { apiKey = $bindable(""), provider = $bindable("gemini") } = $props<{
 	apiKey?: string;
 	provider?: AIProvider;
 }>();

@@ -1,30 +1,26 @@
 {
-  "manifest_version": 3,
-  "name": "History Workflow Analyzer",
-  "version": "1.0.0",
-  "description": "Analyze your browsing history to find repetitive workflows that can be automated",
-  "minimum_chrome_version": "131",
-  "permissions": [
-    "history",
-    "storage",
-    "sidePanel"
-  ],
-  "host_permissions": [
-    "https://api.openai.com/*",
-    "https://generativelanguage.googleapis.com/*"
-  ],
-  "background": {
-    "service_worker": "background.js"
-  },
-  "side_panel": {
-    "default_path": "sidepanel.html"
-  },
-  "action": {
-    "default_title": "Open History Analyzer in side panel"
-  },
-  "icons": {
-    "16": "icons/icon-16.svg",
-    "48": "icons/icon-48.svg",
-    "128": "icons/icon-128.svg"
-  }
+	"manifest_version": 3,
+	"name": "History Workflow Analyzer",
+	"version": "1.0.0",
+	"description": "Analyze your browsing history to find repetitive workflows that can be automated",
+	"minimum_chrome_version": "131",
+	"permissions": ["history", "storage", "sidePanel"],
+	"host_permissions": [
+		"https://api.openai.com/*",
+		"https://generativelanguage.googleapis.com/*"
+	],
+	"background": {
+		"service_worker": "background.js"
+	},
+	"side_panel": {
+		"default_path": "sidepanel.html"
+	},
+	"action": {
+		"default_title": "Open History Analyzer in side panel"
+	},
+	"icons": {
+		"16": "icons/icon-16.svg",
+		"48": "icons/icon-48.svg",
+		"128": "icons/icon-128.svg"
+	}
 }

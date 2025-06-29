@@ -1,13 +1,13 @@
 // Simple script to create placeholder icons for the extension
-import fs from 'fs';
-import path from 'path';
+import fs from "node:fs";
+import path from "node:path";
 
 const sizes = [16, 48, 128];
-const iconDir = 'extension/icons';
+const iconDir = "extension/icons";
 
 // Ensure directory exists
 if (!fs.existsSync(iconDir)) {
-  fs.mkdirSync(iconDir, { recursive: true });
+	fs.mkdirSync(iconDir, { recursive: true });
 }
 
 // SVG template for the icon
@@ -19,11 +19,13 @@ const createSvg = (size) => `
 `;
 
 // Create SVG files
-sizes.forEach(size => {
-  const svg = createSvg(size);
-  const filename = path.join(iconDir, `icon-${size}.svg`);
-  fs.writeFileSync(filename, svg);
-  console.log(`Created ${filename}`);
+sizes.forEach((size) => {
+	const svg = createSvg(size);
+	const filename = path.join(iconDir, `icon-${size}.svg`);
+	fs.writeFileSync(filename, svg);
+	console.log(`Created ${filename}`);
 });
 
-console.log('Icon SVGs created. You can convert them to PNG using an image editor or online tool.');
+console.log(
+	"Icon SVGs created. You can convert them to PNG using an image editor or online tool.",
+);

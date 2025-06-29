@@ -2,9 +2,7 @@
 import { createEventDispatcher } from "svelte";
 import type { ChromeHistoryItem } from "../types";
 
-let {
-	isAnalyzing = $bindable(false),
-} = $props<{
+let { isAnalyzing = $bindable(false) } = $props<{
 	isAnalyzing?: boolean;
 }>();
 
@@ -27,7 +25,9 @@ function getStartTime(): number {
 		case "month":
 			return now - 30 * 24 * 60 * 60 * 1000;
 		case "custom":
-			return customStartDate ? new Date(customStartDate).getTime() : now - 24 * 60 * 60 * 1000;
+			return customStartDate
+				? new Date(customStartDate).getTime()
+				: now - 24 * 60 * 60 * 1000;
 		case "all":
 		default:
 			return 0;
@@ -43,20 +43,22 @@ function getEndTime(): number {
 
 async function fetchHistory() {
 	if (isFetching || isAnalyzing) return;
-	
+
 	error = "";
 	isFetching = true;
 	fetchProgress = 0;
-	
+
 	try {
 		const startTime = getStartTime();
 		const endTime = getEndTime();
-		
+
 		// Check if we're in an extension context
 		if (!chrome?.history?.search) {
-			throw new Error("Chrome History API not available. Please make sure you're running this as a Chrome extension.");
+			throw new Error(
+				"Chrome History API not available. Please make sure you're running this as a Chrome extension.",
+			);
 		}
-		
+
 		// Fetch history in batches for progress indication
 		const maxResults = 5000;
 		const results = await chrome.history.search({
@@ -65,33 +67,33 @@ async function fetchHistory() {
 			endTime,
 			maxResults,
 		});
-		
+
 		if (!results || results.length === 0) {
 			error = "No browsing history found for the selected date range.";
 			return;
 		}
-		
+
 		// Convert to our ChromeHistoryItem format
 		const historyItems: ChromeHistoryItem[] = results
-			.filter(item => item.url && item.lastVisitTime)
-			.map(item => ({
+			.filter((item) => item.url && item.lastVisitTime)
+			.map((item) => ({
 				id: item.id || "",
 				url: item.url || "",
 				title: item.title || "",
-				lastVisitTime: item.lastVisitTime || 0,
+				lastVisitTime: new Date(item.lastVisitTime || 0).toISOString(),
 				visitCount: item.visitCount || 1,
 				typedCount: item.typedCount || 0,
 			}));
-		
+
 		// Emit the history data as JSON
-		dispatch("analysis-request", { 
-			input: JSON.stringify(historyItems), 
-			type: "json" 
+		dispatch("analysis-request", {
+			input: JSON.stringify(historyItems),
+			type: "json",
 		});
-		
 	} catch (err) {
 		console.error("Failed to fetch history:", err);
-		error = err instanceof Error ? err.message : "Failed to fetch browsing history";
+		error =
+			err instanceof Error ? err.message : "Failed to fetch browsing history";
 	} finally {
 		isFetching = false;
 		fetchProgress = 0;
@@ -99,13 +101,15 @@ async function fetchHistory() {
 }
 
 function formatDateForInput(date: Date): string {
-	return date.toISOString().split('T')[0];
+	return date.toISOString().split("T")[0];
 }
 
 // Set default custom dates
 $effect(() => {
 	if (!customStartDate) {
-		customStartDate = formatDateForInput(new Date(Date.now() - 7 * 24 * 60 * 60 * 1000));
+		customStartDate = formatDateForInput(
+			new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
+		);
 	}
 	if (!customEndDate) {
 		customEndDate = formatDateForInput(new Date());
