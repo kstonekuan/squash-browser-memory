@@ -103,19 +103,19 @@ export const CHUNK_SCHEMA = {
 			items: {
 				type: "object",
 				properties: {
-					startTime: {
+					startIndex: {
 						type: "number",
 						description:
-							"Milliseconds since epoch (13-digit number like 1751194854628)",
+							"Index of the first timestamp in this session (e.g., 0, 5, 12)",
 					},
-					endTime: {
+					endIndex: {
 						type: "number",
 						description:
-							"Milliseconds since epoch (13-digit number like 1751194854628)",
+							"Index of the last timestamp in this session (e.g., 4, 11, 23)",
 					},
 					description: { type: "string" }, // e.g., "Morning work session"
 				},
-				required: ["startTime", "endTime", "description"],
+				required: ["startIndex", "endIndex", "description"],
 			},
 		},
 	},

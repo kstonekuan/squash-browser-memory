@@ -1,5 +1,5 @@
 import { createChromeAISession } from "./chrome-ai";
-import { DEFAULT_CHUNK_SYSTEM_PROMPT } from "./constants";
+import { buildChunkingPrompt, DEFAULT_CHUNK_SYSTEM_PROMPT } from "./constants";
 import type { ChunkTimeRange, HistoryChunk } from "./memory";
 import { CHUNK_SCHEMA } from "./schemas";
 
@@ -41,23 +41,7 @@ export async function identifyChunks(
 		return await analyzeTimestampsInBatches(timestamps, customChunkPrompt);
 	}
 
-	const prompt = `Group these ${timestamps.length} timestamps into browsing sessions.
-
-Timestamps with their millisecond values:
-${timestamps
-	.map((ts) => {
-		const d = new Date(ts);
-		return `${ts} = ${d.toLocaleDateString()} ${d.getHours()}:${String(d.getMinutes()).padStart(2, "0")}`;
-	})
-	.join("\n")}
-
-Rules:
-- Gap >30min = new session
-- Sessions can span days if continuous
-- Return at least 1 chunk
-- Use descriptive labels
-
-IMPORTANT: Return startTime and endTime as the exact millisecond timestamps from the list above (the numbers before the = sign).`;
+	const prompt = buildChunkingPrompt(timestamps);
 
 	const session = await createChromeAISession(
 		customChunkPrompt || DEFAULT_CHUNK_SYSTEM_PROMPT,
@@ -115,7 +99,13 @@ IMPORTANT: Return startTime and endTime as the exact millisecond timestamps from
 			});
 		});
 
-		let parsed: { chunks?: ChunkTimeRange[] };
+		let parsed: {
+			chunks?: Array<{
+				startIndex: number;
+				endIndex: number;
+				description: string;
+			}>;
+		};
 		try {
 			parsed = JSON.parse(response);
 		} catch (parseError) {
@@ -136,14 +126,22 @@ IMPORTANT: Return startTime and endTime as the exact millisecond timestamps from
 			};
 		}
 
-		// Validate and clean up chunks
+		// Convert indices to timestamps and validate
 		const validChunks: ChunkTimeRange[] = parsed.chunks
 			.filter(
-				(chunk: ChunkTimeRange) =>
-					typeof chunk.startTime === "number" &&
-					typeof chunk.endTime === "number" &&
-					chunk.startTime < chunk.endTime,
+				(chunk) =>
+					typeof chunk.startIndex === "number" &&
+					typeof chunk.endIndex === "number" &&
+					chunk.startIndex >= 0 &&
+					chunk.endIndex < timestamps.length &&
+					chunk.startIndex <= chunk.endIndex &&
+					typeof chunk.description === "string",
 			)
+			.map((chunk) => ({
+				startTime: timestamps[chunk.startIndex],
+				endTime: timestamps[chunk.endIndex],
+				description: chunk.description,
+			}))
 			.sort(
 				(a: ChunkTimeRange, b: ChunkTimeRange) => a.startTime - b.startTime,
 			);
@@ -257,23 +255,7 @@ async function identifyChunksForBatch(
 		};
 	}
 
-	const prompt = `Group these ${timestamps.length} timestamps into browsing sessions.
-
-Timestamps with their millisecond values:
-${timestamps
-	.map((ts) => {
-		const d = new Date(ts);
-		return `${ts} = ${d.toLocaleDateString()} ${d.getHours()}:${String(d.getMinutes()).padStart(2, "0")}`;
-	})
-	.join("\n")}
-
-Rules:
-- Gap >30min = new session
-- Sessions can span days if continuous
-- Return at least 1 chunk
-- Use descriptive labels
-
-IMPORTANT: Return startTime and endTime as the exact millisecond timestamps from the list above (the numbers before the = sign).`;
+	const prompt = buildChunkingPrompt(timestamps);
 
 	const session = await createChromeAISession(
 		customChunkPrompt || DEFAULT_CHUNK_SYSTEM_PROMPT,
@@ -331,7 +313,13 @@ IMPORTANT: Return startTime and endTime as the exact millisecond timestamps from
 			});
 		});
 
-		let parsed: { chunks?: ChunkTimeRange[] };
+		let parsed: {
+			chunks?: Array<{
+				startIndex: number;
+				endIndex: number;
+				description: string;
+			}>;
+		};
 		try {
 			parsed = JSON.parse(response);
 		} catch (parseError) {
@@ -352,14 +340,22 @@ IMPORTANT: Return startTime and endTime as the exact millisecond timestamps from
 			};
 		}
 
-		// Validate and clean up chunks
+		// Convert indices to timestamps and validate
 		const validChunks: ChunkTimeRange[] = parsed.chunks
 			.filter(
-				(chunk: ChunkTimeRange) =>
-					typeof chunk.startTime === "number" &&
-					typeof chunk.endTime === "number" &&
-					chunk.startTime < chunk.endTime,
+				(chunk) =>
+					typeof chunk.startIndex === "number" &&
+					typeof chunk.endIndex === "number" &&
+					chunk.startIndex >= 0 &&
+					chunk.endIndex < timestamps.length &&
+					chunk.startIndex <= chunk.endIndex &&
+					typeof chunk.description === "string",
 			)
+			.map((chunk) => ({
+				startTime: timestamps[chunk.startIndex],
+				endTime: timestamps[chunk.endIndex],
+				description: chunk.description,
+			}))
 			.sort(
 				(a: ChunkTimeRange, b: ChunkTimeRange) => a.startTime - b.startTime,
 			);
