@@ -3,6 +3,8 @@ import { onMount } from "svelte";
 import type { AnalysisMemory } from "../utils/memory";
 import { loadMemory } from "../utils/memory";
 
+const { autoExpand = false } = $props<{ autoExpand?: boolean }>();
+
 let showMemory = $state(false);
 let memory = $state<AnalysisMemory | null>(null);
 let loading = $state(false);
@@ -93,6 +95,13 @@ function getAutomationPotentialColor(
 $effect(() => {
 	if (showMemory && !hasAttemptedLoad && !loading) {
 		loadMemoryData();
+	}
+});
+
+// Auto-expand when requested
+$effect(() => {
+	if (autoExpand && !showMemory) {
+		showMemory = true;
 	}
 });
 </script>

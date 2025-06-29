@@ -10,6 +10,7 @@ import type { AnalysisResult } from "./types";
 import { analyzeHistoryItems, clearMemory } from "./utils/analyzer";
 
 let analysisResult: AnalysisResult | null = $state(null);
+let memoryAutoExpand = $state(false);
 let isAnalyzing = $state(false);
 let analysisPhase: AnalysisPhase = $state("idle");
 let rawHistoryData: chrome.history.HistoryItem[] | null = $state(null);
@@ -71,6 +72,8 @@ async function handleAnalysis(
 		analysisResult = result;
 		analysisPhase = "complete";
 		chunkProgress = null;
+		// Auto-expand memory when analysis is complete
+		memoryAutoExpand = true;
 	} catch (error) {
 		if (
 			error instanceof Error &&
@@ -123,6 +126,11 @@ function handleCancelAnalysis() {
 		chunkProgress = null;
 	}
 }
+
+function handleDismissAnalysis() {
+	analysisResult = null;
+	memoryAutoExpand = false;
+}
 </script>
 
 <main class="min-h-screen bg-gray-50">
@@ -156,11 +164,11 @@ function handleCancelAnalysis() {
 		/>
 
 		{#if analysisResult}
-			<AnalysisResults result={analysisResult} />
+			<AnalysisResults result={analysisResult} onDismiss={handleDismissAnalysis} />
 		{/if}
 
 		<!-- Memory Viewer -->
-		<MemoryViewer />
+		<MemoryViewer autoExpand={memoryAutoExpand} />
 
 		<!-- Advanced Settings and Memory Management -->
 		<div class="mt-4 space-y-4">
