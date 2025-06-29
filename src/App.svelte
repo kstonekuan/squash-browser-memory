@@ -2,6 +2,8 @@
 import { setCustomPrompts } from "./config/llm";
 import AdvancedSettings from "./lib/AdvancedSettings.svelte";
 import AIProviderInput from "./lib/AIProviderInput.svelte";
+import type { AnalysisPhase } from "./lib/AnalysisProgress.svelte";
+import AnalysisProgress from "./lib/AnalysisProgress.svelte";
 import AnalysisResults from "./lib/AnalysisResults.svelte";
 import HistoryInput from "./lib/HistoryInput.svelte";
 import type {
@@ -19,6 +21,7 @@ let standardizedData: StandardizedHistoryData | null = $state(null);
 let isAnalyzing = $state(false);
 let apiKey = $state("");
 let provider: AIProvider = $state("gemini");
+let analysisPhase: AnalysisPhase = $state("idle");
 
 async function handleAnalysis(
 	event: CustomEvent<{ input: string; type: "text" | "json" }>,
@@ -33,20 +36,39 @@ async function handleAnalysis(
 	isAnalyzing = true;
 	standardizedData = null;
 	analysisResult = null;
+	analysisPhase = "parsing";
 
 	try {
 		// Stage 1: Parse to standardized format
 		const parsed = await parseToStandardFormat(input, apiKey, provider, type);
+
+		// Stage 2: Calculate statistics (this happens synchronously in parseToStandardFormat)
+		analysisPhase = "calculating";
 		standardizedData = parsed;
 
-		// Stage 2: Analyze the standardized data
+		// Small delay to show the calculating phase
+		await new Promise((resolve) => setTimeout(resolve, 300));
+
+		// Stage 3: Analyze the standardized data
+		analysisPhase = "analyzing";
 		const result = await analyzeStandardizedData(parsed, apiKey, provider);
 		analysisResult = result;
+
+		analysisPhase = "complete";
 	} catch (error) {
 		console.error("Analysis error:", error);
+		analysisPhase = "error";
 		alert(error instanceof Error ? error.message : "Failed to analyze history");
 	} finally {
 		isAnalyzing = false;
+		// Reset phase after a delay if complete
+		if (analysisPhase === "complete") {
+			setTimeout(() => {
+				if (analysisPhase === "complete") {
+					analysisPhase = "idle";
+				}
+			}, 3000);
+		}
 	}
 }
 
@@ -86,6 +108,8 @@ function handlePromptsChange(prompts: { parsing: string; analysis: string }) {
         on:analysis-request={handleAnalysis}
       />
     </div>
+
+    <AnalysisProgress phase={analysisPhase} />
 
     {#if analysisResult}
       <AnalysisResults result={analysisResult} />

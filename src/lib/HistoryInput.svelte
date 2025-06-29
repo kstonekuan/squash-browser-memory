@@ -171,14 +171,6 @@ stackoverflow.com/questions/...'
     </div>
   {/if}
   
-  {#if isAnalyzing}
-    <div class="flex items-center justify-center py-8">
-      <div class="flex items-center space-x-2">
-        <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-        <span class="text-gray-600">Analyzing your browsing patterns...</span>
-      </div>
-    </div>
-  {/if}
   
   <div class="bg-gray-50 rounded-lg p-4">
     <h3 class="text-sm font-medium text-gray-700 mb-2">
