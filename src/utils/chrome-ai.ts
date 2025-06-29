@@ -121,14 +121,7 @@ export async function createChromeAISession(
 
 					// Handle UnknownError specifically
 					if (error instanceof Error && error.name === "UnknownError") {
-						console.error("Chrome AI UnknownError - possible causes:");
-						console.error("1. Chrome AI service temporarily unavailable");
-						console.error("2. Model not fully downloaded/initialized");
-						console.error("3. Invalid response constraint schema");
-						console.error("4. Internal Chrome AI error");
-						throw new Error(
-							`Chrome AI error: ${error.message}. Try refreshing the page or waiting a moment.`,
-						);
+						throw new Error(`Chrome AI error: ${error.message}`);
 					}
 
 					console.error("Error during Chrome AI prompt:", error);
