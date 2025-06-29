@@ -12,6 +12,8 @@ import type {
 
 const CLAUDE_API_URL = "https://api.anthropic.com/v1/messages";
 const CLAUDE_API_VERSION = "2023-06-01";
+const CLAUDE_MODEL = "claude-3-5-haiku-20241022";
+const CLAUDE_MAX_TOKENS = 8192;
 
 export class ClaudeSession implements AISession {
 	private apiKey: string;
@@ -48,8 +50,8 @@ export class ClaudeSession implements AISession {
 		}
 
 		const body: ClaudeRequestBody = {
-			model: "claude-4-sonnet-20250514", // Updated to Claude 4 Sonnet
-			max_tokens: 8192, // Increased limit for Claude 4
+			model: CLAUDE_MODEL,
+			max_tokens: CLAUDE_MAX_TOKENS,
 			messages,
 		};
 
@@ -168,7 +170,7 @@ export class ClaudeProvider implements AIProvider {
 			return false;
 		}
 
-		// Test API connectivity with a minimal request
+		// Use token counting API - it's free and doesn't consume tokens for generation
 		try {
 			const headers = {
 				"Content-Type": "application/json",
@@ -177,17 +179,20 @@ export class ClaudeProvider implements AIProvider {
 				"anthropic-dangerous-direct-browser-access": "true",
 			};
 
-			const response = await fetch(CLAUDE_API_URL, {
-				method: "POST",
-				headers,
-				body: JSON.stringify({
-					model: "claude-4-sonnet-20250514",
-					max_tokens: 1,
-					messages: [{ role: "user", content: "test" }],
-				}),
-			});
+			const response = await fetch(
+				"https://api.anthropic.com/v1/messages/count_tokens",
+				{
+					method: "POST",
+					headers,
+					body: JSON.stringify({
+						model: CLAUDE_MODEL,
+						messages: [{ role: "user", content: "test" }],
+					}),
+				},
+			);
 
 			// API key is valid if we get any response (even errors about content)
+			// Token counting doesn't consume generation tokens but validates API access
 			return response.status !== 401 && response.status !== 403;
 		} catch (error) {
 			console.error("Claude availability check failed:", error);
@@ -242,8 +247,8 @@ export class ClaudeProvider implements AIProvider {
 
 	getCapabilities(): AIProviderCapabilities {
 		return {
-			maxInputTokens: 1000000, // Claude 4 supports 1M input tokens
-			optimalChunkTokens: 100000, // Larger chunk size for Claude 4's expanded context
+			maxInputTokens: 200000, // Claude 3.5 Haiku supports 200K input tokens
+			optimalChunkTokens: 50000, // Optimal chunk size for Claude 3.5 Haiku
 			supportsTokenMeasurement: false, // Claude API doesn't provide direct token measurement
 		};
 	}

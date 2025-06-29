@@ -9,12 +9,8 @@ export interface WorkflowPattern {
 }
 
 export interface UserProfile {
+	// === Stable Background (Core Identity) ===
 	profession: string;
-	interests: string[];
-	workPatterns: {
-		type: string;
-		description: string;
-	}[];
 	personalityTraits: {
 		trait: string;
 		evidence: string;
@@ -24,6 +20,22 @@ export interface UserProfile {
 		level: "beginner" | "intermediate" | "advanced" | "expert";
 		tools: string[];
 	}[];
+	personalPreferences: {
+		category: string;
+		preference: string;
+	}[];
+
+	// === Current Context (Dynamic/Active) ===
+	currentGoals: string[];
+	recentObsessions: string[];
+	lifecycleHints: string[];
+	interests: string[];
+	workPatterns: {
+		type: string;
+		description: string;
+	}[];
+
+	// === Overall Summary ===
 	summary: string;
 }
 

@@ -51,6 +51,10 @@ ${JSON.stringify(historyData)}
 Create a profile including:
 - Profession based on browsing patterns
 - Key interests (up to 10)
+- Current goals or aspirations (up to 6)
+- Recent obsessions or topics of intense focus (up to 5)
+- Lifecycle hints like trip planning, job hunting, side projects (up to 4)
+- Personal preferences like tech stack, travel style, sports teams (up to 8)
 - Work patterns (up to 8)
 - Personality traits with evidence (up to 8)
 - Technology use patterns (up to 10)
@@ -97,6 +101,10 @@ MERGE RULES:
 
 2. LIMIT lists strictly:
    - interests: MAX 10 items (remove least relevant)
+   - currentGoals: MAX 6 items
+   - recentObsessions: MAX 5 items
+   - lifecycleHints: MAX 4 items
+   - personalPreferences: MAX 8 items
    - workPatterns: MAX 8 items
    - personalityTraits: MAX 8 items  
    - technologyUse: MAX 10 items

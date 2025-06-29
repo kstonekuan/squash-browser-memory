@@ -7,6 +7,7 @@ let showMemory = $state(false);
 let memory = $state<AnalysisMemory | null>(null);
 let loading = $state(false);
 let hasAttemptedLoad = $state(false);
+let activeTab = $state<"profile" | "patterns">("profile");
 
 // Load memory when component mounts or when section is opened
 async function loadMemoryData() {
@@ -119,7 +120,7 @@ $effect(() => {
 		onclick={() => showMemory = !showMemory}
 		class="w-full px-4 py-3 flex items-center justify-between bg-gray-50 hover:bg-gray-100 transition-colors rounded-t-lg"
 	>
-		<span class="font-medium text-gray-700">What AI Knows About Me</span>
+		<span class="font-medium text-gray-700">Memory</span>
 		<div class="flex items-center space-x-2">
 			{#if memory && !loading}
 				<span class="text-xs text-gray-500">
@@ -155,7 +156,7 @@ $effect(() => {
 					</p>
 				</div>
 			{:else}
-				<div class="p-4 space-y-6">
+				<div class="p-4 space-y-4">
 					<!-- Header with stats and refresh -->
 					<div class="flex items-center justify-between">
 						<div class="text-sm text-gray-600">
@@ -170,99 +171,201 @@ $effect(() => {
 						</button>
 					</div>
 
-					<!-- User Profile Section -->
-					<div>
-						<h3 class="text-lg font-semibold text-gray-900 mb-3">Your Profile</h3>
-						
-						<!-- Profession -->
-						<div class="mb-4">
-							<h4 class="text-sm font-medium text-gray-700 mb-2">Profession</h4>
-							<span class="inline-block px-3 py-1 text-sm bg-blue-100 text-blue-800 rounded-full">
-								{memory.userProfile.profession}
-							</span>
-						</div>
 
-						<!-- Summary -->
-						{#if memory.userProfile.summary}
-							<div class="mb-4">
-								<h4 class="text-sm font-medium text-gray-700 mb-2">Summary</h4>
-								<p class="text-sm text-gray-600 bg-gray-50 p-3 rounded-lg">
-									{memory.userProfile.summary}
-								</p>
-							</div>
-						{/if}
-
-						<!-- Interests -->
-						{#if memory.userProfile.interests.length > 0}
-							<div class="mb-4">
-								<h4 class="text-sm font-medium text-gray-700 mb-2">Interests</h4>
-								<div class="flex flex-wrap gap-2">
-									{#each memory.userProfile.interests as interest}
-										<span class="inline-block px-2 py-1 text-xs bg-green-100 text-green-800 rounded-full">
-											{interest}
-										</span>
-									{/each}
-								</div>
-							</div>
-						{/if}
-
-						<!-- Technology Use -->
-						{#if memory.userProfile.technologyUse.length > 0}
-							<div class="mb-4">
-								<h4 class="text-sm font-medium text-gray-700 mb-2">Technology Skills</h4>
-								<div class="space-y-2">
-									{#each memory.userProfile.technologyUse as tech}
-										<div class="flex items-center justify-between p-2 bg-gray-50 rounded">
-											<div>
-												<span class="text-sm font-medium text-gray-900">{tech.category}</span>
-												{#if tech.tools.length > 0}
-													<p class="text-xs text-gray-600">{tech.tools.join(", ")}</p>
-												{/if}
-											</div>
-											<span class={`px-2 py-1 text-xs rounded-full ${getTechnologyLevelColor(tech.level)}`}>
-												{tech.level}
-											</span>
-										</div>
-									{/each}
-								</div>
-							</div>
-						{/if}
-
-						<!-- Work Patterns -->
-						{#if memory.userProfile.workPatterns.length > 0}
-							<div class="mb-4">
-								<h4 class="text-sm font-medium text-gray-700 mb-2">Work Patterns</h4>
-								<div class="space-y-2">
-									{#each memory.userProfile.workPatterns as pattern}
-										<div class="p-3 bg-gray-50 rounded-lg">
-											<p class="text-sm font-medium text-gray-900">{pattern.type}</p>
-											<p class="text-xs text-gray-600 mt-1">{pattern.description}</p>
-										</div>
-									{/each}
-								</div>
-							</div>
-						{/if}
-
-						<!-- Personality Traits -->
-						{#if memory.userProfile.personalityTraits.length > 0}
-							<div class="mb-4">
-								<h4 class="text-sm font-medium text-gray-700 mb-2">Personality Traits</h4>
-								<div class="space-y-2">
-									{#each memory.userProfile.personalityTraits as trait}
-										<div class="p-3 bg-gray-50 rounded-lg">
-											<p class="text-sm font-medium text-gray-900">{trait.trait}</p>
-											<p class="text-xs text-gray-600 mt-1">{trait.evidence}</p>
-										</div>
-									{/each}
-								</div>
-							</div>
-						{/if}
+					<!-- Tab Navigation -->
+					<div class="border-b border-gray-200">
+						<nav class="-mb-px flex space-x-8">
+							<button
+								onclick={() => activeTab = 'profile'}
+								class={`whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm ${
+									activeTab === 'profile'
+										? 'border-blue-500 text-blue-600'
+										: 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+								}`}
+							>
+								User Profile
+							</button>
+							<button
+								onclick={() => activeTab = 'patterns'}
+								class={`whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm ${
+									activeTab === 'patterns'
+										? 'border-blue-500 text-blue-600'
+										: 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+								}`}
+							>
+								Workflow Patterns
+								{#if memory.patterns.length > 0}
+									<span class="ml-2 bg-gray-100 text-gray-900 py-0.5 px-2 rounded-full text-xs">
+										{memory.patterns.length}
+									</span>
+								{/if}
+							</button>
+						</nav>
 					</div>
 
-					<!-- Workflow Patterns Section -->
-					{#if memory.patterns.length > 0}
-						<div>
-							<h3 class="text-lg font-semibold text-gray-900 mb-3">Discovered Workflow Patterns</h3>
+					<!-- Tab Content -->
+					{#if activeTab === 'profile'}
+						<!-- User Profile Tab -->
+						<div class="grid gap-4">
+							<!-- Profile Summary -->
+							{#if memory.userProfile.summary}
+								<div class="border border-blue-200 rounded-lg p-4 bg-blue-50">
+									<div class="flex items-center mb-3">
+										<svg class="w-5 h-5 text-blue-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+											<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+										</svg>
+										<h3 class="text-lg font-semibold text-blue-700">Profile Summary</h3>
+									</div>
+									<p class="text-sm text-blue-800 leading-relaxed">
+										{memory.userProfile.summary}
+									</p>
+								</div>
+							{/if}
+							<!-- About Me Card (Stable Background) -->
+							<div class="border border-gray-200 rounded-lg p-4 bg-gray-50">
+								<div class="flex items-center mb-3">
+									<svg class="w-5 h-5 text-gray-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+										<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+									</svg>
+									<h3 class="text-lg font-semibold text-gray-700">About Me</h3>
+									<span class="ml-2 text-xs text-gray-500 bg-gray-200 px-2 py-1 rounded-full">Core Identity</span>
+								</div>
+								
+								<!-- Profession -->
+								<div class="mb-3">
+									<h4 class="text-sm font-medium text-gray-600 mb-1">Profession</h4>
+									<span class="inline-block px-3 py-1 text-sm bg-gray-200 text-gray-800 rounded-full">
+										{memory.userProfile.profession}
+									</span>
+								</div>
+
+								<!-- Personality Traits -->
+								{#if memory.userProfile.personalityTraits.length > 0}
+									<div class="mb-3">
+										<h4 class="text-sm font-medium text-gray-600 mb-2">Personality Traits</h4>
+										<div class="flex flex-wrap gap-1">
+											{#each memory.userProfile.personalityTraits as trait}
+												<span class="inline-block px-2 py-1 text-xs bg-gray-200 text-gray-700 rounded-full" title={trait.evidence}>
+													{trait.trait}
+												</span>
+											{/each}
+										</div>
+									</div>
+								{/if}
+
+								<!-- Technology Skills -->
+								{#if memory.userProfile.technologyUse.length > 0}
+									<div class="mb-3">
+										<h4 class="text-sm font-medium text-gray-600 mb-2">Technology Skills</h4>
+										<div class="flex flex-wrap gap-1">
+											{#each memory.userProfile.technologyUse as tech}
+												<span class="inline-block px-2 py-1 text-xs bg-gray-200 text-gray-700 rounded-full" title="{tech.level} - {tech.tools.join(', ')}">
+													{tech.category}
+												</span>
+											{/each}
+										</div>
+									</div>
+								{/if}
+
+								<!-- Personal Preferences -->
+								{#if memory.userProfile.personalPreferences.length > 0}
+									<div class="mb-3">
+										<h4 class="text-sm font-medium text-gray-600 mb-2">Personal Preferences</h4>
+										<div class="flex flex-wrap gap-1">
+											{#each memory.userProfile.personalPreferences as pref}
+												<span class="inline-block px-2 py-1 text-xs bg-gray-200 text-gray-700 rounded-full" title="{pref.category}">
+													{pref.preference}
+												</span>
+											{/each}
+										</div>
+									</div>
+								{/if}
+							</div>
+
+							<!-- Current Focus Card (Dynamic Context) -->
+							<div class="border border-orange-200 rounded-lg p-4 bg-orange-50">
+								<div class="flex items-center mb-3">
+									<svg class="w-5 h-5 text-orange-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+										<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+									</svg>
+									<h3 class="text-lg font-semibold text-orange-700">Current Focus</h3>
+									<span class="ml-2 text-xs text-orange-600 bg-orange-200 px-2 py-1 rounded-full">Active Now</span>
+								</div>
+
+								<!-- Current Goals -->
+								{#if memory.userProfile.currentGoals.length > 0}
+									<div class="mb-3">
+										<h4 class="text-sm font-medium text-orange-700 mb-2">Goals</h4>
+										<div class="flex flex-wrap gap-1">
+											{#each memory.userProfile.currentGoals as goal}
+												<span class="inline-block px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded-full">
+													{goal}
+												</span>
+											{/each}
+										</div>
+									</div>
+								{/if}
+
+								<!-- Recent Obsessions -->
+								{#if memory.userProfile.recentObsessions.length > 0}
+									<div class="mb-3">
+										<h4 class="text-sm font-medium text-orange-700 mb-2">Recent Obsessions</h4>
+										<div class="flex flex-wrap gap-1">
+											{#each memory.userProfile.recentObsessions as obsession}
+												<span class="inline-block px-2 py-1 text-xs bg-red-100 text-red-800 rounded-full">
+													{obsession}
+												</span>
+											{/each}
+										</div>
+									</div>
+								{/if}
+
+								<!-- Lifecycle Hints -->
+								{#if memory.userProfile.lifecycleHints.length > 0}
+									<div class="mb-3">
+										<h4 class="text-sm font-medium text-orange-700 mb-2">Life Events</h4>
+										<div class="flex flex-wrap gap-1">
+											{#each memory.userProfile.lifecycleHints as hint}
+												<span class="inline-block px-2 py-1 text-xs bg-indigo-100 text-indigo-800 rounded-full">
+													{hint}
+												</span>
+											{/each}
+										</div>
+									</div>
+								{/if}
+
+								<!-- Current Interests -->
+								{#if memory.userProfile.interests.length > 0}
+									<div class="mb-3">
+										<h4 class="text-sm font-medium text-orange-700 mb-2">Interests</h4>
+										<div class="flex flex-wrap gap-1">
+											{#each memory.userProfile.interests as interest}
+												<span class="inline-block px-2 py-1 text-xs bg-green-100 text-green-800 rounded-full">
+													{interest}
+												</span>
+											{/each}
+										</div>
+									</div>
+								{/if}
+
+								<!-- Work Patterns -->
+								{#if memory.userProfile.workPatterns.length > 0}
+									<div class="mb-3">
+										<h4 class="text-sm font-medium text-orange-700 mb-2">Work Patterns</h4>
+										<div class="flex flex-wrap gap-1">
+											{#each memory.userProfile.workPatterns as pattern}
+												<span class="inline-block px-2 py-1 text-xs bg-yellow-100 text-yellow-800 rounded-full" title={pattern.description}>
+													{pattern.type}
+												</span>
+											{/each}
+										</div>
+									</div>
+								{/if}
+							</div>
+						</div>
+					{:else if activeTab === 'patterns'}
+						<!-- Workflow Patterns Tab -->
+						{#if memory.patterns.length > 0}
 							<div class="space-y-3">
 								{#each memory.patterns as pattern}
 									<div class="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors">
@@ -304,7 +407,15 @@ $effect(() => {
 									</div>
 								{/each}
 							</div>
-						</div>
+						{:else}
+							<div class="text-center py-8">
+								<svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+								</svg>
+								<p class="mt-4 text-sm text-gray-600">No workflow patterns discovered yet.</p>
+								<p class="text-xs text-gray-500">Analyze more browsing history to discover patterns.</p>
+							</div>
+						{/if}
 					{/if}
 				</div>
 			{/if}

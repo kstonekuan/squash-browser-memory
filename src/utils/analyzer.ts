@@ -261,10 +261,21 @@ export async function analyzeHistoryItems(
 
 			// Update memory with merged results
 			if (results) {
+				// Find the most recent timestamp in this chunk
+				const chunkTimestamps = chunk.items
+					.map((item) => item.lastVisitTime || 0)
+					.filter((time) => time > 0);
+				const mostRecentInChunk =
+					chunkTimestamps.length > 0 ? Math.max(...chunkTimestamps) : 0;
+
 				memory = {
 					userProfile: results.userProfile,
 					patterns: results.patterns,
 					lastAnalyzedDate: new Date(),
+					lastHistoryTimestamp: Math.max(
+						memory.lastHistoryTimestamp,
+						mostRecentInChunk,
+					),
 					totalItemsAnalyzed: memory.totalItemsAnalyzed + processedItems,
 					version: memory.version,
 				};
@@ -567,6 +578,11 @@ async function mergeAnalysisResults(
 		const validatedProfile = {
 			...parsed.userProfile,
 			interests: parsed.userProfile.interests?.slice(0, 10) || [],
+			currentGoals: parsed.userProfile.currentGoals?.slice(0, 6) || [],
+			recentObsessions: parsed.userProfile.recentObsessions?.slice(0, 5) || [],
+			lifecycleHints: parsed.userProfile.lifecycleHints?.slice(0, 4) || [],
+			personalPreferences:
+				parsed.userProfile.personalPreferences?.slice(0, 8) || [],
 			workPatterns: parsed.userProfile.workPatterns?.slice(0, 8) || [],
 			personalityTraits:
 				parsed.userProfile.personalityTraits?.slice(0, 8) || [],
@@ -815,10 +831,21 @@ async function analyzeChunkWithSubdivision(
 						);
 
 			// Update memory with merged results
+			// Find the most recent timestamp in this sub-chunk
+			const subChunkTimestamps = subItems
+				.map((item) => item.lastVisitTime || 0)
+				.filter((time) => time > 0);
+			const mostRecentInSubChunk =
+				subChunkTimestamps.length > 0 ? Math.max(...subChunkTimestamps) : 0;
+
 			currentMemory = {
 				userProfile: mergedResults.userProfile,
 				patterns: mergedResults.patterns,
 				lastAnalyzedDate: new Date(),
+				lastHistoryTimestamp: Math.max(
+					currentMemory.lastHistoryTimestamp,
+					mostRecentInSubChunk,
+				),
 				totalItemsAnalyzed: currentMemory.totalItemsAnalyzed + subItems.length,
 				version: currentMemory.version,
 			};
@@ -968,6 +995,12 @@ async function analyzeChunk(
 			const validatedProfile = {
 				...parsed.userProfile,
 				interests: parsed.userProfile.interests?.slice(0, 10) || [],
+				currentGoals: parsed.userProfile.currentGoals?.slice(0, 6) || [],
+				recentObsessions:
+					parsed.userProfile.recentObsessions?.slice(0, 5) || [],
+				lifecycleHints: parsed.userProfile.lifecycleHints?.slice(0, 4) || [],
+				personalPreferences:
+					parsed.userProfile.personalPreferences?.slice(0, 8) || [],
 				workPatterns: parsed.userProfile.workPatterns?.slice(0, 8) || [],
 				personalityTraits:
 					parsed.userProfile.personalityTraits?.slice(0, 8) || [],

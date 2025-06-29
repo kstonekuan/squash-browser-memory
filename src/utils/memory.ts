@@ -5,6 +5,7 @@ export interface AnalysisMemory {
 	userProfile: UserProfile;
 	patterns: WorkflowPattern[];
 	lastAnalyzedDate: Date;
+	lastHistoryTimestamp: number; // Timestamp of the most recent history item analyzed
 	totalItemsAnalyzed: number;
 	version: string;
 }
@@ -27,7 +28,7 @@ export interface ChunkTimeRange {
 }
 
 const MEMORY_KEY = "history_analysis_memory";
-const MEMORY_VERSION = "1.0.2"; // Bumped to fix date object serialization issues
+const MEMORY_VERSION = "1.1.0"; // Added new UserProfile fields: currentGoals, recentObsessions, lifecycleHints, personalPreferences
 
 // Initialize empty memory
 export function createEmptyMemory(): AnalysisMemory {
@@ -35,6 +36,10 @@ export function createEmptyMemory(): AnalysisMemory {
 		userProfile: {
 			profession: "Unknown",
 			interests: [],
+			currentGoals: [],
+			recentObsessions: [],
+			lifecycleHints: [],
+			personalPreferences: [],
 			workPatterns: [],
 			personalityTraits: [],
 			technologyUse: [],
@@ -42,6 +47,7 @@ export function createEmptyMemory(): AnalysisMemory {
 		},
 		patterns: [],
 		lastAnalyzedDate: new Date(0), // Start from epoch
+		lastHistoryTimestamp: 0, // No history analyzed yet
 		totalItemsAnalyzed: 0,
 		version: MEMORY_VERSION,
 	};
@@ -113,6 +119,25 @@ export async function loadMemory(): Promise<AnalysisMemory | null> {
 
 		stored.lastAnalyzedDate = parsedDate;
 
+		// Handle lastHistoryTimestamp field (new in v1.0.3)
+		if (typeof stored.lastHistoryTimestamp !== "number") {
+			stored.lastHistoryTimestamp = 0;
+		}
+
+		// Handle new UserProfile fields (new in v1.1.0)
+		if (!stored.userProfile.currentGoals) {
+			stored.userProfile.currentGoals = [];
+		}
+		if (!stored.userProfile.recentObsessions) {
+			stored.userProfile.recentObsessions = [];
+		}
+		if (!stored.userProfile.lifecycleHints) {
+			stored.userProfile.lifecycleHints = [];
+		}
+		if (!stored.userProfile.personalPreferences) {
+			stored.userProfile.personalPreferences = [];
+		}
+
 		// Validate the date conversion
 		if (Number.isNaN(stored.lastAnalyzedDate.getTime())) {
 			console.warn(
@@ -136,6 +161,7 @@ export async function loadMemory(): Promise<AnalysisMemory | null> {
 			lastAnalyzed: stored.lastAnalyzedDate,
 			lastAnalyzedType: typeof stored.lastAnalyzedDate,
 			lastAnalyzedIsDate: stored.lastAnalyzedDate instanceof Date,
+			lastHistoryTimestamp: stored.lastHistoryTimestamp,
 		});
 		return stored;
 	} catch (error) {
@@ -151,6 +177,7 @@ export async function saveMemory(memory: AnalysisMemory): Promise<void> {
 		const memoryToSave = {
 			...memory,
 			lastAnalyzedDate: memory.lastAnalyzedDate.toISOString(),
+			lastHistoryTimestamp: memory.lastHistoryTimestamp,
 		};
 
 		await chrome.storage.local.set({ [MEMORY_KEY]: memoryToSave });
@@ -159,6 +186,7 @@ export async function saveMemory(memory: AnalysisMemory): Promise<void> {
 			patterns: memory.patterns.length,
 			lastAnalyzedDate: memory.lastAnalyzedDate,
 			lastAnalyzedDateISO: memoryToSave.lastAnalyzedDate,
+			lastHistoryTimestamp: memory.lastHistoryTimestamp,
 		});
 	} catch (error) {
 		console.error("Failed to save memory:", error);

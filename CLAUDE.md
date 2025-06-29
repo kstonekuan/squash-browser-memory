@@ -1,0 +1,1 @@
+- Run npm run build after making changes to the code.

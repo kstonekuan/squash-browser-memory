@@ -2,6 +2,7 @@
 import { createEventDispatcher, onMount } from "svelte";
 import { loadAIConfig } from "../utils/ai-config";
 import type { AIProviderType } from "../utils/ai-interface";
+import { loadMemory } from "../utils/memory";
 
 let { isAnalyzing = $bindable(false) } = $props<{
 	isAnalyzing?: boolean;
@@ -10,19 +11,27 @@ let { isAnalyzing = $bindable(false) } = $props<{
 const dispatch = createEventDispatcher();
 
 let error = $state("");
-let dateRange = $state("day"); // 3hours, day, week, all
+let dateRange = $state("3hours"); // 3hours, day, week, all
 let fetchProgress = $state(0);
 let isFetching = $state(false);
 let rawHistoryData = $state<chrome.history.HistoryItem[] | null>(null);
 let showRawData = $state(false);
 let currentProvider = $state<AIProviderType>("chrome");
+let onlyNewHistory = $state(false);
+let lastHistoryTimestamp = $state(0);
 
 onMount(async () => {
 	try {
 		const config = await loadAIConfig();
 		currentProvider = config.provider;
+
+		// Load memory to get the last analyzed timestamp
+		const memory = await loadMemory();
+		if (memory && memory.lastHistoryTimestamp > 0) {
+			lastHistoryTimestamp = memory.lastHistoryTimestamp;
+		}
 	} catch (error) {
-		console.error("Failed to load AI config:", error);
+		console.error("Failed to load AI config or memory:", error);
 		currentProvider = "chrome"; // fallback
 	}
 });
@@ -50,6 +59,11 @@ function getPrivacyColor(): string {
 }
 
 function getStartTime(): number {
+	if (onlyNewHistory && lastHistoryTimestamp > 0) {
+		// Start from the timestamp of the last analyzed item + 1ms to avoid duplicates
+		return lastHistoryTimestamp + 1;
+	}
+
 	const now = Date.now();
 	switch (dateRange) {
 		case "3hours":
@@ -96,7 +110,11 @@ async function fetchHistory() {
 		});
 
 		if (!results || results.length === 0) {
-			error = "No browsing history found for the selected date range.";
+			if (onlyNewHistory) {
+				error = "No new browsing history found since last analysis.";
+			} else {
+				error = "No browsing history found for the selected date range.";
+			}
 			return;
 		}
 
@@ -165,6 +183,21 @@ async function fetchHistory() {
 		</div>
 
 	</div>
+
+	{#if lastHistoryTimestamp > 0}
+		<div class="flex items-center space-x-2">
+			<input
+				id="only-new-history"
+				type="checkbox"
+				bind:checked={onlyNewHistory}
+				class="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+				disabled={isFetching || isAnalyzing}
+			/>
+			<label for="only-new-history" class="text-sm text-gray-700">
+				Only analyze new history since {new Date(lastHistoryTimestamp).toLocaleString()}
+			</label>
+		</div>
+	{/if}
 
 	{#if isFetching}
 		<div class="space-y-1">

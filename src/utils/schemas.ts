@@ -37,24 +37,8 @@ export const ANALYSIS_SCHEMA = {
 		userProfile: {
 			type: "object",
 			properties: {
+				// === Stable Background (Core Identity) ===
 				profession: { type: "string", maxLength: 100 },
-				interests: {
-					type: "array",
-					items: { type: "string", maxLength: 50 },
-					maxItems: 10,
-				},
-				workPatterns: {
-					type: "array",
-					items: {
-						type: "object",
-						properties: {
-							type: { type: "string", maxLength: 50 },
-							description: { type: "string", maxLength: 100 },
-						},
-						required: ["type", "description"],
-					},
-					maxItems: 8,
-				},
 				personalityTraits: {
 					type: "array",
 					items: {
@@ -87,14 +71,66 @@ export const ANALYSIS_SCHEMA = {
 					},
 					maxItems: 10,
 				},
+				personalPreferences: {
+					type: "array",
+					items: {
+						type: "object",
+						properties: {
+							category: { type: "string", maxLength: 40 },
+							preference: { type: "string", maxLength: 80 },
+						},
+						required: ["category", "preference"],
+					},
+					maxItems: 8,
+				},
+
+				// === Current Context (Dynamic/Active) ===
+				currentGoals: {
+					type: "array",
+					items: { type: "string", maxLength: 80 },
+					maxItems: 6,
+				},
+				recentObsessions: {
+					type: "array",
+					items: { type: "string", maxLength: 60 },
+					maxItems: 5,
+				},
+				lifecycleHints: {
+					type: "array",
+					items: { type: "string", maxLength: 60 },
+					maxItems: 4,
+				},
+				interests: {
+					type: "array",
+					items: { type: "string", maxLength: 50 },
+					maxItems: 10,
+				},
+				workPatterns: {
+					type: "array",
+					items: {
+						type: "object",
+						properties: {
+							type: { type: "string", maxLength: 50 },
+							description: { type: "string", maxLength: 100 },
+						},
+						required: ["type", "description"],
+					},
+					maxItems: 8,
+				},
+
+				// === Overall Summary ===
 				summary: { type: "string", maxLength: 500 },
 			},
 			required: [
 				"profession",
-				"interests",
-				"workPatterns",
 				"personalityTraits",
 				"technologyUse",
+				"personalPreferences",
+				"currentGoals",
+				"recentObsessions",
+				"lifecycleHints",
+				"interests",
+				"workPatterns",
 				"summary",
 			],
 		},
