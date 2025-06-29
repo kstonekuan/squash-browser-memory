@@ -340,8 +340,13 @@ function shortenUrlParams(
 		"uact",
 		"sca_esv",
 		"gs_lp",
+		"gs_lcrp",
 		"sclient",
 		"iflsig",
+		"aqs",
+		"sourceid",
+		"ie",
+		"oe",
 		// Session/tracking IDs
 		"sid",
 		"sessionid",
@@ -455,7 +460,7 @@ async function analyzeChunkWithSubdivision(
 	results: { userProfile: UserProfile; patterns: WorkflowPattern[] } | null;
 }> {
 	const TOKEN_LIMIT = 1024;
-	const SAFETY_MARGIN = 24; // Reduced margin for more items per chunk
+	const SAFETY_MARGIN = 200; // Large margin to account for system prompt, response formatting, and long URLs
 	const MAX_TOKENS = TOKEN_LIMIT - SAFETY_MARGIN;
 
 	// First, try to analyze the entire chunk
@@ -533,7 +538,7 @@ async function analyzeChunkWithSubdivision(
 		// Binary search for the right size
 		let left = 1;
 		let right = items.length;
-		let optimalSize = 5; // Start with minimum
+		let optimalSize = 1; // Start with minimum of 1 item
 
 		while (left <= right) {
 			const mid = Math.floor((left + right) / 2);
@@ -672,7 +677,7 @@ async function analyzeChunk(
 	const tokenCount = countTokens(prompt);
 
 	// This should have been checked by the caller
-	if (tokenCount > 1024 - 50) {
+	if (tokenCount > 1024 - 200) {
 		throw new Error(
 			`analyzeChunk called with too many items: ${items.length} items, ${tokenCount} tokens`,
 		);
