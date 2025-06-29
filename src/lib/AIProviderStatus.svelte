@@ -2,7 +2,7 @@
 import { onMount } from "svelte";
 import { loadAIConfig } from "../utils/ai-config";
 import type { AIProviderStatus } from "../utils/ai-interface";
-import { AIProviderFactory } from "../utils/ai-provider-factory";
+import { getProvider } from "../utils/ai-provider-factory";
 import { getAIModelStatus } from "../utils/chrome-ai";
 
 let status: Availability | AIProviderStatus | null = $state(null);
@@ -12,7 +12,7 @@ let providerName = $state("AI");
 onMount(async () => {
 	try {
 		const config = await loadAIConfig();
-		const provider = AIProviderFactory.getProvider(config);
+		const provider = getProvider(config);
 		providerName = provider.getProviderName();
 
 		if (config.provider === "chrome") {

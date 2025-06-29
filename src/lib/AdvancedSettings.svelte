@@ -6,7 +6,11 @@ import {
 	setClaudeApiKey,
 } from "../utils/ai-config";
 import type { AIProviderType } from "../utils/ai-interface";
-import { AIProviderFactory } from "../utils/ai-provider-factory";
+import {
+	getAvailableProviders,
+	getProvider,
+	getProviderDisplayName,
+} from "../utils/ai-provider-factory";
 import {
 	DEFAULT_CHUNK_SYSTEM_PROMPT,
 	DEFAULT_SYSTEM_PROMPT,
@@ -53,7 +57,7 @@ async function updateProviderStatuses() {
 				config.claudeApiKey = claudeApiKey;
 			}
 
-			const provider = AIProviderFactory.getProvider({
+			const provider = getProvider({
 				provider: providerType,
 				claudeApiKey: providerType === "claude" ? claudeApiKey : undefined,
 			});
@@ -143,7 +147,7 @@ function getStatusColor(status: string): string {
 							Select AI Provider
 						</legend>
 						<div class="space-y-2">
-							{#each AIProviderFactory.getAvailableProviders() as provider}
+							{#each getAvailableProviders() as provider}
 								<label class="flex items-center justify-between p-3 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
 									<div class="flex items-center">
 										<input
@@ -155,7 +159,7 @@ function getStatusColor(status: string): string {
 										/>
 										<div>
 											<div class="text-sm font-medium text-gray-900">
-												{AIProviderFactory.getProviderDisplayName(provider)}
+												{getProviderDisplayName(provider)}
 											</div>
 											<div class="text-xs text-gray-500">
 												{#if provider === "chrome"}
@@ -207,7 +211,7 @@ function getStatusColor(status: string): string {
 					<div class="p-3 bg-gray-50 rounded-lg">
 						<div class="text-sm">
 							<span class="font-medium text-gray-700">Current Provider: </span>
-							<span class="text-gray-900">{AIProviderFactory.getProviderDisplayName(currentProvider)}</span>
+							<span class="text-gray-900">{getProviderDisplayName(currentProvider)}</span>
 							<span class={`ml-2 text-xs font-medium ${getStatusColor(providerStatus[currentProvider])}`}>
 								({providerStatus[currentProvider]})
 							</span>

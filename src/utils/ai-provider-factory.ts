@@ -10,77 +10,71 @@ import type {
 import { ChromeAIProvider } from "./chrome-ai";
 import { ClaudeProvider } from "./remote-ai";
 
+// Provider instances for singleton pattern
+let chromeProvider: ChromeAIProvider | null = null;
+let claudeProvider: ClaudeProvider | null = null;
+
 /**
- * Factory class to create and manage AI providers
+ * Get an AI provider instance based on configuration
  */
-export class AIProviderFactory {
-	private static chromeProvider: ChromeAIProvider | null = null;
-	private static claudeProvider: ClaudeProvider | null = null;
+export function getProvider(config: AIProviderConfig): AIProvider {
+	switch (config.provider) {
+		case "chrome":
+			if (!chromeProvider) {
+				chromeProvider = new ChromeAIProvider();
+			}
+			return chromeProvider;
 
-	/**
-	 * Get an AI provider instance based on configuration
-	 */
-	static getProvider(config: AIProviderConfig): AIProvider {
-		switch (config.provider) {
-			case "chrome":
-				if (!AIProviderFactory.chromeProvider) {
-					AIProviderFactory.chromeProvider = new ChromeAIProvider();
-				}
-				return AIProviderFactory.chromeProvider;
+		case "claude":
+			if (!claudeProvider || config.claudeApiKey) {
+				claudeProvider = new ClaudeProvider(config.claudeApiKey);
+			}
+			return claudeProvider;
 
-			case "claude":
-				if (!AIProviderFactory.claudeProvider || config.claudeApiKey) {
-					AIProviderFactory.claudeProvider = new ClaudeProvider(
-						config.claudeApiKey,
-					);
-				}
-				return AIProviderFactory.claudeProvider;
-
-			default:
-				throw new Error(`Unknown AI provider: ${config.provider}`);
-		}
+		default:
+			throw new Error(`Unknown AI provider: ${config.provider}`);
 	}
+}
 
-	/**
-	 * Get all available provider types
-	 */
-	static getAvailableProviders(): AIProviderType[] {
-		return ["chrome", "claude"];
-	}
+/**
+ * Get all available provider types
+ */
+export function getAvailableProviders(): AIProviderType[] {
+	return ["chrome", "claude"];
+}
 
-	/**
-	 * Get provider display names
-	 */
-	static getProviderDisplayName(type: AIProviderType): string {
-		switch (type) {
-			case "chrome":
-				return "Chrome AI (Local)";
-			case "claude":
-				return "Claude API (Remote)";
-			default:
-				return type;
-		}
+/**
+ * Get provider display names
+ */
+export function getProviderDisplayName(type: AIProviderType): string {
+	switch (type) {
+		case "chrome":
+			return "Chrome AI (Local)";
+		case "claude":
+			return "Claude API (Remote)";
+		default:
+			return type;
 	}
+}
 
-	/**
-	 * Check if a provider requires configuration
-	 */
-	static providerRequiresConfiguration(type: AIProviderType): boolean {
-		switch (type) {
-			case "chrome":
-				return false;
-			case "claude":
-				return true;
-			default:
-				return false;
-		}
+/**
+ * Check if a provider requires configuration
+ */
+export function providerRequiresConfiguration(type: AIProviderType): boolean {
+	switch (type) {
+		case "chrome":
+			return false;
+		case "claude":
+			return true;
+		default:
+			return false;
 	}
+}
 
-	/**
-	 * Reset provider instances (useful for testing or configuration changes)
-	 */
-	static resetProviders(): void {
-		AIProviderFactory.chromeProvider = null;
-		AIProviderFactory.claudeProvider = null;
-	}
+/**
+ * Reset provider instances (useful for testing or configuration changes)
+ */
+export function resetProviders(): void {
+	chromeProvider = null;
+	claudeProvider = null;
 }

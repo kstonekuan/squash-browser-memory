@@ -4,7 +4,7 @@
 
 import { loadAIConfig } from "./ai-config";
 import type { AISession } from "./ai-interface";
-import { AIProviderFactory } from "./ai-provider-factory";
+import { getProvider } from "./ai-provider-factory";
 
 /**
  * Create an AI session using the currently configured provider
@@ -14,7 +14,7 @@ export async function createAISession(
 ): Promise<AISession | null> {
 	try {
 		const config = await loadAIConfig();
-		const provider = AIProviderFactory.getProvider(config);
+		const provider = getProvider(config);
 
 		const session = await provider.createSession(systemPrompt);
 
@@ -55,7 +55,7 @@ export async function promptAI(
 export async function isAIAvailable(): Promise<boolean> {
 	try {
 		const config = await loadAIConfig();
-		const provider = AIProviderFactory.getProvider(config);
+		const provider = getProvider(config);
 		return await provider.isAvailable();
 	} catch (error) {
 		console.error("Failed to check AI availability:", error);
@@ -69,7 +69,7 @@ export async function isAIAvailable(): Promise<boolean> {
 export async function getAIProviderStatus(): Promise<string> {
 	try {
 		const config = await loadAIConfig();
-		const provider = AIProviderFactory.getProvider(config);
+		const provider = getProvider(config);
 		const status = await provider.getStatus();
 
 		switch (status) {

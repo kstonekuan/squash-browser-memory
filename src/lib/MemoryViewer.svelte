@@ -30,7 +30,7 @@ onMount(() => {
 		[key: string]: chrome.storage.StorageChange;
 	}) => {
 		// Check if the memory key changed
-		if (changes["history_analysis_memory"] && showMemory) {
+		if (changes.history_analysis_memory && showMemory) {
 			console.log("Memory updated in storage, refreshing...");
 			refreshMemory();
 		}
@@ -84,23 +84,6 @@ function getAutomationPotentialColor(
 			return "text-yellow-600 bg-yellow-50";
 		case "low":
 			return "text-red-600 bg-red-50";
-		default:
-			return "text-gray-600 bg-gray-50";
-	}
-}
-
-function getTechnologyLevelColor(
-	level: "beginner" | "intermediate" | "advanced" | "expert",
-): string {
-	switch (level) {
-		case "expert":
-			return "text-purple-600 bg-purple-50";
-		case "advanced":
-			return "text-blue-600 bg-blue-50";
-		case "intermediate":
-			return "text-green-600 bg-green-50";
-		case "beginner":
-			return "text-yellow-600 bg-yellow-50";
 		default:
 			return "text-gray-600 bg-gray-50";
 	}

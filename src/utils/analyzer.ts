@@ -5,7 +5,7 @@ import type {
 	WorkflowPattern,
 } from "../types";
 import { loadAIConfig } from "./ai-config";
-import { AIProviderFactory } from "./ai-provider-factory";
+import { getProvider } from "./ai-provider-factory";
 import { createAISession, promptAI } from "./ai-session-factory";
 import { createHistoryChunks, identifyChunks } from "./chunking";
 import {
@@ -687,7 +687,7 @@ async function analyzeChunkWithSubdivision(
 			) {
 				// Get provider capabilities for better error messaging
 				const config = await loadAIConfig();
-				const provider = AIProviderFactory.getProvider(config);
+				const provider = getProvider(config);
 				console.log(
 					`Chunk with ${items.length} items exceeds token limit for ${provider.getProviderName()}, subdividing...`,
 				);
@@ -710,7 +710,7 @@ async function analyzeChunkWithSubdivision(
 
 		// Get provider capabilities for optimal chunking
 		const config = await loadAIConfig();
-		const provider = AIProviderFactory.getProvider(config);
+		const provider = getProvider(config);
 		const capabilities = provider.getCapabilities();
 
 		let left = 1;
