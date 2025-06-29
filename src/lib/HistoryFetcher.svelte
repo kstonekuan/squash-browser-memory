@@ -1,5 +1,7 @@
 <script lang="ts">
-import { createEventDispatcher } from "svelte";
+import { createEventDispatcher, onMount } from "svelte";
+import { loadAIConfig } from "../utils/ai-config";
+import type { AIProviderType } from "../utils/ai-interface";
 
 let { isAnalyzing = $bindable(false) } = $props<{
 	isAnalyzing?: boolean;
@@ -8,27 +10,54 @@ let { isAnalyzing = $bindable(false) } = $props<{
 const dispatch = createEventDispatcher();
 
 let error = $state("");
-let dateRange = $state("day"); // day, week, month, all
-let customStartDate = $state("");
-let customEndDate = $state("");
+let dateRange = $state("day"); // 3hours, day, week, all
 let fetchProgress = $state(0);
 let isFetching = $state(false);
 let rawHistoryData = $state<chrome.history.HistoryItem[] | null>(null);
 let showRawData = $state(false);
+let currentProvider = $state<AIProviderType>("chrome");
+
+onMount(async () => {
+	try {
+		const config = await loadAIConfig();
+		currentProvider = config.provider;
+	} catch (error) {
+		console.error("Failed to load AI config:", error);
+		currentProvider = "chrome"; // fallback
+	}
+});
+
+function getPrivacyMessage(): string {
+	switch (currentProvider) {
+		case "chrome":
+			return "Your browsing history never leaves your device. Analysis is performed using Chrome's built-in AI.";
+		case "claude":
+			return "⚠️ Using Claude API for development purposes. Your browsing history will be sent to Anthropic's servers for analysis.";
+		default:
+			return "Your browsing history will be processed according to the selected AI provider's privacy policy.";
+	}
+}
+
+function getPrivacyColor(): string {
+	switch (currentProvider) {
+		case "chrome":
+			return "bg-blue-50 text-blue-700";
+		case "claude":
+			return "bg-yellow-50 text-yellow-800";
+		default:
+			return "bg-gray-50 text-gray-700";
+	}
+}
 
 function getStartTime(): number {
 	const now = Date.now();
 	switch (dateRange) {
+		case "3hours":
+			return now - 3 * 60 * 60 * 1000;
 		case "day":
 			return now - 24 * 60 * 60 * 1000;
 		case "week":
 			return now - 7 * 24 * 60 * 60 * 1000;
-		case "month":
-			return now - 30 * 24 * 60 * 60 * 1000;
-		case "custom":
-			return customStartDate
-				? new Date(customStartDate).getTime()
-				: now - 24 * 60 * 60 * 1000;
 		case "all":
 		default:
 			return 0;
@@ -36,9 +65,6 @@ function getStartTime(): number {
 }
 
 function getEndTime(): number {
-	if (dateRange === "custom" && customEndDate) {
-		return new Date(customEndDate).getTime();
-	}
 	return Date.now();
 }
 
@@ -100,11 +126,21 @@ async function fetchHistory() {
 				<input
 					type="radio"
 					bind:group={dateRange}
+					value="3hours"
+					class="mr-2 text-blue-600 focus:ring-blue-500"
+					disabled={isFetching || isAnalyzing}
+				/>
+				<span class="text-sm">3 hours</span>
+			</label>
+			<label class="flex items-center">
+				<input
+					type="radio"
+					bind:group={dateRange}
 					value="day"
 					class="mr-2 text-blue-600 focus:ring-blue-500"
 					disabled={isFetching || isAnalyzing}
 				/>
-				<span class="text-sm">Last 24 hours</span>
+				<span class="text-sm">24 hours</span>
 			</label>
 			<label class="flex items-center">
 				<input
@@ -114,17 +150,7 @@ async function fetchHistory() {
 					class="mr-2 text-blue-600 focus:ring-blue-500"
 					disabled={isFetching || isAnalyzing}
 				/>
-				<span class="text-sm">Last 7 days</span>
-			</label>
-			<label class="flex items-center">
-				<input
-					type="radio"
-					bind:group={dateRange}
-					value="month"
-					class="mr-2 text-blue-600 focus:ring-blue-500"
-					disabled={isFetching || isAnalyzing}
-				/>
-				<span class="text-sm">Last 30 days</span>
+				<span class="text-sm">7 days</span>
 			</label>
 			<label class="flex items-center">
 				<input
@@ -134,48 +160,10 @@ async function fetchHistory() {
 					class="mr-2 text-blue-600 focus:ring-blue-500"
 					disabled={isFetching || isAnalyzing}
 				/>
-				<span class="text-sm">Last 90 days (Chrome limit)</span>
-			</label>
-			<label class="flex items-center col-span-2">
-				<input
-					type="radio"
-					bind:group={dateRange}
-					value="custom"
-					class="mr-2 text-blue-600 focus:ring-blue-500"
-					disabled={isFetching || isAnalyzing}
-				/>
-				<span class="text-sm">Custom range</span>
+				<span class="text-sm">90 days</span>
 			</label>
 		</div>
 
-		{#if dateRange === "custom"}
-			<div class="grid grid-cols-2 gap-2 mt-3">
-				<div>
-					<label for="start-date" class="block text-xs text-gray-600 mb-1">
-						Start date
-					</label>
-					<input
-						id="start-date"
-						type="date"
-						bind:value={customStartDate}
-						class="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-blue-500 focus:border-blue-500"
-						disabled={isFetching || isAnalyzing}
-					/>
-				</div>
-				<div>
-					<label for="end-date" class="block text-xs text-gray-600 mb-1">
-						End date
-					</label>
-					<input
-						id="end-date"
-						type="date"
-						bind:value={customEndDate}
-						class="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-blue-500 focus:border-blue-500"
-						disabled={isFetching || isAnalyzing}
-					/>
-				</div>
-			</div>
-		{/if}
 	</div>
 
 	{#if isFetching}
@@ -213,9 +201,9 @@ async function fetchHistory() {
 		</div>
 	{/if}
 	
-	<div class="bg-blue-50 rounded-lg p-3">
-		<p class="text-xs text-blue-700">
-			Your browsing history never leaves your device. Analysis is performed using Chrome's built-in AI.
+	<div class={`${getPrivacyColor()} rounded-lg p-3`}>
+		<p class="text-xs">
+			{getPrivacyMessage()}
 		</p>
 	</div>
 	

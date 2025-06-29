@@ -4,7 +4,9 @@ import type {
 	UserProfile,
 	WorkflowPattern,
 } from "../types";
-import { createChromeAISession, promptChromeAI } from "./chrome-ai";
+import { loadAIConfig } from "./ai-config";
+import { AIProviderFactory } from "./ai-provider-factory";
+import { createAISession, promptAI } from "./ai-session-factory";
 import { createHistoryChunks, identifyChunks } from "./chunking";
 import {
 	buildAnalysisPrompt,
@@ -457,12 +459,12 @@ async function mergeAnalysisResults(
 		newResults,
 	);
 
-	const session = await createChromeAISession(
+	const session = await createAISession(
 		customSystemPrompt || DEFAULT_SYSTEM_PROMPT,
 	);
 
 	if (!session) {
-		throw new Error("Chrome AI is not available for merging.");
+		throw new Error("AI is not available for merging.");
 	}
 
 	try {
@@ -478,7 +480,7 @@ async function mergeAnalysisResults(
 		}
 
 		const startTime = performance.now();
-		const response = await promptChromeAI(session, mergePrompt, {
+		const response = await promptAI(session, mergePrompt, {
 			responseConstraint: ANALYSIS_SCHEMA,
 		});
 		const endTime = performance.now();
@@ -628,8 +630,11 @@ async function analyzeChunkWithSubdivision(
 				error instanceof DOMException &&
 				error.name === "QuotaExceededError"
 			) {
+				// Get provider capabilities for better error messaging
+				const config = await loadAIConfig();
+				const provider = AIProviderFactory.getProvider(config);
 				console.log(
-					`Chunk with ${items.length} items exceeds token limit, subdividing...`,
+					`Chunk with ${items.length} items exceeds token limit for ${provider.getProviderName()}, subdividing...`,
 				);
 			} else {
 				// Not a token limit error, re-throw
@@ -639,14 +644,19 @@ async function analyzeChunkWithSubdivision(
 
 		// Need to subdivide the chunk
 
-		// Binary search for the right size using the Chrome AI API
-		const session = await createChromeAISession(
+		// Binary search for the right size using the AI API
+		const session = await createAISession(
 			customSystemPrompt || DEFAULT_SYSTEM_PROMPT,
 		);
 
 		if (!session) {
-			throw new Error("Chrome AI is not available for measuring tokens.");
+			throw new Error("AI is not available for measuring tokens.");
 		}
+
+		// Get provider capabilities for optimal chunking
+		const config = await loadAIConfig();
+		const provider = AIProviderFactory.getProvider(config);
+		const capabilities = provider.getCapabilities();
 
 		let left = 1;
 		let right = items.length;
@@ -660,17 +670,43 @@ async function analyzeChunkWithSubdivision(
 				const testPrompt = buildAnalysisPrompt(testItems, testData);
 
 				try {
-					const testTokenCount = await session.measureInputUsage(testPrompt, {
-						responseConstraint: ANALYSIS_SCHEMA,
-					});
-					console.log(`Testing ${mid} items: ${testTokenCount} tokens`);
+					if (
+						capabilities.supportsTokenMeasurement &&
+						session.measureInputUsage
+					) {
+						const testTokenCount = await session.measureInputUsage(testPrompt, {
+							responseConstraint: ANALYSIS_SCHEMA,
+						});
+						console.log(
+							`Testing ${mid} items: ${testTokenCount} tokens (${provider.getProviderName()})`,
+						);
 
-					// Chrome AI has a 1024 token limit, leave some margin
-					if (testTokenCount <= 900) {
-						optimalSize = mid;
-						left = mid + 1;
+						// Use provider-specific token limit
+						if (testTokenCount <= capabilities.optimalChunkTokens) {
+							optimalSize = mid;
+							left = mid + 1;
+						} else {
+							right = mid - 1;
+						}
 					} else {
-						right = mid - 1;
+						// If provider doesn't support token measurement, use a conservative approach
+						// For Claude: estimate ~4 chars per token, ~50 tokens per item average
+						// For others: use very conservative estimate
+						const tokensPerItem = provider.getProviderName().includes("Claude")
+							? 50
+							: 25;
+						const estimatedTokens = mid * tokensPerItem;
+
+						console.log(
+							`Estimating ${mid} items = ${estimatedTokens} tokens (${provider.getProviderName()})`,
+						);
+
+						if (estimatedTokens <= capabilities.optimalChunkTokens) {
+							optimalSize = mid;
+							left = mid + 1;
+						} else {
+							right = mid - 1;
+						}
 					}
 				} catch {
 					// If measurement fails, assume it's too large
@@ -814,12 +850,12 @@ async function analyzeChunk(
 	// Build the analysis prompt
 	const prompt = buildAnalysisPrompt(items, historyData);
 
-	const session = await createChromeAISession(
+	const session = await createAISession(
 		customSystemPrompt || DEFAULT_SYSTEM_PROMPT,
 	);
 
 	if (!session) {
-		throw new Error("Chrome AI is not available.");
+		throw new Error("AI is not available.");
 	}
 
 	try {
@@ -850,7 +886,7 @@ async function analyzeChunk(
 				}
 
 				const startTime = performance.now();
-				const result = await promptChromeAI(session, prompt, {
+				const result = await promptAI(session, prompt, {
 					responseConstraint: ANALYSIS_SCHEMA,
 				});
 				const endTime = performance.now();

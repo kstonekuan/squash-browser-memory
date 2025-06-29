@@ -1,4 +1,4 @@
-import { createChromeAISession, promptChromeAI } from "./chrome-ai";
+import { createAISession, promptAI } from "./ai-session-factory";
 import { buildChunkingPrompt, DEFAULT_CHUNK_SYSTEM_PROMPT } from "./constants";
 import type { ChunkTimeRange, HistoryChunk } from "./memory";
 import { CHUNK_SCHEMA } from "./schemas";
@@ -43,7 +43,7 @@ export async function identifyChunks(
 
 	const prompt = buildChunkingPrompt(timestamps);
 
-	const session = await createChromeAISession(
+	const session = await createAISession(
 		customChunkPrompt || DEFAULT_CHUNK_SYSTEM_PROMPT,
 	);
 
@@ -51,7 +51,7 @@ export async function identifyChunks(
 		// Fallback to half-day chunking
 		return {
 			timeRanges: createHalfDayChunks(timestamps),
-			error: "Failed to create Chrome AI session",
+			error: "Failed to create AI session",
 			isFallback: true,
 		};
 	}
@@ -89,7 +89,7 @@ export async function identifyChunks(
 	try {
 		const startTime = performance.now();
 		const response = await retryWithBackoff(async () => {
-			return await promptChromeAI(session, prompt, {
+			return await promptAI(session, prompt, {
 				responseConstraint: CHUNK_SCHEMA,
 			});
 		});
@@ -257,7 +257,7 @@ async function identifyChunksForBatch(
 
 	const prompt = buildChunkingPrompt(timestamps);
 
-	const session = await createChromeAISession(
+	const session = await createAISession(
 		customChunkPrompt || DEFAULT_CHUNK_SYSTEM_PROMPT,
 	);
 
@@ -265,7 +265,7 @@ async function identifyChunksForBatch(
 		// Fallback to half-day chunking
 		return {
 			timeRanges: createHalfDayChunks(timestamps),
-			error: "Failed to create Chrome AI session",
+			error: "Failed to create AI session",
 			isFallback: true,
 		};
 	}
@@ -303,7 +303,7 @@ async function identifyChunksForBatch(
 	try {
 		const startTime = performance.now();
 		const response = await retryWithBackoff(async () => {
-			return await promptChromeAI(session, prompt, {
+			return await promptAI(session, prompt, {
 				responseConstraint: CHUNK_SCHEMA,
 			});
 		});

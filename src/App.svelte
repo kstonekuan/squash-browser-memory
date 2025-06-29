@@ -1,10 +1,11 @@
 <script lang="ts">
 import AdvancedSettings from "./lib/AdvancedSettings.svelte";
+import AIProviderStatus from "./lib/AIProviderStatus.svelte";
 import type { AnalysisPhase, SubPhase } from "./lib/AnalysisProgress.svelte";
 import AnalysisProgress from "./lib/AnalysisProgress.svelte";
 import AnalysisResults from "./lib/AnalysisResults.svelte";
-import ChromeAIStatus from "./lib/ChromeAIStatus.svelte";
 import HistoryFetcher from "./lib/HistoryFetcher.svelte";
+import MemoryViewer from "./lib/MemoryViewer.svelte";
 import type { AnalysisResult } from "./types";
 import { analyzeHistoryItems, clearMemory } from "./utils/analyzer";
 
@@ -136,7 +137,7 @@ function handleCancelAnalysis() {
 		</header>
 
 		<div class="bg-white rounded-lg shadow-sm p-4 mb-4">
-			<ChromeAIStatus />
+			<AIProviderStatus />
 
 			<div class="mt-4 pt-4 border-t border-gray-200">
 				<HistoryFetcher 
@@ -157,6 +158,9 @@ function handleCancelAnalysis() {
 		{#if analysisResult}
 			<AnalysisResults result={analysisResult} />
 		{/if}
+
+		<!-- Memory Viewer -->
+		<MemoryViewer />
 
 		<!-- Advanced Settings and Memory Management -->
 		<div class="mt-4 space-y-4">

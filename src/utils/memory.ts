@@ -59,7 +59,14 @@ export async function loadMemory(): Promise<AnalysisMemory | null> {
 		}
 
 		// Convert date strings back to Date objects
-		stored.lastAnalyzedDate = new Date(stored.lastAnalyzedDate);
+		const dateValue = stored.lastAnalyzedDate;
+		stored.lastAnalyzedDate = new Date(dateValue);
+
+		// Validate the date conversion
+		if (isNaN(stored.lastAnalyzedDate.getTime())) {
+			console.warn("Invalid lastAnalyzedDate in stored memory, using epoch");
+			stored.lastAnalyzedDate = new Date(0);
+		}
 
 		// Check version compatibility
 		if (stored.version !== MEMORY_VERSION) {
