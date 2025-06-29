@@ -6,7 +6,11 @@ import type {
 } from "../types";
 import { createChromeAISession } from "./chrome-ai";
 import { createHistoryChunks, identifyChunks } from "./chunking";
-import { buildAnalysisPrompt, DEFAULT_SYSTEM_PROMPT } from "./constants";
+import {
+	buildAnalysisPrompt,
+	buildMergePrompt,
+	DEFAULT_SYSTEM_PROMPT,
+} from "./constants";
 import {
 	type AnalysisMemory,
 	createEmptyMemory,
@@ -185,7 +189,7 @@ export async function analyzeHistoryItems(
 				abortSignal,
 			);
 
-			// Update memory with new results (AI has already done the merging)
+			// Update memory with merged results
 			if (results) {
 				memory = {
 					userProfile: results.userProfile,
@@ -294,6 +298,65 @@ function countTokens(text: string): number {
 	return Math.ceil(text.length / 3.5);
 }
 
+// Merge new analysis results with existing results using LLM
+async function mergeAnalysisResults(
+	memory: AnalysisMemory,
+	newResults: { userProfile: UserProfile; patterns: WorkflowPattern[] },
+	customSystemPrompt?: string,
+): Promise<{ userProfile: UserProfile; patterns: WorkflowPattern[] }> {
+	// If memory is empty, just return the new results
+	if (memory.totalItemsAnalyzed === 0) {
+		return newResults;
+	}
+
+	const mergePrompt = buildMergePrompt(
+		{
+			userProfile: memory.userProfile,
+			patterns: memory.patterns,
+			totalItemsAnalyzed: memory.totalItemsAnalyzed,
+		},
+		newResults,
+	);
+
+	const session = await createChromeAISession(
+		customSystemPrompt || DEFAULT_SYSTEM_PROMPT,
+	);
+
+	if (!session) {
+		throw new Error("Chrome AI is not available for merging.");
+	}
+
+	try {
+		const response = await session.prompt(mergePrompt, {
+			responseConstraint: ANALYSIS_SCHEMA,
+		});
+
+		const parsed = JSON.parse(response);
+
+		// Validate and enforce limits
+		const validatedProfile = {
+			...parsed.userProfile,
+			interests: parsed.userProfile.interests?.slice(0, 10) || [],
+			workPatterns: parsed.userProfile.workPatterns?.slice(0, 8) || [],
+			personalityTraits:
+				parsed.userProfile.personalityTraits?.slice(0, 8) || [],
+			technologyUse: parsed.userProfile.technologyUse?.slice(0, 10) || [],
+		};
+
+		const validatedPatterns = parsed.patterns?.slice(0, 15) || [];
+
+		return {
+			patterns: validatedPatterns,
+			userProfile: validatedProfile,
+		};
+	} catch (error) {
+		console.error("Failed to merge with memory, returning new results:", error);
+		return newResults;
+	} finally {
+		session.destroy();
+	}
+}
+
 // Analyze a chunk with automatic subdivision if it's too large
 async function analyzeChunkWithSubdivision(
 	items: chrome.history.HistoryItem[],
@@ -349,19 +412,27 @@ async function analyzeChunkWithSubdivision(
 			};
 		});
 
-		const testPrompt = buildAnalysisPrompt(items, testHistoryData, memory);
+		const testPrompt = buildAnalysisPrompt(items, testHistoryData);
 		const tokenCount = countTokens(testPrompt);
 
 		if (tokenCount <= MAX_TOKENS) {
 			// Fits within limits, analyze normally
-			const results = await analyzeChunkWithMemory(
+			// Step 1: Analyze the chunk
+			const chunkResults = await analyzeChunk(
 				items,
-				memory,
 				customSystemPrompt,
 				onProgress,
 				abortSignal,
 			);
-			return { processedItems: items.length, results };
+
+			// Step 2: Merge with existing memory
+			const mergedResults = await mergeAnalysisResults(
+				memory,
+				chunkResults,
+				customSystemPrompt,
+			);
+
+			return { processedItems: items.length, results: mergedResults };
 		}
 
 		// Too large, need to subdivide
@@ -378,7 +449,7 @@ async function analyzeChunkWithSubdivision(
 			const mid = Math.floor((left + right) / 2);
 			const testItems = items.slice(0, mid);
 			const testData = testHistoryData.slice(0, mid);
-			const testPrompt = buildAnalysisPrompt(testItems, testData, memory);
+			const testPrompt = buildAnalysisPrompt(testItems, testData);
 			const testTokenCount = countTokens(testPrompt);
 
 			if (testTokenCount <= MAX_TOKENS) {
@@ -407,18 +478,25 @@ async function analyzeChunkWithSubdivision(
 				});
 			}
 
-			const subResults = await analyzeChunkWithMemory(
+			// Step 1: Analyze sub-chunk
+			const subResults = await analyzeChunk(
 				subItems,
-				currentMemory,
 				customSystemPrompt,
-				onProgress,
+				undefined, // Don't pass onProgress to avoid duplicate updates
 				abortSignal,
 			);
 
-			// Update memory with sub-chunk results
+			// Step 2: Merge with current memory
+			const mergedResults = await mergeAnalysisResults(
+				currentMemory,
+				subResults,
+				customSystemPrompt,
+			);
+
+			// Update memory with merged results
 			currentMemory = {
-				userProfile: subResults.userProfile,
-				patterns: subResults.patterns,
+				userProfile: mergedResults.userProfile,
+				patterns: mergedResults.patterns,
 				lastAnalyzedDate: new Date(),
 				totalItemsAnalyzed: currentMemory.totalItemsAnalyzed + subItems.length,
 				version: currentMemory.version,
@@ -445,96 +523,61 @@ async function analyzeChunkWithSubdivision(
 	}
 }
 
-// Analyze a single chunk with memory context
-async function analyzeChunkWithMemory(
+// Analyze a single chunk of history items
+async function analyzeChunk(
 	items: chrome.history.HistoryItem[],
-	memory: AnalysisMemory,
 	customSystemPrompt?: string,
 	onProgress?: ProgressCallback,
 	abortSignal?: AbortSignal,
 ): Promise<{ userProfile: UserProfile; patterns: WorkflowPattern[] }> {
-	const TOKEN_LIMIT = 1024;
-	const SAFETY_MARGIN = 50;
-	const MAX_TOKENS = TOKEN_LIMIT - SAFETY_MARGIN;
+	// Parse URLs for all items
+	const historyData = items.map((item) => {
+		const urlParts: {
+			domain: string;
+			path: string;
+			params: Record<string, string>;
+		} = { domain: "", path: "", params: {} };
 
-	// Start with a subset of items and incrementally add more
-	let itemsToAnalyze = items.slice(0, 5); // Start with 5 items
-	let prompt = "";
-	let tokenCount = 0;
+		try {
+			if (item.url) {
+				const url = new URL(item.url);
+				urlParts.domain = url.hostname;
+				urlParts.path = url.pathname;
 
-	// Keep adding items until we approach the token limit
-	for (let i = 5; i <= items.length; i += 5) {
-		// Parse URLs for current set of items
-		const currentHistoryData = itemsToAnalyze.map((item) => {
-			const urlParts: {
-				domain: string;
-				path: string;
-				params: Record<string, string>;
-			} = { domain: "", path: "", params: {} };
-
-			try {
-				if (item.url) {
-					const url = new URL(item.url);
-					urlParts.domain = url.hostname;
-					urlParts.path = url.pathname;
-
-					// Extract ALL parameters - no filtering or truncation
-					const params: Record<string, string> = {};
-					url.searchParams.forEach((value, key) => {
-						params[key] = value;
-					});
-					urlParts.params = params;
-				}
-			} catch {
-				// Invalid URL - try to extract domain from URL string
-				const match = item.url?.match(/^https?:\/\/([^/]+)/);
-				if (match) {
-					urlParts.domain = match[1];
-				}
+				// Extract ALL parameters - no filtering or truncation
+				const params: Record<string, string> = {};
+				url.searchParams.forEach((value, key) => {
+					params[key] = value;
+				});
+				urlParts.params = params;
 			}
-
-			// Return structured data with ALL information preserved
-			return {
-				d: urlParts.domain, // domain
-				p: urlParts.path || "", // full path
-				q:
-					Object.keys(urlParts.params).length > 0 ? urlParts.params : undefined, // all query params
-				t: item.title || "", // full title
-				ts: item.lastVisitTime || 0, // timestamp
-				v: item.visitCount || 0, // visit count
-			};
-		});
-
-		// Build the prompt with current items
-		const currentPrompt = buildAnalysisPrompt(
-			itemsToAnalyze,
-			currentHistoryData,
-			memory,
-		);
-		const currentTokenCount = countTokens(currentPrompt);
-
-		// If this would exceed the limit, use the previous iteration
-		if (currentTokenCount > MAX_TOKENS && i > 5) {
-			console.log(
-				`Stopping at ${itemsToAnalyze.length} items (${tokenCount} tokens) to stay under limit`,
-			);
-			break;
+		} catch {
+			// Invalid URL - try to extract domain from URL string
+			const match = item.url?.match(/^https?:\/\/([^/]+)/);
+			if (match) {
+				urlParts.domain = match[1];
+			}
 		}
 
-		// Update for next iteration
-		prompt = currentPrompt;
-		tokenCount = currentTokenCount;
+		// Return structured data with ALL information preserved
+		return {
+			d: urlParts.domain, // domain
+			p: urlParts.path || "", // full path
+			q: Object.keys(urlParts.params).length > 0 ? urlParts.params : undefined, // all query params
+			t: item.title || "", // full title
+			ts: item.lastVisitTime || 0, // timestamp
+			v: item.visitCount || 0, // visit count
+		};
+	});
 
-		// Don't add more items if we're already at the end
-		if (i < items.length) {
-			itemsToAnalyze = items.slice(0, Math.min(i + 5, items.length));
-		}
-	}
+	// Build the analysis prompt
+	const prompt = buildAnalysisPrompt(items, historyData);
+	const tokenCount = countTokens(prompt);
 
-	// Log if we had to limit items
-	if (itemsToAnalyze.length < items.length) {
-		console.warn(
-			`Token limit: analyzing ${itemsToAnalyze.length} of ${items.length} items (${tokenCount} tokens)`,
+	// This should have been checked by the caller
+	if (tokenCount > 1024 - 50) {
+		throw new Error(
+			`analyzeChunk called with too many items: ${items.length} items, ${tokenCount} tokens`,
 		);
 	}
 
@@ -571,10 +614,7 @@ async function analyzeChunkWithMemory(
 			// Ensure patterns is an array and userProfile exists
 			if (!parsed || !Array.isArray(parsed.patterns) || !parsed.userProfile) {
 				// Chrome AI analysis response missing required fields
-				return {
-					patterns: [],
-					userProfile: memory.userProfile,
-				};
+				throw new Error("AI response missing required fields");
 			}
 
 			// Validate and enforce limits
@@ -589,30 +629,14 @@ async function analyzeChunkWithMemory(
 
 			const validatedPatterns = parsed.patterns?.slice(0, 15) || [];
 
-			// Log if limits were exceeded
-			if (memory.totalItemsAnalyzed > 0) {
-				if (parsed.patterns?.length > 15) {
-					console.warn(
-						`AI returned ${parsed.patterns.length} patterns, limiting to 15`,
-					);
-				}
-				if (parsed.userProfile.interests?.length > 10) {
-					console.warn(
-						`AI returned ${parsed.userProfile.interests.length} interests, limiting to 10`,
-					);
-				}
-			}
-
 			return {
 				patterns: validatedPatterns,
 				userProfile: validatedProfile,
 			};
-		} catch (_error) {
+		} catch (error) {
 			// Failed to parse Chrome AI analysis response
-			return {
-				patterns: [],
-				userProfile: memory.userProfile,
-			};
+			console.error("Failed to parse AI response:", error);
+			throw error;
 		}
 	} finally {
 		session.destroy();

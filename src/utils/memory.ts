@@ -83,21 +83,3 @@ export async function saveMemory(memory: AnalysisMemory): Promise<void> {
 export async function clearMemory(): Promise<void> {
 	localStorage.removeItem(MEMORY_KEY);
 }
-
-// Simply update memory with new results (AI handles the merging)
-export function mergeMemoryWithResults(
-	memory: AnalysisMemory,
-	newProfile: UserProfile,
-	newPatterns: WorkflowPattern[],
-	itemsAnalyzed: number,
-): AnalysisMemory {
-	// The AI has already merged old memory with new chunk data
-	// So we just take the new results as-is
-	return {
-		userProfile: newProfile,
-		patterns: newPatterns,
-		lastAnalyzedDate: new Date(),
-		totalItemsAnalyzed: memory.totalItemsAnalyzed + itemsAnalyzed,
-		version: MEMORY_VERSION,
-	};
-}

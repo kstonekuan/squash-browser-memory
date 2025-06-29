@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { calculateStats } from "./analyzer";
 import { buildAnalysisPrompt } from "./constants";
-import { createEmptyMemory } from "./memory";
 
 describe("calculateStats", () => {
 	it("should calculate stats for empty array", () => {
@@ -129,7 +128,6 @@ describe("token counting and subdivision", () => {
 		}
 
 		// Create test data to measure prompt size
-		const memory = createEmptyMemory();
 		const historyData = largeItems.map((item) => ({
 			d: "example.com",
 			p: "/very/long/path/with/many/segments/and/parameters",
@@ -145,7 +143,7 @@ describe("token counting and subdivision", () => {
 		}));
 
 		// Build the prompt to check its size
-		const prompt = buildAnalysisPrompt(largeItems, historyData, memory);
+		const prompt = buildAnalysisPrompt(largeItems, historyData);
 
 		// Token estimation: ~3.5 characters per token
 		const estimatedTokens = Math.ceil(prompt.length / 3.5);
@@ -156,11 +154,7 @@ describe("token counting and subdivision", () => {
 		// Verify that a smaller subset would fit
 		const smallSubset = largeItems.slice(0, 10);
 		const smallHistoryData = historyData.slice(0, 10);
-		const smallPrompt = buildAnalysisPrompt(
-			smallSubset,
-			smallHistoryData,
-			memory,
-		);
+		const smallPrompt = buildAnalysisPrompt(smallSubset, smallHistoryData);
 		const smallTokens = Math.ceil(smallPrompt.length / 3.5);
 
 		expect(smallTokens).toBeLessThan(1024);
@@ -187,8 +181,6 @@ describe("token counting and subdivision", () => {
 			});
 		}
 
-		const memory = createEmptyMemory();
-
 		// Simulate binary search for optimal size
 		let left = 1;
 		let right = items.length;
@@ -206,7 +198,7 @@ describe("token counting and subdivision", () => {
 				v: item.visitCount || 0,
 			}));
 
-			const testPrompt = buildAnalysisPrompt(testItems, testData, memory);
+			const testPrompt = buildAnalysisPrompt(testItems, testData);
 			const testTokenCount = countTokens(testPrompt);
 
 			if (testTokenCount <= MAX_TOKENS) {
@@ -232,11 +224,7 @@ describe("token counting and subdivision", () => {
 			v: item.visitCount || 0,
 		}));
 
-		const optimalPrompt = buildAnalysisPrompt(
-			optimalItems,
-			optimalData,
-			memory,
-		);
+		const optimalPrompt = buildAnalysisPrompt(optimalItems, optimalData);
 		const optimalTokenCount = countTokens(optimalPrompt);
 
 		expect(optimalTokenCount).toBeLessThanOrEqual(MAX_TOKENS);
