@@ -20,7 +20,7 @@ let analysisResult: AnalysisResult | null = $state(null);
 let standardizedData: StandardizedHistoryData | null = $state(null);
 let isAnalyzing = $state(false);
 let apiKey = $state("");
-let provider: AIProvider = $state("gemini");
+let provider: AIProvider = $state("chrome");
 let analysisPhase: AnalysisPhase = $state("idle");
 
 // Load saved API key and provider from chrome.storage

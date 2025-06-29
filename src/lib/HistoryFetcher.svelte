@@ -14,6 +14,8 @@ let customStartDate = $state("");
 let customEndDate = $state("");
 let fetchProgress = $state(0);
 let isFetching = $state(false);
+let rawHistoryData = $state<ChromeHistoryItem[] | null>(null);
+let showRawData = $state(false);
 
 function getStartTime(): number {
 	const now = Date.now();
@@ -84,6 +86,9 @@ async function fetchHistory() {
 				visitCount: item.visitCount || 1,
 				typedCount: item.typedCount || 0,
 			}));
+
+		// Store raw data for display
+		rawHistoryData = historyItems;
 
 		// Emit the history data as JSON
 		dispatch("analysis-request", {
@@ -161,7 +166,7 @@ $effect(() => {
 					class="mr-2 text-blue-600 focus:ring-blue-500"
 					disabled={isFetching || isAnalyzing}
 				/>
-				<span class="text-sm">All time</span>
+				<span class="text-sm">Last 90 days (Chrome limit)</span>
 			</label>
 			<label class="flex items-center">
 				<input
@@ -232,4 +237,37 @@ $effect(() => {
 			Your browsing history never leaves your device. Analysis is performed using your API key.
 		</p>
 	</div>
+	
+	{#if rawHistoryData && rawHistoryData.length > 0}
+		<div class="border border-gray-200 rounded-lg">
+			<button
+				type="button"
+				onclick={() => showRawData = !showRawData}
+				class="w-full px-4 py-3 text-left text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-500 flex items-center justify-between"
+			>
+				<span>Raw History Data ({rawHistoryData.length} items)</span>
+				<svg 
+					class={`w-5 h-5 transition-transform ${showRawData ? 'rotate-180' : ''}`} 
+					fill="none" 
+					stroke="currentColor" 
+					viewBox="0 0 24 24"
+				>
+					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+				</svg>
+			</button>
+			
+			{#if showRawData}
+				<div class="border-t border-gray-200">
+					<div class="p-4 max-h-96 overflow-y-auto">
+						<pre class="text-xs font-mono whitespace-pre-wrap break-words bg-gray-50 p-3 rounded">{JSON.stringify(rawHistoryData, null, 2)}</pre>
+					</div>
+					<div class="border-t border-gray-200 px-4 py-2 bg-gray-50">
+						<p class="text-xs text-gray-600">
+							This is the raw Chrome history data that will be sent to the AI model for standardization and analysis.
+						</p>
+					</div>
+				</div>
+			{/if}
+		</div>
+	{/if}
 </div>

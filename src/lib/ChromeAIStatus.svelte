@@ -1,11 +1,8 @@
 <script lang="ts">
 import { onMount } from "svelte";
-import {
-	type ChromeAIAvailability,
-	getAIModelStatus,
-} from "../utils/chrome-ai";
+import { getAIModelStatus } from "../utils/chrome-ai";
 
-let status: ChromeAIAvailability | null = $state(null);
+let status: Availability | null = $state(null);
 let checking = $state(true);
 
 onMount(async () => {
@@ -19,7 +16,7 @@ onMount(async () => {
 	}
 });
 
-function getStatusColor(status: ChromeAIAvailability | null): string {
+function getStatusColor(status: Availability | null): string {
 	switch (status) {
 		case "available":
 			return "text-green-600";
@@ -33,7 +30,7 @@ function getStatusColor(status: ChromeAIAvailability | null): string {
 	}
 }
 
-function getStatusIcon(status: ChromeAIAvailability | null): string {
+function getStatusIcon(status: Availability | null): string {
 	switch (status) {
 		case "available":
 			return "✓";
@@ -47,7 +44,7 @@ function getStatusIcon(status: ChromeAIAvailability | null): string {
 	}
 }
 
-function getStatusMessage(status: ChromeAIAvailability | null): string {
+function getStatusMessage(status: Availability | null): string {
 	switch (status) {
 		case "available":
 			return "Chrome AI is ready to use";

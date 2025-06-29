@@ -20,7 +20,7 @@ let analysisResult: AnalysisResult | null = $state(null);
 let standardizedData: StandardizedHistoryData | null = $state(null);
 let isAnalyzing = $state(false);
 let apiKey = $state("");
-let provider: AIProvider = $state("gemini");
+let provider: AIProvider = $state("chrome");
 let analysisPhase: AnalysisPhase = $state("idle");
 
 async function handleAnalysis(
@@ -28,7 +28,7 @@ async function handleAnalysis(
 ) {
 	const { input, type } = event.detail;
 
-	if (!apiKey) {
+	if (!apiKey && provider !== "chrome") {
 		alert("Please enter your API key first.");
 		return;
 	}

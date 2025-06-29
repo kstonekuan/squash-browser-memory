@@ -23,10 +23,24 @@ import {
 export function calculateStats(
 	items: StandardizedHistoryItem[],
 ): Pick<StandardizedHistoryData, "totalUrls" | "topDomains" | "dateRange"> {
+	// Ensure items is a valid array
+	if (!items || !Array.isArray(items)) {
+		return {
+			totalUrls: 0,
+			topDomains: [],
+			dateRange: {
+				start: new Date().toISOString(),
+				end: new Date().toISOString(),
+			},
+		};
+	}
+
 	// Calculate domain frequencies
 	const domains = new Map<string, number>();
 	items.forEach((item) => {
-		domains.set(item.domain, (domains.get(item.domain) || 0) + 1);
+		if (item?.domain) {
+			domains.set(item.domain, (domains.get(item.domain) || 0) + 1);
+		}
 	});
 
 	const topDomains = Array.from(domains.entries())
@@ -95,6 +109,12 @@ ${input}`;
 			parsed = await parseWithGemini(apiKey, parsePrompt);
 		} else {
 			parsed = await parseWithChromeAI(parsePrompt);
+		}
+
+		// Ensure parsed.items exists and is an array
+		if (!parsed || !parsed.items || !Array.isArray(parsed.items)) {
+			console.error("Invalid parsed data:", parsed);
+			throw new Error("Failed to parse history data - invalid format received");
 		}
 
 		// Calculate statistics from the parsed data
@@ -184,11 +204,25 @@ async function parseWithChromeAI(prompt: string) {
 	try {
 		const jsonPrompt = createJSONPrompt(
 			prompt +
-				"\n\nReturn as JSON with an 'items' array containing objects with timestamp, url, domain, and title fields.",
+				"\n\nReturn as JSON with an 'items' array containing objects with timestamp, url, domain, and title fields. Even if there's only one history entry, ensure it's wrapped in an 'items' array.",
 		);
 		const response = await session.prompt(jsonPrompt);
 
-		return parseAIResponse(response, { items: [] });
+		const parsed = parseAIResponse(response, { items: [] });
+
+		// Additional validation for Chrome AI responses
+		if (!parsed || typeof parsed !== "object") {
+			console.error("Chrome AI returned invalid response:", response);
+			return { items: [] };
+		}
+
+		// Ensure items is an array
+		if (!Array.isArray(parsed.items)) {
+			console.error("Chrome AI response missing items array:", parsed);
+			return { items: [] };
+		}
+
+		return parsed;
 	} finally {
 		session.destroy();
 	}
