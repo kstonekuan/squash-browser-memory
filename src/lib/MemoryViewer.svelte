@@ -1,4 +1,5 @@
 <script lang="ts">
+import { onMount } from "svelte";
 import type { AnalysisMemory } from "../utils/memory";
 import { loadMemory } from "../utils/memory";
 
@@ -22,11 +23,36 @@ async function loadMemoryData() {
 	}
 }
 
+// Listen for storage changes to automatically refresh memory
+onMount(() => {
+	const handleStorageChange = (changes: {
+		[key: string]: chrome.storage.StorageChange;
+	}) => {
+		// Check if the memory key changed
+		if (changes["history_analysis_memory"] && showMemory) {
+			console.log("Memory updated in storage, refreshing...");
+			refreshMemory();
+		}
+	};
+
+	// Listen to chrome storage changes
+	if (chrome?.storage?.onChanged) {
+		chrome.storage.onChanged.addListener(handleStorageChange);
+
+		// Cleanup listener on component destroy
+		return () => {
+			chrome.storage.onChanged.removeListener(handleStorageChange);
+		};
+	}
+});
+
 // Refresh memory data
 async function refreshMemory() {
 	loading = true;
 	try {
 		memory = await loadMemory();
+		// Force refresh next time if memory section is toggled
+		hasAttemptedLoad = false;
 	} catch (error) {
 		console.error("Failed to refresh memory:", error);
 	} finally {
@@ -35,7 +61,7 @@ async function refreshMemory() {
 }
 
 function formatDate(date: Date): string {
-	if (!date || isNaN(date.getTime())) {
+	if (!date || Number.isNaN(date.getTime())) {
 		return "Never";
 	}
 

@@ -27,7 +27,7 @@ export interface ChunkTimeRange {
 }
 
 const MEMORY_KEY = "history_analysis_memory";
-const MEMORY_VERSION = "1.0.0";
+const MEMORY_VERSION = "1.0.2"; // Bumped to fix date object serialization issues
 
 // Initialize empty memory
 export function createEmptyMemory(): AnalysisMemory {
@@ -60,17 +60,73 @@ export async function loadMemory(): Promise<AnalysisMemory | null> {
 
 		// Convert date strings back to Date objects
 		const dateValue = stored.lastAnalyzedDate;
-		stored.lastAnalyzedDate = new Date(dateValue);
+		console.log(
+			"Raw dateValue from storage:",
+			dateValue,
+			"Type:",
+			typeof dateValue,
+		);
+
+		// Handle different possible date formats
+		let parsedDate: Date;
+		if (dateValue instanceof Date) {
+			// Already a Date object
+			parsedDate = dateValue;
+		} else if (typeof dateValue === "string") {
+			// ISO string from JSON serialization
+			parsedDate = new Date(dateValue);
+		} else if (typeof dateValue === "number") {
+			// Unix timestamp
+			parsedDate = new Date(dateValue);
+		} else if (typeof dateValue === "object" && dateValue !== null) {
+			// Date object that lost its prototype during JSON serialization/deserialization
+			console.warn(
+				"Date stored as plain object, attempting to recover:",
+				dateValue,
+			);
+			try {
+				// Try to convert the object to a string and parse it
+				const dateString = String(dateValue);
+				parsedDate = new Date(dateString);
+
+				// If that didn't work, it might be a Date object that lost its prototype
+				if (Number.isNaN(parsedDate.getTime())) {
+					// Force create a new Date from current time as fallback
+					console.warn(
+						"Could not recover date from object, using current time",
+					);
+					parsedDate = new Date();
+				}
+			} catch (error) {
+				console.warn("Error parsing date object:", error);
+				parsedDate = new Date();
+			}
+		} else {
+			// Invalid format
+			console.warn(
+				"Unexpected date format in storage:",
+				dateValue,
+				typeof dateValue,
+			);
+			parsedDate = new Date();
+		}
+
+		stored.lastAnalyzedDate = parsedDate;
 
 		// Validate the date conversion
-		if (isNaN(stored.lastAnalyzedDate.getTime())) {
-			console.warn("Invalid lastAnalyzedDate in stored memory, using epoch");
+		if (Number.isNaN(stored.lastAnalyzedDate.getTime())) {
+			console.warn(
+				"Invalid lastAnalyzedDate in stored memory, using epoch. Original value:",
+				dateValue,
+			);
 			stored.lastAnalyzedDate = new Date(0);
 		}
 
 		// Check version compatibility
 		if (stored.version !== MEMORY_VERSION) {
-			console.log("Memory version mismatch, creating new memory");
+			console.log(
+				`Memory version mismatch (${stored.version} !== ${MEMORY_VERSION}), creating new memory`,
+			);
 			return null;
 		}
 
@@ -78,6 +134,8 @@ export async function loadMemory(): Promise<AnalysisMemory | null> {
 			itemsAnalyzed: stored.totalItemsAnalyzed,
 			patterns: stored.patterns.length,
 			lastAnalyzed: stored.lastAnalyzedDate,
+			lastAnalyzedType: typeof stored.lastAnalyzedDate,
+			lastAnalyzedIsDate: stored.lastAnalyzedDate instanceof Date,
 		});
 		return stored;
 	} catch (error) {
@@ -89,10 +147,18 @@ export async function loadMemory(): Promise<AnalysisMemory | null> {
 // Save memory to Chrome storage
 export async function saveMemory(memory: AnalysisMemory): Promise<void> {
 	try {
-		await chrome.storage.local.set({ [MEMORY_KEY]: memory });
+		// Normalize the date to an ISO string before saving to prevent serialization issues
+		const memoryToSave = {
+			...memory,
+			lastAnalyzedDate: memory.lastAnalyzedDate.toISOString(),
+		};
+
+		await chrome.storage.local.set({ [MEMORY_KEY]: memoryToSave });
 		console.log("Saved memory to chrome.storage.local:", {
 			itemsAnalyzed: memory.totalItemsAnalyzed,
 			patterns: memory.patterns.length,
+			lastAnalyzedDate: memory.lastAnalyzedDate,
+			lastAnalyzedDateISO: memoryToSave.lastAnalyzedDate,
 		});
 	} catch (error) {
 		console.error("Failed to save memory:", error);

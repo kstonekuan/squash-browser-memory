@@ -27,6 +27,37 @@ export { clearMemory } from "./memory";
 // Export for testing
 export { hideTrackingParams };
 
+// Helper function to extract JSON from markdown-wrapped responses
+function extractJSONFromResponse(response: string): string {
+	// Remove markdown code fences if present
+	const codeBlockRegex = /```(?:json)?\s*([\s\S]*?)\s*```/;
+	const match = response.match(codeBlockRegex);
+
+	if (match) {
+		console.log("Found markdown-wrapped JSON, extracting...");
+		return match[1].trim();
+	}
+
+	// If no code blocks, try to find JSON object boundaries
+	const jsonStartIndex = response.indexOf("{");
+	const jsonEndIndex = response.lastIndexOf("}");
+
+	if (
+		jsonStartIndex !== -1 &&
+		jsonEndIndex !== -1 &&
+		jsonEndIndex > jsonStartIndex
+	) {
+		const extractedJson = response.substring(jsonStartIndex, jsonEndIndex + 1);
+		if (extractedJson !== response.trim()) {
+			console.log("Extracted JSON from mixed content response");
+		}
+		return extractedJson;
+	}
+
+	// Return as-is if no extraction needed
+	return response.trim();
+}
+
 // Calculate statistics from Chrome history items
 export function calculateStats(items: chrome.history.HistoryItem[]): {
 	totalUrls: number;
@@ -270,6 +301,11 @@ export async function analyzeHistoryItems(
 		}
 	}
 
+	// Final save with completion timestamp
+	memory.lastAnalyzedDate = new Date();
+	await saveMemory(memory);
+	console.log("Final memory saved with completion timestamp");
+
 	// Return final results from memory
 	const analysisEndTime = performance.now();
 	const totalDuration = ((analysisEndTime - analysisStartTime) / 1000).toFixed(
@@ -280,6 +316,7 @@ export async function analyzeHistoryItems(
 	console.log(`Items analyzed: ${stats.totalUrls}`);
 	console.log(`Chunks processed: ${processedChunks}`);
 	console.log(`Patterns found: ${memory.patterns.length}`);
+	console.log(`Last analyzed: ${memory.lastAnalyzedDate.toISOString()}`);
 	console.log(`========================\n`);
 
 	return {
@@ -500,7 +537,9 @@ async function mergeAnalysisResults(
 
 		let parsed: { userProfile: UserProfile; patterns: WorkflowPattern[] };
 		try {
-			parsed = JSON.parse(response);
+			// Clean the response to extract JSON from markdown if needed
+			const cleanedResponse = extractJSONFromResponse(response);
+			parsed = JSON.parse(cleanedResponse);
 		} catch (parseError) {
 			console.error("Failed to parse merge response:", parseError);
 			console.error("Response length:", response.length);
@@ -915,7 +954,9 @@ async function analyzeChunk(
 		console.log("Analysis response received");
 
 		try {
-			const parsed = JSON.parse(response);
+			// Clean the response to extract JSON from markdown if needed
+			const cleanedResponse = extractJSONFromResponse(response);
+			const parsed = JSON.parse(cleanedResponse);
 
 			// Ensure patterns is an array and userProfile exists
 			if (!parsed || !Array.isArray(parsed.patterns) || !parsed.userProfile) {
@@ -940,10 +981,25 @@ async function analyzeChunk(
 				userProfile: validatedProfile,
 			};
 		} catch (error) {
-			// Failed to parse Chrome AI analysis response
+			// Failed to parse AI analysis response
 			console.error("Failed to parse AI response:", error);
 			console.error("Raw response length:", response.length);
 			console.error("Response preview:", `${response.substring(0, 200)}...`);
+			console.error(
+				"Response end:",
+				`...${response.substring(Math.max(0, response.length - 200))}`,
+			);
+
+			// Try to show what the cleaning function extracted
+			try {
+				const cleaned = extractJSONFromResponse(response);
+				console.error(
+					"Cleaned response preview:",
+					`${cleaned.substring(0, 200)}...`,
+				);
+			} catch (cleanError) {
+				console.error("Failed to clean response:", cleanError);
+			}
 			console.error(
 				"Response end:",
 				`...${response.substring(response.length - 200)}`,

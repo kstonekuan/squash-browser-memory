@@ -22,7 +22,9 @@ Rules:
 - Use descriptive labels
 
 IMPORTANT: Return startIndex and endIndex (not startTime/endTime) using the indices shown in brackets above.
-Example: If session spans from [5] to [12], return startIndex: 5, endIndex: 12`;
+Example: If session spans from [5] to [12], return startIndex: 5, endIndex: 12
+
+IMPORTANT: Return only valid JSON matching the schema. Do not include markdown formatting, code blocks, or any other text.`;
 }
 
 import type { UserProfile, WorkflowPattern } from "../types";
@@ -58,7 +60,9 @@ Also identify workflow patterns:
 - Repetitive sequences of sites/actions
 - Time patterns (daily, weekly, etc.)
 - Automation opportunities
-- Include frequency and specific URLs as evidence`;
+- Include frequency and specific URLs as evidence
+
+IMPORTANT: Return only valid JSON matching the schema. Do not include markdown formatting, code blocks, or any other text.`;
 }
 
 export function buildMergePrompt(
@@ -105,5 +109,7 @@ MERGE RULES:
 
 4. The response must have FEWER or EQUAL items than the input, never more!
 
-Return the MERGED result that intelligently combines both old and new information.`;
+Return the MERGED result that intelligently combines both old and new information.
+
+IMPORTANT: Return only valid JSON matching the schema. Do not include markdown formatting, code blocks, or any other text.`;
 }

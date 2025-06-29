@@ -3,6 +3,39 @@ import { buildChunkingPrompt, DEFAULT_CHUNK_SYSTEM_PROMPT } from "./constants";
 import type { ChunkTimeRange, HistoryChunk } from "./memory";
 import { CHUNK_SCHEMA } from "./schemas";
 
+// Helper function to extract JSON from markdown-wrapped responses
+function extractJSONFromResponse(response: string): string {
+	// Remove markdown code fences if present
+	const codeBlockRegex = /```(?:json)?\s*([\s\S]*?)\s*```/;
+	const match = response.match(codeBlockRegex);
+
+	if (match) {
+		console.log(
+			"Found markdown-wrapped JSON in chunking response, extracting...",
+		);
+		return match[1].trim();
+	}
+
+	// If no code blocks, try to find JSON object boundaries
+	const jsonStartIndex = response.indexOf("{");
+	const jsonEndIndex = response.lastIndexOf("}");
+
+	if (
+		jsonStartIndex !== -1 &&
+		jsonEndIndex !== -1 &&
+		jsonEndIndex > jsonStartIndex
+	) {
+		const extractedJson = response.substring(jsonStartIndex, jsonEndIndex + 1);
+		if (extractedJson !== response.trim()) {
+			console.log("Extracted JSON from mixed content chunking response");
+		}
+		return extractedJson;
+	}
+
+	// Return as-is if no extraction needed
+	return response.trim();
+}
+
 export interface ChunkingResult {
 	timeRanges: ChunkTimeRange[];
 	rawResponse?: string;
@@ -107,7 +140,9 @@ export async function identifyChunks(
 			}>;
 		};
 		try {
-			parsed = JSON.parse(response);
+			// Clean the response to extract JSON from markdown if needed
+			const cleanedResponse = extractJSONFromResponse(response);
+			parsed = JSON.parse(cleanedResponse);
 		} catch (parseError) {
 			return {
 				timeRanges: createHalfDayChunks(timestamps),
@@ -321,7 +356,9 @@ async function identifyChunksForBatch(
 			}>;
 		};
 		try {
-			parsed = JSON.parse(response);
+			// Clean the response to extract JSON from markdown if needed
+			const cleanedResponse = extractJSONFromResponse(response);
+			parsed = JSON.parse(cleanedResponse);
 		} catch (parseError) {
 			return {
 				timeRanges: createHalfDayChunks(timestamps),
