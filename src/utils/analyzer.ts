@@ -422,6 +422,19 @@ async function mergeAnalysisResults(
 
 		const parsed = JSON.parse(response);
 
+		// Log merge results for debugging
+		console.log("Merge operation:", {
+			beforePatterns: memory.patterns.length,
+			newPatterns: newResults.patterns.length,
+			afterPatterns: parsed.patterns?.length || 0,
+			sampleBefore: memory.patterns.slice(0, 3).map((p) => p.description),
+			sampleNew: newResults.patterns.slice(0, 3).map((p) => p.description),
+			sampleAfter:
+				parsed.patterns
+					?.slice(0, 3)
+					.map((p: WorkflowPattern) => p.description) || [],
+		});
+
 		// Validate and enforce limits
 		const validatedProfile = {
 			...parsed.userProfile,

@@ -81,11 +81,15 @@ NEW ANALYSIS RESULTS:
 ${JSON.stringify(newResults)}
 
 MERGE RULES:
-1. CONSOLIDATE patterns:
-   - Merge similar patterns (e.g., "Daily GitHub PR review" and "GitHub pull request checking" should become one)
-   - Sum frequencies when merging
+1. CONSOLIDATE patterns - CRITICAL:
+   - DETECT and MERGE similar patterns. Examples:
+     * "Daily GitHub PR review" + "Checking GitHub pull requests" = ONE pattern
+     * "Google search for programming" + "Search Google for code" = ONE pattern
+     * "Reading Reddit programming" + "Browsing r/programming" = ONE pattern
+   - When merging, ADD frequencies together
    - Keep ONLY 10-15 most frequent/important patterns total
    - Remove patterns with frequency < 3 unless highly significant
+   - NEVER have two patterns that describe the same activity
 
 2. LIMIT lists strictly:
    - interests: MAX 10 items (remove least relevant)
