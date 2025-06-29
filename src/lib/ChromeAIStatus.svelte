@@ -53,7 +53,7 @@ function getStatusMessage(status: Availability | null): string {
 		case "downloading":
 			return "Chrome AI model is downloading...";
 		case "unavailable":
-			return "Chrome AI is not available (requires Chrome 131+)";
+			return "Chrome AI is not available";
 		default:
 			return "Checking Chrome AI availability...";
 	}
@@ -80,8 +80,7 @@ function getStatusMessage(status: Availability | null): string {
 	
 	{#if status === 'unavailable'}
 		<div class="mt-2 text-xs text-gray-600">
-			<p>Please use Chrome 131 or later to use the local AI feature.</p>
-			<p>You can still use Google Gemini or OpenAI with an API key.</p>
+			<p>Chrome AI feature is not available in this browser.</p>
 		</div>
 	{/if}
 {/if}

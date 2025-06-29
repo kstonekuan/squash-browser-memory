@@ -106,6 +106,7 @@ export async function analyzeHistoryItems(
 
 	// Notify that we're calculating statistics
 	if (onProgress) onProgress({ phase: "calculating" });
+	console.log("Starting analysis with", items.length, "items");
 	const stats = calculateStats(items);
 
 	// Load existing memory
@@ -113,6 +114,10 @@ export async function analyzeHistoryItems(
 	if (!memory) {
 		memory = createEmptyMemory();
 	}
+	console.log(
+		"Memory loaded, items previously analyzed:",
+		memory.totalItemsAnalyzed,
+	);
 
 	// Check if aborted before chunking
 	if (abortSignal?.aborted) {
@@ -121,15 +126,22 @@ export async function analyzeHistoryItems(
 
 	// Identify chunks using AI
 	if (onProgress) onProgress({ phase: "chunking" });
+	console.log("Starting chunking phase");
 	const chunkingResult = await identifyChunks(
 		items,
 		customPrompts?.chunkPrompt,
+	);
+	console.log(
+		"Chunking result:",
+		chunkingResult.timeRanges.length,
+		"chunks identified",
 	);
 	const chunks = createHistoryChunks(
 		items,
 		chunkingResult.timeRanges,
 		chunkingResult.isFallback,
 	);
+	console.log("Created", chunks.length, "chunks for processing");
 
 	if (chunks.length === 0) {
 		return {
@@ -183,6 +195,9 @@ export async function analyzeHistoryItems(
 		}
 
 		try {
+			console.log(
+				`Processing chunk ${i + 1}/${totalChunks} with ${chunk.items.length} items`,
+			);
 			// Analyze this chunk - if it's too large, subdivide it
 			const { processedItems, results } = await analyzeChunkWithSubdivision(
 				chunk.items,
@@ -190,6 +205,8 @@ export async function analyzeHistoryItems(
 				customPrompts?.systemPrompt,
 				onProgress,
 				abortSignal,
+				processedChunks,
+				totalChunks,
 			);
 
 			// Update memory with merged results
@@ -416,9 +433,11 @@ async function mergeAnalysisResults(
 	}
 
 	try {
+		console.log("Sending merge prompt to AI...");
 		const response = await session.prompt(mergePrompt, {
 			responseConstraint: ANALYSIS_SCHEMA,
 		});
+		console.log("Merge response received");
 
 		const parsed = JSON.parse(response);
 
@@ -466,6 +485,8 @@ async function analyzeChunkWithSubdivision(
 	customSystemPrompt?: string,
 	onProgress?: ProgressCallback,
 	abortSignal?: AbortSignal,
+	chunkNumber?: number,
+	totalChunks?: number,
 ): Promise<{
 	processedItems: number;
 	results: { userProfile: UserProfile; patterns: WorkflowPattern[] } | null;
@@ -583,11 +604,15 @@ async function analyzeChunkWithSubdivision(
 			if (onProgress) {
 				const subChunkNum = Math.floor(i / optimalSize) + 1;
 				const totalSubChunks = Math.ceil(items.length / optimalSize);
+				const mainChunkInfo =
+					chunkNumber && totalChunks
+						? `Chunk ${chunkNumber}/${totalChunks}: `
+						: "";
 				onProgress({
 					phase: "analyzing",
-					currentChunk: subChunkNum,
-					totalChunks: totalSubChunks,
-					chunkDescription: `Sub-chunk ${subChunkNum} of ${totalSubChunks}`,
+					currentChunk: chunkNumber || subChunkNum,
+					totalChunks: totalChunks || totalSubChunks,
+					chunkDescription: `${mainChunkInfo}Sub-chunk ${subChunkNum}/${totalSubChunks}`,
 				});
 			}
 
@@ -699,18 +724,20 @@ async function analyzeChunk(
 	);
 
 	if (!session) {
-		throw new Error(
-			"Chrome AI is not available. Please use Chrome 131+ with AI features enabled.",
-		);
+		throw new Error("Chrome AI is not available.");
 	}
 
 	try {
+		console.log(
+			`Analyzing chunk with ${items.length} items, ${tokenCount} tokens`,
+		);
 		const response = await retryWithBackoff(
 			async () => {
 				// Check abort before making request
 				if (abortSignal?.aborted) {
 					throw new Error("Analysis cancelled");
 				}
+				console.log("Sending analysis prompt to AI...");
 				return await session.prompt(prompt, {
 					responseConstraint: ANALYSIS_SCHEMA,
 				});
@@ -720,6 +747,7 @@ async function analyzeChunk(
 			onProgress,
 			abortSignal,
 		);
+		console.log("Analysis response received");
 
 		try {
 			const parsed = JSON.parse(response);
