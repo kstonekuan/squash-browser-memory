@@ -310,7 +310,7 @@ function countTokens(text: string): number {
 function hideTrackingParams(
 	params: Record<string, string>,
 ): Record<string, string> {
-	const shortened: Record<string, string> = {};
+	const filtered: Record<string, string> = {};
 
 	// Known tracking/analytics parameters that don't help with browsing pattern analysis
 	const trackingParams = new Set([
@@ -361,8 +361,6 @@ function hideTrackingParams(
 		"referer",
 		"referrer",
 		"source",
-		// Google specific
-		"uact",
 	]);
 
 	for (const [key, value] of Object.entries(params)) {
@@ -373,14 +371,14 @@ function hideTrackingParams(
 			trackingParams.has(lowerKey) || /^(utm_|ga_|fb_|__)/i.test(key);
 
 		if (isTrackingParam) {
-			shortened[key] = "<hidden>"; // Make it clear the value was hidden
+			filtered[key] = "<hidden>"; // Make it clear the value was hidden
 		} else {
 			// Keep all non-tracking parameters intact - they may contain meaningful data
-			shortened[key] = value;
+			filtered[key] = value;
 		}
 	}
 
-	return shortened;
+	return filtered;
 }
 
 // Merge new analysis results with existing results using LLM

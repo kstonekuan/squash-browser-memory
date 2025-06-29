@@ -163,7 +163,7 @@ describe("token counting and subdivision", () => {
 	it("should calculate optimal subdivision size", () => {
 		// Test the binary search logic for finding optimal size
 		const TOKEN_LIMIT = 1024;
-		const SAFETY_MARGIN = 50;
+		const SAFETY_MARGIN = 200;
 		const MAX_TOKENS = TOKEN_LIMIT - SAFETY_MARGIN;
 
 		// Helper to count tokens
