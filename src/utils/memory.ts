@@ -47,42 +47,43 @@ export function createEmptyMemory(): AnalysisMemory {
 	};
 }
 
-// Load memory from local storage
+// Load memory from Chrome storage
 export async function loadMemory(): Promise<AnalysisMemory | null> {
 	try {
-		const stored = localStorage.getItem(MEMORY_KEY);
+		const result = await chrome.storage.local.get(MEMORY_KEY);
+		const stored = result[MEMORY_KEY];
+
 		if (!stored) {
-			console.log("No existing memory found in localStorage");
+			console.log("No existing memory found in chrome.storage.local");
 			return null;
 		}
 
-		const memory = JSON.parse(stored);
 		// Convert date strings back to Date objects
-		memory.lastAnalyzedDate = new Date(memory.lastAnalyzedDate);
+		stored.lastAnalyzedDate = new Date(stored.lastAnalyzedDate);
 
 		// Check version compatibility
-		if (memory.version !== MEMORY_VERSION) {
+		if (stored.version !== MEMORY_VERSION) {
 			console.log("Memory version mismatch, creating new memory");
 			return null;
 		}
 
-		console.log("Loaded memory from localStorage:", {
-			itemsAnalyzed: memory.totalItemsAnalyzed,
-			patterns: memory.patterns.length,
-			lastAnalyzed: memory.lastAnalyzedDate,
+		console.log("Loaded memory from chrome.storage.local:", {
+			itemsAnalyzed: stored.totalItemsAnalyzed,
+			patterns: stored.patterns.length,
+			lastAnalyzed: stored.lastAnalyzedDate,
 		});
-		return memory;
+		return stored;
 	} catch (error) {
 		console.error("Failed to load memory:", error);
 		return null;
 	}
 }
 
-// Save memory to local storage
+// Save memory to Chrome storage
 export async function saveMemory(memory: AnalysisMemory): Promise<void> {
 	try {
-		localStorage.setItem(MEMORY_KEY, JSON.stringify(memory));
-		console.log("Saved memory to localStorage:", {
+		await chrome.storage.local.set({ [MEMORY_KEY]: memory });
+		console.log("Saved memory to chrome.storage.local:", {
 			itemsAnalyzed: memory.totalItemsAnalyzed,
 			patterns: memory.patterns.length,
 		});
@@ -93,6 +94,6 @@ export async function saveMemory(memory: AnalysisMemory): Promise<void> {
 
 // Clear memory
 export async function clearMemory(): Promise<void> {
-	localStorage.removeItem(MEMORY_KEY);
-	console.log("Analysis memory cleared from localStorage");
+	await chrome.storage.local.remove(MEMORY_KEY);
+	console.log("Analysis memory cleared from chrome.storage.local");
 }
