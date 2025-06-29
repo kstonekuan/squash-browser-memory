@@ -93,11 +93,17 @@ export async function identifyChunks(
 	};
 
 	try {
+		const startTime = performance.now();
 		const response = await retryWithBackoff(async () => {
 			return await session.prompt(prompt, {
 				responseConstraint: CHUNK_SCHEMA,
 			});
 		});
+		const endTime = performance.now();
+		const duration = ((endTime - startTime) / 1000).toFixed(2);
+		console.log(
+			`Chunking LLM call completed in ${duration}s for ${items.length} items`,
+		);
 
 		let parsed: {
 			chunks?: Array<{
@@ -307,11 +313,17 @@ async function identifyChunksForBatch(
 	};
 
 	try {
+		const startTime = performance.now();
 		const response = await retryWithBackoff(async () => {
 			return await session.prompt(prompt, {
 				responseConstraint: CHUNK_SCHEMA,
 			});
 		});
+		const endTime = performance.now();
+		const duration = ((endTime - startTime) / 1000).toFixed(2);
+		console.log(
+			`Chunking LLM call completed in ${duration}s for ${items.length} items`,
+		);
 
 		let parsed: {
 			chunks?: Array<{

@@ -5,18 +5,20 @@ export const ANALYSIS_SCHEMA = {
 	properties: {
 		patterns: {
 			type: "array",
+			maxItems: 10,
 			items: {
 				type: "object",
 				properties: {
-					pattern: { type: "string" },
-					description: { type: "string" },
+					pattern: { type: "string", maxLength: 100 },
+					description: { type: "string", maxLength: 200 },
 					frequency: { type: "number" },
 					urls: {
 						type: "array",
-						items: { type: "string" },
+						items: { type: "string", maxLength: 150 },
+						maxItems: 5,
 					},
-					timePattern: { type: "string" },
-					suggestion: { type: "string" },
+					timePattern: { type: "string", maxLength: 50 },
+					suggestion: { type: "string", maxLength: 200 },
 					automationPotential: {
 						type: "string",
 						enum: ["high", "medium", "low"],
@@ -35,52 +37,57 @@ export const ANALYSIS_SCHEMA = {
 		userProfile: {
 			type: "object",
 			properties: {
-				profession: { type: "string" },
+				profession: { type: "string", maxLength: 100 },
 				interests: {
 					type: "array",
-					items: { type: "string" },
+					items: { type: "string", maxLength: 50 },
+					maxItems: 10,
 				},
 				workPatterns: {
 					type: "array",
 					items: {
 						type: "object",
 						properties: {
-							type: { type: "string" },
-							description: { type: "string" },
+							type: { type: "string", maxLength: 50 },
+							description: { type: "string", maxLength: 100 },
 						},
 						required: ["type", "description"],
 					},
+					maxItems: 8,
 				},
 				personalityTraits: {
 					type: "array",
 					items: {
 						type: "object",
 						properties: {
-							trait: { type: "string" },
-							evidence: { type: "string" },
+							trait: { type: "string", maxLength: 50 },
+							evidence: { type: "string", maxLength: 150 },
 						},
 						required: ["trait", "evidence"],
 					},
+					maxItems: 8,
 				},
 				technologyUse: {
 					type: "array",
 					items: {
 						type: "object",
 						properties: {
-							category: { type: "string" },
+							category: { type: "string", maxLength: 50 },
 							level: {
 								type: "string",
 								enum: ["beginner", "intermediate", "advanced", "expert"],
 							},
 							tools: {
 								type: "array",
-								items: { type: "string" },
+								items: { type: "string", maxLength: 50 },
+								maxItems: 5,
 							},
 						},
 						required: ["category", "level", "tools"],
 					},
+					maxItems: 10,
 				},
-				summary: { type: "string" },
+				summary: { type: "string", maxLength: 500 },
 			},
 			required: [
 				"profession",

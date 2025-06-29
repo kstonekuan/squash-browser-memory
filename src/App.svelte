@@ -1,6 +1,6 @@
 <script lang="ts">
 import AdvancedSettings from "./lib/AdvancedSettings.svelte";
-import type { AnalysisPhase } from "./lib/AnalysisProgress.svelte";
+import type { AnalysisPhase, SubPhase } from "./lib/AnalysisProgress.svelte";
 import AnalysisProgress from "./lib/AnalysisProgress.svelte";
 import AnalysisResults from "./lib/AnalysisResults.svelte";
 import ChromeAIStatus from "./lib/ChromeAIStatus.svelte";
@@ -19,6 +19,7 @@ let chunkProgress = $state<{
 	description: string;
 } | null>(null);
 let retryMessage = $state("");
+let subPhase: SubPhase | undefined = $state(undefined);
 let abortController: AbortController | null = null;
 
 async function handleAnalysis(
@@ -41,12 +42,24 @@ async function handleAnalysis(
 			customPrompts,
 			(info) => {
 				analysisPhase = info.phase;
+				subPhase = info.subPhase;
 				if (info.currentChunk && info.totalChunks) {
 					chunkProgress = {
 						current: info.currentChunk,
 						total: info.totalChunks,
 						description: info.chunkDescription || "",
 					};
+				} else if (info.chunkDescription) {
+					// Update description even without chunk numbers
+					if (chunkProgress) {
+						chunkProgress.description = info.chunkDescription;
+					} else {
+						chunkProgress = {
+							current: 0,
+							total: 0,
+							description: info.chunkDescription,
+						};
+					}
 				}
 				if (info.retryMessage) {
 					retryMessage = info.retryMessage;
@@ -137,6 +150,7 @@ function handleCancelAnalysis() {
 			phase={analysisPhase} 
 			chunkProgress={chunkProgress} 
 			retryMessage={retryMessage}
+			subPhase={subPhase}
 			onCancel={handleCancelAnalysis}
 		/>
 

@@ -8,11 +8,14 @@ export type AnalysisPhase =
 	| "complete"
 	| "error";
 
+export type SubPhase = "sending-analysis" | "sending-merge" | "processing";
+
 let {
 	phase = "idle",
 	chunkProgress = null,
 	retryMessage = "",
 	onCancel,
+	subPhase = undefined,
 } = $props<{
 	phase: AnalysisPhase;
 	chunkProgress?: {
@@ -22,6 +25,7 @@ let {
 	} | null;
 	retryMessage?: string;
 	onCancel?: () => void;
+	subPhase?: SubPhase;
 }>();
 
 const phases = [
@@ -62,6 +66,19 @@ function getPhaseStatus(phaseId: string): "pending" | "active" | "complete" {
 	if (isPhaseComplete(phaseId)) return "complete";
 	if (isPhaseActive(phaseId)) return "active";
 	return "pending";
+}
+
+function getSubPhaseIcon(subPhase: SubPhase | undefined): string {
+	switch (subPhase) {
+		case "sending-analysis":
+			return "📤";
+		case "sending-merge":
+			return "🔄";
+		case "processing":
+			return "⚙️";
+		default:
+			return "";
+	}
 }
 </script>
 
@@ -112,6 +129,9 @@ function getPhaseStatus(phaseId: string): "pending" | "active" | "complete" {
 								{/if}
 								{#if chunkProgress?.description}
 									<div class="text-xs text-gray-600 mt-1 max-w-[200px] mx-auto">
+										{#if subPhase}
+											<span class="text-lg mr-1">{getSubPhaseIcon(subPhase)}</span>
+										{/if}
 										{chunkProgress.description}
 									</div>
 								{/if}

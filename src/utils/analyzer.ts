@@ -84,6 +84,7 @@ export type ProgressCallback = (info: {
 	totalChunks?: number;
 	chunkDescription?: string;
 	retryMessage?: string;
+	subPhase?: "sending-analysis" | "sending-merge" | "processing";
 }) => void;
 
 // Custom prompts interface
@@ -99,6 +100,8 @@ export async function analyzeHistoryItems(
 	onProgress?: ProgressCallback,
 	abortSignal?: AbortSignal,
 ): Promise<AnalysisResult> {
+	const analysisStartTime = performance.now();
+
 	// Check if already aborted
 	if (abortSignal?.aborted) {
 		throw new Error("Analysis cancelled");
@@ -266,6 +269,17 @@ export async function analyzeHistoryItems(
 	}
 
 	// Return final results from memory
+	const analysisEndTime = performance.now();
+	const totalDuration = ((analysisEndTime - analysisStartTime) / 1000).toFixed(
+		2,
+	);
+	console.log(`\n=== Analysis Complete ===`);
+	console.log(`Total time: ${totalDuration}s`);
+	console.log(`Items analyzed: ${stats.totalUrls}`);
+	console.log(`Chunks processed: ${processedChunks}`);
+	console.log(`Patterns found: ${memory.patterns.length}`);
+	console.log(`========================\n`);
+
 	return {
 		patterns: memory.patterns,
 		totalUrls: stats.totalUrls,
@@ -435,6 +449,7 @@ async function mergeAnalysisResults(
 	newResults: { userProfile: UserProfile; patterns: WorkflowPattern[] },
 	customSystemPrompt?: string,
 	abortSignal?: AbortSignal,
+	onProgress?: ProgressCallback,
 ): Promise<{ userProfile: UserProfile; patterns: WorkflowPattern[] }> {
 	// Check if aborted
 	if (abortSignal?.aborted) {
@@ -465,12 +480,47 @@ async function mergeAnalysisResults(
 
 	try {
 		console.log("Sending merge prompt to AI...");
+
+		// Notify progress that we're sending merge prompt
+		if (onProgress) {
+			onProgress({
+				phase: "analyzing",
+				subPhase: "sending-merge",
+				chunkDescription: `Merging ${newResults.patterns.length} new patterns with ${memory.patterns.length} existing patterns`,
+			});
+		}
+
+		const startTime = performance.now();
 		const response = await session.prompt(mergePrompt, {
 			responseConstraint: ANALYSIS_SCHEMA,
 		});
+		const endTime = performance.now();
+		const duration = ((endTime - startTime) / 1000).toFixed(2);
+
+		console.log(`Merge LLM call completed in ${duration}s`);
 		console.log("Merge response received");
 
-		const parsed = JSON.parse(response);
+		// Notify that merge is complete
+		if (onProgress) {
+			onProgress({
+				phase: "analyzing",
+				subPhase: "processing",
+				chunkDescription: `Processing merge results (${duration}s)`,
+			});
+		}
+
+		let parsed: { userProfile: UserProfile; patterns: WorkflowPattern[] };
+		try {
+			parsed = JSON.parse(response);
+		} catch (parseError) {
+			console.error("Failed to parse merge response:", parseError);
+			console.error("Response length:", response.length);
+			console.error("Response preview:", `${response.substring(0, 200)}...`);
+
+			// For merge failures, return the new results as-is
+			console.log("Falling back to new results without merging");
+			return newResults;
+		}
 
 		// Log merge results for debugging
 		console.log("Merge operation:", {
@@ -588,6 +638,7 @@ async function analyzeChunkWithSubdivision(
 							chunkResults,
 							customSystemPrompt,
 							abortSignal,
+							onProgress,
 						);
 
 			return { processedItems: items.length, results: mergedResults };
@@ -620,6 +671,15 @@ async function analyzeChunkWithSubdivision(
 
 		console.log(`Optimal subdivision size: ${optimalSize} items per sub-chunk`);
 
+		// Double-check the optimal size actually works
+		const verifyItems = items.slice(0, optimalSize);
+		const verifyData = testHistoryData.slice(0, optimalSize);
+		const verifyPrompt = buildAnalysisPrompt(verifyItems, verifyData);
+		const verifyTokenCount = countTokens(verifyPrompt);
+		console.log(
+			`Verification: ${optimalSize} items = ${verifyTokenCount} tokens (limit: ${MAX_TOKENS})`,
+		);
+
 		// Process in sub-chunks
 		let currentMemory = memory;
 		let totalProcessed = 0;
@@ -631,6 +691,9 @@ async function analyzeChunkWithSubdivision(
 			}
 
 			const subItems = items.slice(i, i + optimalSize);
+			console.log(
+				`Processing sub-chunk starting at index ${i}, ${subItems.length} items`,
+			);
 
 			if (onProgress) {
 				const subChunkNum = Math.floor(i / optimalSize) + 1;
@@ -665,6 +728,7 @@ async function analyzeChunkWithSubdivision(
 							subResults,
 							customSystemPrompt,
 							abortSignal,
+							onProgress,
 						);
 
 			// Update memory with merged results
@@ -745,6 +809,15 @@ async function analyzeChunk(
 
 	// This should have been checked by the caller
 	if (tokenCount > 1024 - 200) {
+		console.error("Token limit exceeded in analyzeChunk:");
+		console.error("- Items:", items.length);
+		console.error("- Token count:", tokenCount);
+		console.error("- Prompt length:", prompt.length, "characters");
+		console.error("- historyData sample:", JSON.stringify(historyData[0]));
+		console.error(
+			"- First item URL:",
+			`${items[0]?.url?.substring(0, 100)}...`,
+		);
 		throw new Error(
 			`analyzeChunk called with too many items: ${items.length} items, ${tokenCount} tokens`,
 		);
@@ -777,9 +850,37 @@ async function analyzeChunk(
 					"Using response schema:",
 					`${JSON.stringify(ANALYSIS_SCHEMA).substring(0, 100)}...`,
 				);
-				return await session.prompt(prompt, {
+
+				// Notify progress that we're sending analysis prompt
+				if (onProgress) {
+					onProgress({
+						phase: "analyzing",
+						subPhase: "sending-analysis",
+						chunkDescription: `Sending analysis prompt for ${items.length} items`,
+					});
+				}
+
+				const startTime = performance.now();
+				const result = await session.prompt(prompt, {
 					responseConstraint: ANALYSIS_SCHEMA,
 				});
+				const endTime = performance.now();
+				const duration = ((endTime - startTime) / 1000).toFixed(2);
+
+				console.log(
+					`Analysis LLM call completed in ${duration}s for ${items.length} items`,
+				);
+
+				// Notify that we received response
+				if (onProgress) {
+					onProgress({
+						phase: "analyzing",
+						subPhase: "processing",
+						chunkDescription: `Processing AI response (${duration}s)`,
+					});
+				}
+
+				return result;
 			},
 			3,
 			2000,
@@ -816,6 +917,88 @@ async function analyzeChunk(
 		} catch (error) {
 			// Failed to parse Chrome AI analysis response
 			console.error("Failed to parse AI response:", error);
+			console.error("Raw response length:", response.length);
+			console.error("Response preview:", `${response.substring(0, 200)}...`);
+			console.error(
+				"Response end:",
+				`...${response.substring(response.length - 200)}`,
+			);
+
+			// Try to salvage the response by finding the last complete JSON object
+			if (
+				error instanceof SyntaxError &&
+				error.message.includes("Unterminated string")
+			) {
+				console.log("Attempting to salvage truncated JSON response...");
+
+				// Try to find the last complete object by looking for closing braces
+				let lastValidIndex = response.length;
+				let braceCount = 0;
+				let inString = false;
+				let escapeNext = false;
+
+				for (let i = 0; i < response.length; i++) {
+					const char = response[i];
+
+					if (escapeNext) {
+						escapeNext = false;
+						continue;
+					}
+
+					if (char === "\\") {
+						escapeNext = true;
+						continue;
+					}
+
+					if (char === '"' && !escapeNext) {
+						inString = !inString;
+						continue;
+					}
+
+					if (!inString) {
+						if (char === "{") braceCount++;
+						else if (char === "}") {
+							braceCount--;
+							if (braceCount === 0) {
+								lastValidIndex = i + 1;
+							}
+						}
+					}
+				}
+
+				if (lastValidIndex < response.length && lastValidIndex > 100) {
+					const truncatedResponse = response.substring(0, lastValidIndex);
+					console.log(
+						"Attempting to parse truncated response at index",
+						lastValidIndex,
+					);
+
+					try {
+						const salvaged = JSON.parse(truncatedResponse);
+						console.log("Successfully salvaged truncated response!");
+
+						// Return with default patterns if needed
+						return {
+							patterns: salvaged.patterns || [],
+							userProfile: salvaged.userProfile || {
+								profession: "Unknown",
+								interests: [],
+								workPatterns: [],
+								personalityTraits: [],
+								technologyUse: [],
+								summary:
+									"Analysis was partially completed due to response truncation.",
+							},
+						};
+					} catch (salvageError) {
+						console.error(
+							"Failed to salvage truncated response:",
+							salvageError,
+						);
+					}
+				}
+			}
+
 			throw error;
 		}
 	} finally {
