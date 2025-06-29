@@ -22,6 +22,9 @@ import { ANALYSIS_SCHEMA } from "./schemas";
 // Re-export clearMemory for use in UI
 export { clearMemory } from "./memory";
 
+// Export for testing
+export { shortenUrlParams };
+
 // Calculate statistics from Chrome history items
 export function calculateStats(items: chrome.history.HistoryItem[]): {
 	totalUrls: number;
@@ -203,9 +206,9 @@ export async function analyzeHistoryItems(
 				await saveMemory(memory);
 			}
 
-			// Add a delay between chunks to avoid quota issues
+			// Small delay between chunks to avoid quota issues
 			if (i < chunks.length - 1) {
-				await new Promise((resolve) => setTimeout(resolve, 1000)); // 1 second delay
+				await new Promise((resolve) => setTimeout(resolve, 100)); // 100ms delay
 			}
 		} catch (error) {
 			console.error(`Failed to analyze chunk ${i + 1}:`, error);
@@ -269,6 +272,11 @@ async function retryWithBackoff<T>(
 				});
 			}
 
+			// Check if already aborted before waiting
+			if (abortSignal?.aborted) {
+				throw new Error("Analysis cancelled");
+			}
+
 			// Wait with abort support
 			await new Promise<void>((resolve, reject) => {
 				const timeout = setTimeout(resolve, delay);
@@ -298,12 +306,90 @@ function countTokens(text: string): number {
 	return Math.ceil(text.length / 3.5);
 }
 
+// Shorten long URL parameter values to reduce token usage
+function shortenUrlParams(
+	params: Record<string, string>,
+): Record<string, string> {
+	const shortened: Record<string, string> = {};
+
+	// Known tracking/analytics parameters that don't help with browsing pattern analysis
+	const trackingParams = new Set([
+		// Google Analytics & Ads
+		"utm_source",
+		"utm_medium",
+		"utm_campaign",
+		"utm_term",
+		"utm_content",
+		"gclid",
+		"gbraid",
+		"wbraid",
+		"ga_",
+		"gad_source",
+		// Facebook
+		"fbclid",
+		"fb_action_ids",
+		"fb_action_types",
+		// Microsoft/Bing
+		"msclkid",
+		// Yahoo
+		"yclid",
+		// Google Search specific
+		"ei",
+		"sei",
+		"ved",
+		"uact",
+		"sca_esv",
+		"gs_lp",
+		"sclient",
+		"iflsig",
+		// Session/tracking IDs
+		"sid",
+		"sessionid",
+		"vid",
+		"cid",
+		"client_id",
+		// Adobe Analytics
+		"s_kwcid",
+		"ef_id",
+		// Other common tracking
+		"ref",
+		"referer",
+		"referrer",
+		"source",
+		// Google specific
+		"uact",
+	]);
+
+	for (const [key, value] of Object.entries(params)) {
+		const lowerKey = key.toLowerCase();
+
+		// Check if it's a tracking parameter
+		const isTrackingParam =
+			trackingParams.has(lowerKey) || /^(utm_|ga_|fb_|__)/i.test(key);
+
+		if (isTrackingParam) {
+			shortened[key] = "<hidden>"; // Make it clear the value was hidden
+		} else {
+			// Keep all non-tracking parameters intact - they may contain meaningful data
+			shortened[key] = value;
+		}
+	}
+
+	return shortened;
+}
+
 // Merge new analysis results with existing results using LLM
 async function mergeAnalysisResults(
 	memory: AnalysisMemory,
 	newResults: { userProfile: UserProfile; patterns: WorkflowPattern[] },
 	customSystemPrompt?: string,
+	abortSignal?: AbortSignal,
 ): Promise<{ userProfile: UserProfile; patterns: WorkflowPattern[] }> {
+	// Check if aborted
+	if (abortSignal?.aborted) {
+		throw new Error("Analysis cancelled");
+	}
+
 	// If memory is empty, just return the new results
 	if (memory.totalItemsAnalyzed === 0) {
 		return newResults;
@@ -369,7 +455,7 @@ async function analyzeChunkWithSubdivision(
 	results: { userProfile: UserProfile; patterns: WorkflowPattern[] } | null;
 }> {
 	const TOKEN_LIMIT = 1024;
-	const SAFETY_MARGIN = 50;
+	const SAFETY_MARGIN = 24; // Reduced margin for more items per chunk
 	const MAX_TOKENS = TOKEN_LIMIT - SAFETY_MARGIN;
 
 	// First, try to analyze the entire chunk
@@ -392,7 +478,7 @@ async function analyzeChunkWithSubdivision(
 					url.searchParams.forEach((value, key) => {
 						params[key] = value;
 					});
-					urlParts.params = params;
+					urlParts.params = shortenUrlParams(params);
 				}
 			} catch {
 				const match = item.url?.match(/^https?:\/\/([^/]+)/);
@@ -425,12 +511,16 @@ async function analyzeChunkWithSubdivision(
 				abortSignal,
 			);
 
-			// Step 2: Merge with existing memory
-			const mergedResults = await mergeAnalysisResults(
-				memory,
-				chunkResults,
-				customSystemPrompt,
-			);
+			// Step 2: Merge with existing memory (skip if memory is empty)
+			const mergedResults =
+				memory.totalItemsAnalyzed === 0
+					? chunkResults
+					: await mergeAnalysisResults(
+							memory,
+							chunkResults,
+							customSystemPrompt,
+							abortSignal,
+						);
 
 			return { processedItems: items.length, results: mergedResults };
 		}
@@ -467,14 +557,21 @@ async function analyzeChunkWithSubdivision(
 		let totalProcessed = 0;
 
 		for (let i = 0; i < items.length; i += optimalSize) {
+			// Check if aborted before processing sub-chunk
+			if (abortSignal?.aborted) {
+				throw new Error("Analysis cancelled");
+			}
+
 			const subItems = items.slice(i, i + optimalSize);
 
 			if (onProgress) {
+				const subChunkNum = Math.floor(i / optimalSize) + 1;
+				const totalSubChunks = Math.ceil(items.length / optimalSize);
 				onProgress({
 					phase: "analyzing",
-					currentChunk: Math.floor(i / optimalSize) + 1,
-					totalChunks: Math.ceil(items.length / optimalSize),
-					chunkDescription: `Sub-chunk ${Math.floor(i / optimalSize) + 1} of ${Math.ceil(items.length / optimalSize)}`,
+					currentChunk: subChunkNum,
+					totalChunks: totalSubChunks,
+					chunkDescription: `Sub-chunk ${subChunkNum} of ${totalSubChunks}`,
 				});
 			}
 
@@ -486,12 +583,17 @@ async function analyzeChunkWithSubdivision(
 				abortSignal,
 			);
 
-			// Step 2: Merge with current memory
-			const mergedResults = await mergeAnalysisResults(
-				currentMemory,
-				subResults,
-				customSystemPrompt,
-			);
+			// Step 2: Merge with current memory (skip if current memory is from original empty memory)
+			const mergedResults =
+				currentMemory.totalItemsAnalyzed === memory.totalItemsAnalyzed &&
+				memory.totalItemsAnalyzed === 0
+					? subResults
+					: await mergeAnalysisResults(
+							currentMemory,
+							subResults,
+							customSystemPrompt,
+							abortSignal,
+						);
 
 			// Update memory with merged results
 			currentMemory = {
@@ -503,11 +605,6 @@ async function analyzeChunkWithSubdivision(
 			};
 
 			totalProcessed += subItems.length;
-
-			// Small delay between sub-chunks
-			if (i + optimalSize < items.length) {
-				await new Promise((resolve) => setTimeout(resolve, 500));
-			}
 		}
 
 		return {
@@ -544,12 +641,12 @@ async function analyzeChunk(
 				urlParts.domain = url.hostname;
 				urlParts.path = url.pathname;
 
-				// Extract ALL parameters - no filtering or truncation
+				// Extract parameters and shorten long values
 				const params: Record<string, string> = {};
 				url.searchParams.forEach((value, key) => {
 					params[key] = value;
 				});
-				urlParts.params = params;
+				urlParts.params = shortenUrlParams(params);
 			}
 		} catch {
 			// Invalid URL - try to extract domain from URL string

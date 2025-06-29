@@ -58,11 +58,15 @@ async function handleAnalysis(
 		analysisPhase = "complete";
 		chunkProgress = null;
 	} catch (error) {
-		console.error("Analysis error:", error);
-		if (error instanceof Error && error.message.includes("cancelled")) {
-			analysisPhase = "idle";
-			alert("Analysis cancelled");
+		if (
+			error instanceof Error &&
+			error.message.toLowerCase().includes("cancelled")
+		) {
+			console.log("Analysis cancelled by user");
+			// analysisPhase already set to "error" in handleCancelAnalysis
+			// Don't show alert for user-initiated cancellation
 		} else {
+			console.error("Analysis error:", error);
 			analysisPhase = "error";
 			alert(
 				error instanceof Error ? error.message : "Failed to analyze history",
@@ -100,6 +104,9 @@ function handleCancelAnalysis() {
 	if (abortController && !abortController.signal.aborted) {
 		abortController.abort();
 		retryMessage = "";
+		analysisPhase = "error";
+		isAnalyzing = false;
+		chunkProgress = null;
 	}
 }
 </script>

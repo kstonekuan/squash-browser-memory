@@ -51,7 +51,10 @@ export function createEmptyMemory(): AnalysisMemory {
 export async function loadMemory(): Promise<AnalysisMemory | null> {
 	try {
 		const stored = localStorage.getItem(MEMORY_KEY);
-		if (!stored) return null;
+		if (!stored) {
+			console.log("No existing memory found in localStorage");
+			return null;
+		}
 
 		const memory = JSON.parse(stored);
 		// Convert date strings back to Date objects
@@ -59,13 +62,18 @@ export async function loadMemory(): Promise<AnalysisMemory | null> {
 
 		// Check version compatibility
 		if (memory.version !== MEMORY_VERSION) {
-			// Memory version mismatch, creating new memory
+			console.log("Memory version mismatch, creating new memory");
 			return null;
 		}
 
+		console.log("Loaded memory from localStorage:", {
+			itemsAnalyzed: memory.totalItemsAnalyzed,
+			patterns: memory.patterns.length,
+			lastAnalyzed: memory.lastAnalyzedDate,
+		});
 		return memory;
-	} catch (_error) {
-		// Failed to load memory
+	} catch (error) {
+		console.error("Failed to load memory:", error);
 		return null;
 	}
 }
@@ -74,12 +82,17 @@ export async function loadMemory(): Promise<AnalysisMemory | null> {
 export async function saveMemory(memory: AnalysisMemory): Promise<void> {
 	try {
 		localStorage.setItem(MEMORY_KEY, JSON.stringify(memory));
-	} catch (_error) {
-		// Failed to save memory
+		console.log("Saved memory to localStorage:", {
+			itemsAnalyzed: memory.totalItemsAnalyzed,
+			patterns: memory.patterns.length,
+		});
+	} catch (error) {
+		console.error("Failed to save memory:", error);
 	}
 }
 
 // Clear memory
 export async function clearMemory(): Promise<void> {
 	localStorage.removeItem(MEMORY_KEY);
+	console.log("Analysis memory cleared from localStorage");
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { calculateStats } from "./analyzer";
+import { calculateStats, shortenUrlParams } from "./analyzer";
 import { buildAnalysisPrompt } from "./constants";
 
 describe("calculateStats", () => {
@@ -228,5 +228,180 @@ describe("token counting and subdivision", () => {
 		const optimalTokenCount = countTokens(optimalPrompt);
 
 		expect(optimalTokenCount).toBeLessThanOrEqual(MAX_TOKENS);
+	});
+});
+
+describe("shortenUrlParams", () => {
+	it("should hide tracking parameters", () => {
+		const params = {
+			// Google Analytics
+			utm_source: "newsletter",
+			utm_medium: "email",
+			utm_campaign: "spring_sale",
+			gclid: "CjwKCAiA1MCrBhAoEiwAC2d64QTg",
+			// Facebook
+			fbclid: "IwAR2xGf3k4j5l6m7n8o9p0q",
+			// Google Search
+			ei: "ThxhaLKSKYOf4-EPwqu1qQg",
+			ved: "0ahUKEwiy8b3RvJaOAxWDzzgGHcJVLYUQ4dUDCBA",
+			sca_esv: "6e2c4b1adddb3c28",
+			// Other tracking
+			sid: "abc123def456",
+			ref: "homepage",
+		};
+
+		const result = shortenUrlParams(params);
+
+		// All tracking params should be hidden
+		expect(result.utm_source).toBe("<hidden>");
+		expect(result.utm_medium).toBe("<hidden>");
+		expect(result.utm_campaign).toBe("<hidden>");
+		expect(result.gclid).toBe("<hidden>");
+		expect(result.fbclid).toBe("<hidden>");
+		expect(result.ei).toBe("<hidden>");
+		expect(result.ved).toBe("<hidden>");
+		expect(result.sca_esv).toBe("<hidden>");
+		expect(result.sid).toBe("<hidden>");
+		expect(result.ref).toBe("<hidden>");
+	});
+
+	it("should preserve search queries completely", () => {
+		const params = {
+			q: "chrome dev cannot see ai innovations tab in settings",
+			query: "how to enable chrome ai features",
+			search: "javascript async await tutorial",
+		};
+
+		const result = shortenUrlParams(params);
+
+		// Search queries should be preserved in full
+		expect(result.q).toBe(
+			"chrome dev cannot see ai innovations tab in settings",
+		);
+		expect(result.query).toBe("how to enable chrome ai features");
+		expect(result.search).toBe("javascript async await tutorial");
+	});
+
+	it("should preserve all non-tracking parameters regardless of length", () => {
+		const params = {
+			data: "a".repeat(150), // 150 character string
+			token: "b".repeat(80), // 80 character string
+			short: "c".repeat(20), // 20 character string
+			encoded:
+				"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c", // JWT token
+		};
+
+		const result = shortenUrlParams(params);
+
+		// All non-tracking params should be preserved in full
+		expect(result.data).toBe("a".repeat(150));
+		expect(result.token).toBe("b".repeat(80));
+		expect(result.short).toBe("c".repeat(20));
+		expect(result.encoded).toBe(params.encoded);
+	});
+
+	it("should handle mixed parameter types", () => {
+		const params = {
+			// Search query - should be preserved
+			q: "typescript generic constraints explained with examples",
+			// Tracking - should be hidden
+			utm_source: "google",
+			gclid: "CjwKCAiA1MCrBhAoEiwAC2d64QTg",
+			// Regular params
+			page: "2",
+			sort: "relevance",
+			filter: "last_week",
+			// Long param
+			description:
+				"This is a very long description that exceeds one hundred characters and should be truncated to maintain reasonable token usage in the prompt",
+		};
+
+		const result = shortenUrlParams(params);
+
+		expect(result.q).toBe(
+			"typescript generic constraints explained with examples",
+		);
+		expect(result.utm_source).toBe("<hidden>");
+		expect(result.gclid).toBe("<hidden>");
+		expect(result.page).toBe("2");
+		expect(result.sort).toBe("relevance");
+		expect(result.filter).toBe("last_week");
+		expect(result.description).toBe(
+			"This is a very long description that exceeds one hundred characters and should be truncated to maintain reasonable token usage in the prompt",
+		);
+	});
+
+	it("should handle empty params object", () => {
+		const result = shortenUrlParams({});
+		expect(result).toEqual({});
+	});
+
+	it("should be case-insensitive for tracking params", () => {
+		const params = {
+			UTM_SOURCE: "facebook",
+			Utm_Medium: "social",
+			GCLID: "abc123",
+			SID: "session123",
+		};
+
+		const result = shortenUrlParams(params);
+
+		expect(result.UTM_SOURCE).toBe("<hidden>");
+		expect(result.Utm_Medium).toBe("<hidden>");
+		expect(result.GCLID).toBe("<hidden>");
+		expect(result.SID).toBe("<hidden>");
+	});
+
+	it("should handle params with prefix patterns", () => {
+		const params = {
+			ga_session_id: "12345",
+			ga_client_id: "67890",
+			fb_pixel_id: "abcdef",
+			__hssc: "tracking_value",
+			__hstc: "another_tracking_value",
+		};
+
+		const result = shortenUrlParams(params);
+
+		expect(result.ga_session_id).toBe("<hidden>");
+		expect(result.ga_client_id).toBe("<hidden>");
+		expect(result.fb_pixel_id).toBe("<hidden>");
+		expect(result.__hssc).toBe("<hidden>");
+		expect(result.__hstc).toBe("<hidden>");
+	});
+
+	it("should handle real Google search URL params", () => {
+		// Real params from the example URL
+		const params = {
+			q: "chrome dev cannot see ai innocations tab in settings",
+			sca_esv: "6e2c4b1adddb3c28",
+			ei: "ThxhaLKSKYOf4-EPwqu1qQg",
+			ved: "0ahUKEwiy8b3RvJaOAxWDzzgGHcJVLYUQ4dUDCBA",
+			uact: "5",
+			oq: "chrome dev cannot see ai innocations tab in settings",
+			gs_lp:
+				"Egxnd3Mtd2l6LXNlcnAiNGNocm9tZSBkZXYgY2Fubm90IHNlZSBhaSBpbm5vY2F0aW9ucyB0YWIgaW4gc2V0dGluZ3MyBxAhGKABGAoyBxAhGKABGAoyBxAhGKABGAoyBxAhGKABGApIuDdQ9gNYqjZwAngAkAEBmAGnAqAB2j6qAQgzMS4yMy4xMrgBA8gBAPgBAZgCM6ACqTjCAgoQABiwAxjWBBhHwgIEECEYFcICCxAAGIAEGJECGIoFwgIKEAAYgAQYsQMYCsICChAuGIAEGLEDGArCAgcQABiABBgKwgIQEC4YgAQYsQMY0QMYxwEYCsICBRAuGIAEwgIIEAAYgAQYsQPCAg4QLhiABBixAxjRAxjHAcICCBAuGIAEGLEDwgIFEAAYgATCAgYQABgWGB7CAggQABgWGAoYHsICCxAAGIAEGIYDGIoFwgIIEAAYgAQYogTCAgUQABjvBcICCBAAGKIEGIkFwgIFECEYoAGYAwDiAwUSATEgQIgGAZAGCJIHCjE3LjIyLjExLjGgB-3sArIHCjE1LjIyLjExLjG4B504wgcHMi4zMS4xOMgHjgE",
+			sclient: "gws-wiz-serp",
+			sei: "qBxhaKShA86d4-EP6K3H8Q4",
+		};
+
+		const result = shortenUrlParams(params);
+
+		// Search query should be preserved
+		expect(result.q).toBe(
+			"chrome dev cannot see ai innocations tab in settings",
+		);
+		expect(result.oq).toBe(
+			"chrome dev cannot see ai innocations tab in settings",
+		);
+
+		// All tracking params should be hidden
+		expect(result.sca_esv).toBe("<hidden>");
+		expect(result.ei).toBe("<hidden>");
+		expect(result.ved).toBe("<hidden>");
+		expect(result.uact).toBe("<hidden>");
+		expect(result.gs_lp).toBe("<hidden>");
+		expect(result.sclient).toBe("<hidden>");
+		expect(result.sei).toBe("<hidden>");
 	});
 });
