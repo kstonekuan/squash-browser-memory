@@ -1,31 +1,44 @@
 <script lang="ts">
 export type AnalysisPhase =
 	| "idle"
-	| "parsing"
 	| "calculating"
+	| "chunking"
 	| "analyzing"
+	| "retrying"
 	| "complete"
 	| "error";
 
-let { phase = "idle" } = $props<{
+let {
+	phase = "idle",
+	chunkProgress = null,
+	retryMessage = "",
+	onCancel,
+} = $props<{
 	phase: AnalysisPhase;
+	chunkProgress?: {
+		current: number;
+		total: number;
+		description: string;
+	} | null;
+	retryMessage?: string;
+	onCancel?: () => void;
 }>();
 
 const phases = [
 	{
-		id: "parsing",
-		label: "Parsing History",
-		description: "Extracting history data",
+		id: "calculating",
+		label: "Processing Data",
+		description: "Calculating statistics",
 	},
 	{
-		id: "calculating",
-		label: "Calculating Stats",
-		description: "Computing statistics",
+		id: "chunking",
+		label: "Organizing Sessions",
+		description: "Identifying browsing sessions",
 	},
 	{
 		id: "analyzing",
-		label: "Analyzing Patterns",
-		description: "Finding workflows",
+		label: "AI Analysis",
+		description: "Analyzing patterns & profile",
 	},
 	{ id: "complete", label: "Complete", description: "Analysis finished" },
 ];
@@ -92,12 +105,26 @@ function getPhaseStatus(phaseId: string): "pending" | "active" | "complete" {
 								<div class="text-xs text-gray-500 mt-1">
 									{phaseItem.description}
 								</div>
+								{#if phase === 'analyzing' && chunkProgress}
+									<div class="text-xs text-blue-600 font-medium mt-1">
+										Chunk {chunkProgress.current} of {chunkProgress.total}
+									</div>
+									<div class="text-xs text-gray-400">
+										{chunkProgress.description}
+									</div>
+								{/if}
 							{/if}
 						</div>
 					</div>
 				{/each}
 			</div>
 		</div>
+		
+		{#if phase === 'retrying' && retryMessage}
+			<div class="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+				<p class="text-sm text-yellow-800">{retryMessage}</p>
+			</div>
+		{/if}
 		
 		{#if phase === 'error'}
 			<div class="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg">
@@ -106,8 +133,17 @@ function getPhaseStatus(phaseId: string): "pending" | "active" | "complete" {
 		{/if}
 		
 		{#if phase !== 'complete' && phase !== 'error'}
-			<div class="mt-6 flex justify-center">
+			<div class="mt-6 flex flex-col items-center gap-3">
 				<div class="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+				{#if onCancel}
+					<button
+						onclick={onCancel}
+						type="button"
+						class="px-4 py-2 text-sm font-medium text-red-600 bg-red-50 rounded-md hover:bg-red-100 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
+					>
+						Cancel Analysis
+					</button>
+				{/if}
 			</div>
 		{/if}
 	</div>

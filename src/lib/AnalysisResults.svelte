@@ -1,9 +1,12 @@
 <script lang="ts">
 import type { AnalysisResult, WorkflowPattern } from "../types";
+import ChunkDebugInfo from "./ChunkDebugInfo.svelte";
+import ChunkDisplay from "./ChunkDisplay.svelte";
 
 const { result } = $props<{ result: AnalysisResult }>();
 
 let showRawAnalysis = $state(false);
+let activeTab = $state<"profile" | "workflows">("profile");
 
 function getAutomationColor(level: WorkflowPattern["automationPotential"]) {
 	switch (level) {
@@ -15,9 +18,25 @@ function getAutomationColor(level: WorkflowPattern["automationPotential"]) {
 			return "bg-gray-100 text-gray-800";
 	}
 }
+
+function getTechLevelColor(level: string) {
+	switch (level) {
+		case "expert":
+			return "bg-purple-100 text-purple-800";
+		case "advanced":
+			return "bg-blue-100 text-blue-800";
+		case "intermediate":
+			return "bg-green-100 text-green-800";
+		case "beginner":
+			return "bg-yellow-100 text-yellow-800";
+		default:
+			return "bg-gray-100 text-gray-800";
+	}
+}
 </script>
 
 <div class="space-y-6">
+  <!-- Analysis Summary -->
   <div class="bg-white rounded-lg shadow-md p-6">
     <h2 class="text-2xl font-semibold text-gray-900 mb-4">Analysis Summary</h2>
     
@@ -57,8 +76,118 @@ function getAutomationColor(level: WorkflowPattern["automationPotential"]) {
     {/if}
   </div>
   
-  <div class="bg-white rounded-lg shadow-md p-6">
-    <h2 class="text-2xl font-semibold text-gray-900 mb-4">Workflow Patterns</h2>
+  <!-- Tab Navigation -->
+  <div class="bg-white rounded-lg shadow-md p-2">
+    <div class="flex space-x-1">
+      <button
+        type="button"
+        onclick={() => activeTab = 'profile'}
+        class={`flex-1 px-4 py-2 text-sm font-medium rounded-md transition-colors ${
+          activeTab === 'profile' 
+            ? 'bg-blue-500 text-white' 
+            : 'text-gray-700 hover:bg-gray-100'
+        }`}
+      >
+        User Profile
+      </button>
+      <button
+        type="button"
+        onclick={() => activeTab = 'workflows'}
+        class={`flex-1 px-4 py-2 text-sm font-medium rounded-md transition-colors ${
+          activeTab === 'workflows' 
+            ? 'bg-blue-500 text-white' 
+            : 'text-gray-700 hover:bg-gray-100'
+        }`}
+      >
+        Workflow Patterns
+      </button>
+    </div>
+  </div>
+  
+  {#if activeTab === 'profile' && result.userProfile}
+    <!-- User Profile Section -->
+    <div class="bg-white rounded-lg shadow-md p-6">
+      <h2 class="text-2xl font-semibold text-gray-900 mb-4">User Profile</h2>
+      
+      <!-- Profile Summary -->
+      <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+        <h3 class="text-lg font-semibold text-blue-900 mb-2">Profile Summary</h3>
+        <p class="text-gray-700">{result.userProfile.summary}</p>
+      </div>
+      
+      <!-- Profession -->
+      <div class="mb-6">
+        <h3 class="text-lg font-semibold text-gray-900 mb-2">Likely Profession</h3>
+        <p class="text-gray-700 bg-gray-50 rounded-lg p-3">{result.userProfile.profession}</p>
+      </div>
+      
+      <!-- Interests -->
+      <div class="mb-6">
+        <h3 class="text-lg font-semibold text-gray-900 mb-3">Interests & Hobbies</h3>
+        <div class="flex flex-wrap gap-2">
+          {#each result.userProfile.interests as interest}
+            <span class="px-3 py-1 bg-indigo-100 text-indigo-800 rounded-full text-sm">
+              {interest}
+            </span>
+          {/each}
+        </div>
+      </div>
+      
+      <!-- Work Patterns -->
+      <div class="mb-6">
+        <h3 class="text-lg font-semibold text-gray-900 mb-3">Work Patterns</h3>
+        <div class="space-y-3">
+          {#each result.userProfile.workPatterns as pattern}
+            <div class="border border-gray-200 rounded-lg p-3">
+              <h4 class="font-medium text-gray-900">{pattern.type}</h4>
+              <p class="text-sm text-gray-600 mt-1">{pattern.description}</p>
+            </div>
+          {/each}
+        </div>
+      </div>
+      
+      <!-- Personality Traits -->
+      <div class="mb-6">
+        <h3 class="text-lg font-semibold text-gray-900 mb-3">Personality Insights</h3>
+        <div class="space-y-3">
+          {#each result.userProfile.personalityTraits as trait}
+            <div class="bg-gray-50 rounded-lg p-3">
+              <h4 class="font-medium text-gray-900">{trait.trait}</h4>
+              <p class="text-sm text-gray-600 mt-1">{trait.evidence}</p>
+            </div>
+          {/each}
+        </div>
+      </div>
+      
+      <!-- Technology Proficiency -->
+      <div class="mb-6">
+        <h3 class="text-lg font-semibold text-gray-900 mb-3">Technology Proficiency</h3>
+        <div class="space-y-3">
+          {#each result.userProfile.technologyUse as tech}
+            <div class="border border-gray-200 rounded-lg p-3">
+              <div class="flex justify-between items-start mb-2">
+                <h4 class="font-medium text-gray-900">{tech.category}</h4>
+                <span class={`px-2 py-1 text-xs font-medium rounded-full ${getTechLevelColor(tech.level)}`}>
+                  {tech.level}
+                </span>
+              </div>
+              <div class="flex flex-wrap gap-1 mt-2">
+                {#each tech.tools as tool}
+                  <span class="px-2 py-1 bg-gray-100 text-gray-700 rounded text-xs">
+                    {tool}
+                  </span>
+                {/each}
+              </div>
+            </div>
+          {/each}
+        </div>
+      </div>
+    </div>
+  {/if}
+  
+  {#if activeTab === 'workflows'}
+    <div class="bg-white rounded-lg shadow-md p-6">
+      <h2 class="text-2xl font-semibold text-gray-900 mb-4">Workflow Patterns</h2>
     
     <div class="space-y-4">
       {#each result.patterns as pattern}
@@ -108,6 +237,15 @@ function getAutomationColor(level: WorkflowPattern["automationPotential"]) {
       {/if}
     </div>
   </div>
+  {/if}
+  
+  <!-- Chunks Display Section -->
+  {#if result.chunks}
+    <ChunkDisplay chunks={result.chunks} />
+  {/if}
+  
+  <!-- Chunking Debug Info -->
+  <ChunkDebugInfo rawResponse={result.chunkingRawResponse} error={result.chunkingError} />
   
   <!-- Raw Analysis Data Section -->
   <div class="bg-white rounded-lg shadow-md">

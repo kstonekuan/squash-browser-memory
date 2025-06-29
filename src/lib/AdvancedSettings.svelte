@@ -1,38 +1,30 @@
 <script lang="ts">
-// Default prompts for Chrome AI
-const DEFAULT_ANALYSIS_PROMPT = `You are an expert at analyzing browsing patterns and identifying repetitive workflows. 
-
-When analyzing browsing history:
-1. Look for patterns where users visit the same sequence of sites repeatedly
-2. Identify time-based routines (daily, weekly, etc.)
-3. Find workflows that could be automated or optimized
-4. Focus on actionable insights
-
-For each pattern found, provide:
-- A clear, descriptive name for the workflow
-- A detailed description of what the user is doing
-- The frequency of occurrence
-- Example URLs that are part of this workflow
-- Time patterns if applicable (e.g., "Every weekday morning")
-- A practical suggestion for automation or optimization
-- An assessment of automation potential (high/medium/low)`;
+import {
+	DEFAULT_CHUNK_SYSTEM_PROMPT,
+	DEFAULT_SYSTEM_PROMPT,
+} from "../utils/constants";
+import { ANALYSIS_SCHEMA, CHUNK_SCHEMA } from "../utils/schemas";
 
 let { onPromptsChange } = $props<{
-	onPromptsChange?: (prompts: { parsing: string; analysis: string }) => void;
+	onPromptsChange?: (prompts: { system: string; chunk: string }) => void;
 }>();
 
 let showPrompts = $state(false);
-let editableAnalysisPrompt = $state(DEFAULT_ANALYSIS_PROMPT);
+let editableSystemPrompt = $state(DEFAULT_SYSTEM_PROMPT);
+let editableChunkPrompt = $state(DEFAULT_CHUNK_SYSTEM_PROMPT);
+let showAnalysisSchema = $state(false);
+let showChunkSchema = $state(false);
 
 function handlePromptChange() {
 	onPromptsChange?.({
-		parsing: "", // Not used anymore
-		analysis: editableAnalysisPrompt,
+		system: editableSystemPrompt,
+		chunk: editableChunkPrompt,
 	});
 }
 
 function resetPrompts() {
-	editableAnalysisPrompt = DEFAULT_ANALYSIS_PROMPT;
+	editableSystemPrompt = DEFAULT_SYSTEM_PROMPT;
+	editableChunkPrompt = DEFAULT_CHUNK_SYSTEM_PROMPT;
 	handlePromptChange();
 }
 </script>
@@ -59,21 +51,70 @@ function resetPrompts() {
 		{#if showPrompts}
 			<div class="p-4 border-t border-gray-200">
 				<div class="space-y-4">
+					<!-- System Prompt -->
 					<div>
-						<label for="analysis-prompt" class="block text-sm font-medium text-gray-700 mb-2">
-							Analysis Prompt
-						</label>
+						<div class="flex items-center justify-between mb-2">
+							<label for="system-prompt" class="block text-sm font-medium text-gray-700">
+								Analysis System Prompt
+							</label>
+							<button
+								type="button"
+								onclick={() => showAnalysisSchema = !showAnalysisSchema}
+								class="text-xs text-blue-600 hover:text-blue-800"
+							>
+								{showAnalysisSchema ? 'Hide' : 'Show'} Expected Output Schema
+							</button>
+						</div>
 						<textarea
-							id="analysis-prompt"
-							bind:value={editableAnalysisPrompt}
+							id="system-prompt"
+							bind:value={editableSystemPrompt}
 							oninput={handlePromptChange}
-							rows="8"
+							rows="4"
 							class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-							placeholder="Enter custom analysis prompt..."
+							placeholder="Enter custom system prompt..."
 						></textarea>
 						<p class="mt-1 text-xs text-gray-500">
-							This prompt is used when analyzing browsing patterns to identify workflows.
+							This prompt guides the AI when analyzing browsing patterns to identify workflows and create user profiles.
 						</p>
+						{#if showAnalysisSchema}
+							<div class="mt-2 p-3 bg-gray-100 rounded-md">
+								<p class="text-xs font-medium text-gray-700 mb-1">Expected Output Schema:</p>
+								<pre class="text-xs text-gray-600 overflow-x-auto">{JSON.stringify(ANALYSIS_SCHEMA, null, 2)}</pre>
+							</div>
+						{/if}
+					</div>
+					
+					<!-- Chunk Prompt -->
+					<div>
+						<div class="flex items-center justify-between mb-2">
+							<label for="chunk-prompt" class="block text-sm font-medium text-gray-700">
+								Chunking System Prompt
+							</label>
+							<button
+								type="button"
+								onclick={() => showChunkSchema = !showChunkSchema}
+								class="text-xs text-blue-600 hover:text-blue-800"
+							>
+								{showChunkSchema ? 'Hide' : 'Show'} Expected Output Schema
+							</button>
+						</div>
+						<textarea
+							id="chunk-prompt"
+							bind:value={editableChunkPrompt}
+							oninput={handlePromptChange}
+							rows="4"
+							class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+							placeholder="Enter custom chunking prompt..."
+						></textarea>
+						<p class="mt-1 text-xs text-gray-500">
+							This prompt guides the AI when identifying natural browsing sessions from timestamps.
+						</p>
+						{#if showChunkSchema}
+							<div class="mt-2 p-3 bg-gray-100 rounded-md">
+								<p class="text-xs font-medium text-gray-700 mb-1">Expected Output Schema:</p>
+								<pre class="text-xs text-gray-600 overflow-x-auto">{JSON.stringify(CHUNK_SCHEMA, null, 2)}</pre>
+							</div>
+						{/if}
 					</div>
 					
 					<div class="flex justify-end">

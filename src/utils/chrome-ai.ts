@@ -80,8 +80,33 @@ export async function createChromeAISession(
 				options?: { responseConstraint?: Record<string, unknown> },
 			) => {
 				try {
+					// Note: Token tracking methods (tokensSoFar, maxTokens, tokensLeft, tokenCount)
+					// are documented but not yet available in current Chrome AI implementation
+
 					return await session.prompt(text, options);
 				} catch (error) {
+					// Check if it's a quota exceeded error
+					if (
+						error instanceof DOMException &&
+						error.name === "QuotaExceededError"
+					) {
+						// QuotaExceededError can mean:
+						// 1. Input exceeds 1024 token limit per prompt
+						// 2. Session context exceeds 4096 token limit
+						const errorMessage = error.message?.toLowerCase() || "";
+						if (
+							errorMessage.includes("input") ||
+							errorMessage.includes("token") ||
+							errorMessage.includes("long")
+						) {
+							console.error(
+								"Chrome AI input too long. Prompt exceeds 1024 token limit or session context full (4096 tokens).",
+							);
+							throw new Error(`Chrome AI input too long: ${error.message}`);
+						}
+						console.error("Chrome AI quota exceeded.");
+						throw new Error(`Chrome AI quota exceeded: ${error.message}`);
+					}
 					console.error("Error during Chrome AI prompt:", error);
 					throw error;
 				}

@@ -6,13 +6,20 @@ import AnalysisResults from "./lib/AnalysisResults.svelte";
 import ChromeAIStatus from "./lib/ChromeAIStatus.svelte";
 import HistoryFetcher from "./lib/HistoryFetcher.svelte";
 import type { AnalysisResult } from "./types";
-import { analyzeHistoryItems } from "./utils/analyzer";
+import { analyzeHistoryItems, clearMemory } from "./utils/analyzer";
 
 let analysisResult: AnalysisResult | null = $state(null);
 let isAnalyzing = $state(false);
 let analysisPhase: AnalysisPhase = $state("idle");
 let rawHistoryData: chrome.history.HistoryItem[] | null = $state(null);
-let customAnalysisPrompt: string | undefined = $state(undefined);
+let customPrompts = $state<{ systemPrompt?: string; chunkPrompt?: string }>({});
+let chunkProgress = $state<{
+	current: number;
+	total: number;
+	description: string;
+} | null>(null);
+let retryMessage = $state("");
+let abortController: AbortController | null = null;
 
 async function handleAnalysis(
 	event: CustomEvent<{ items: chrome.history.HistoryItem[] }>,
@@ -21,20 +28,49 @@ async function handleAnalysis(
 
 	isAnalyzing = true;
 	analysisResult = null;
-	analysisPhase = "analyzing";
+	analysisPhase = "calculating";
 	rawHistoryData = items;
 
+	// Create new abort controller for this analysis
+	abortController = new AbortController();
+
 	try {
-		// Analyze the history items directly
-		const result = await analyzeHistoryItems(items, customAnalysisPrompt);
+		// Analyze the history items with progress callback
+		const result = await analyzeHistoryItems(
+			items,
+			customPrompts,
+			(info) => {
+				analysisPhase = info.phase;
+				if (info.currentChunk && info.totalChunks) {
+					chunkProgress = {
+						current: info.currentChunk,
+						total: info.totalChunks,
+						description: info.chunkDescription || "",
+					};
+				}
+				if (info.retryMessage) {
+					retryMessage = info.retryMessage;
+				}
+			},
+			abortController.signal,
+		);
 		analysisResult = result;
 		analysisPhase = "complete";
+		chunkProgress = null;
 	} catch (error) {
 		console.error("Analysis error:", error);
-		analysisPhase = "error";
-		alert(error instanceof Error ? error.message : "Failed to analyze history");
+		if (error instanceof Error && error.message.includes("cancelled")) {
+			analysisPhase = "idle";
+			alert("Analysis cancelled");
+		} else {
+			analysisPhase = "error";
+			alert(
+				error instanceof Error ? error.message : "Failed to analyze history",
+			);
+		}
 	} finally {
 		isAnalyzing = false;
+		abortController = null;
 		// Reset phase after a delay if complete
 		if (analysisPhase === "complete") {
 			setTimeout(() => {
@@ -46,9 +82,25 @@ async function handleAnalysis(
 	}
 }
 
-function handlePromptsChange(prompts: { parsing: string; analysis: string }) {
-	// Since we only have analysis now, we'll just use the analysis prompt
-	customAnalysisPrompt = prompts.analysis || undefined;
+function handlePromptsChange(prompts: { system: string; chunk: string }) {
+	customPrompts = {
+		systemPrompt: prompts.system || undefined,
+		chunkPrompt: prompts.chunk || undefined,
+	};
+}
+
+async function handleClearMemory() {
+	if (confirm("This will clear all stored analysis memory. Continue?")) {
+		await clearMemory();
+		alert("Memory cleared. Next analysis will start fresh.");
+	}
+}
+
+function handleCancelAnalysis() {
+	if (abortController && !abortController.signal.aborted) {
+		abortController.abort();
+		retryMessage = "";
+	}
 }
 </script>
 
@@ -74,17 +126,37 @@ function handlePromptsChange(prompts: { parsing: string; analysis: string }) {
 			</div>
 		</div>
 
-		<AnalysisProgress phase={analysisPhase} />
+		<AnalysisProgress 
+			phase={analysisPhase} 
+			chunkProgress={chunkProgress} 
+			retryMessage={retryMessage}
+			onCancel={handleCancelAnalysis}
+		/>
 
 		{#if analysisResult}
 			<AnalysisResults result={analysisResult} />
 		{/if}
 
-		<!-- Advanced Settings at the bottom -->
-		<div class="mt-4">
+		<!-- Advanced Settings and Memory Management -->
+		<div class="mt-4 space-y-4">
 			<AdvancedSettings 
 				onPromptsChange={handlePromptsChange}
 			/>
+			
+			<!-- Memory Management -->
+			<div class="bg-white rounded-lg shadow-sm p-4">
+				<h3 class="text-sm font-medium text-gray-900 mb-2">Memory Management</h3>
+				<p class="text-xs text-gray-600 mb-3">
+					Analysis memory helps improve results by remembering patterns from previous sessions.
+				</p>
+				<button
+					type="button"
+					onclick={handleClearMemory}
+					class="px-3 py-1.5 text-xs font-medium text-red-700 bg-red-50 border border-red-200 rounded hover:bg-red-100 focus:outline-none focus:ring-2 focus:ring-offset-0 focus:ring-red-500"
+				>
+					Clear Memory
+				</button>
+			</div>
 		</div>
 	</div>
 </main>
