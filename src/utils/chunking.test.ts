@@ -79,7 +79,7 @@ describe("createHistoryChunks", () => {
 			expect(result[1].isFallback).toBe(false);
 		});
 
-		it("should exclude items outside time ranges", () => {
+		it("should create fallback chunks for items outside time ranges", () => {
 			const items = [
 				createTestHistoryItem(
 					"https://early.com",
@@ -105,9 +105,22 @@ describe("createHistoryChunks", () => {
 
 			const result = createHistoryChunks(items, timeRanges);
 
-			expect(result).toHaveLength(1);
-			expect(result[0].items).toHaveLength(1);
-			expect(result[0].items[0].url).toBe("https://inrange.com");
+			// Should have 3 chunks: 1 from AI + 2 fallback chunks for uncovered items
+			expect(result).toHaveLength(3);
+
+			// Find the chunk with the AI-identified time range
+			const workChunk = result.find((chunk) => !chunk.isFallback);
+			expect(workChunk).toBeDefined();
+			expect(workChunk!.items).toHaveLength(1);
+			expect(workChunk!.items[0].url).toBe("https://inrange.com");
+
+			// Verify fallback chunks exist for uncovered items
+			const fallbackChunks = result.filter((chunk) => chunk.isFallback);
+			expect(fallbackChunks).toHaveLength(2);
+
+			// All items should be covered
+			const allItems = result.flatMap((chunk) => chunk.items);
+			expect(allItems).toHaveLength(3);
 		});
 
 		it("should handle empty time ranges with fallback", () => {

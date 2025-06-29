@@ -35,16 +35,16 @@ export async function identifyChunks(
 		};
 	}
 
-	// Create a concise prompt for chunk identification to avoid token limits
-	// Limit number of timestamps to avoid exceeding 1024 token limit
-	const MAX_TIMESTAMPS = 100;
-	const timestampsToAnalyze = timestamps.slice(0, MAX_TIMESTAMPS);
+	// Recursively analyze timestamps in batches if too many
+	const MAX_TIMESTAMPS_PER_BATCH = 80; // Conservative limit to stay under token limits
+	if (timestamps.length > MAX_TIMESTAMPS_PER_BATCH) {
+		return await analyzeTimestampsInBatches(timestamps, customChunkPrompt);
+	}
 
-	const prompt = `Group these ${timestampsToAnalyze.length} timestamps into browsing sessions.
-${timestampsToAnalyze.length < timestamps.length ? `(Analyzing first ${MAX_TIMESTAMPS} of ${timestamps.length} total)` : ""}
+	const prompt = `Group these ${timestamps.length} timestamps into browsing sessions.
 
 Timestamps with their millisecond values:
-${timestampsToAnalyze
+${timestamps
 	.map((ts) => {
 		const d = new Date(ts);
 		return `${ts} = ${d.toLocaleDateString()} ${d.getHours()}:${String(d.getMinutes()).padStart(2, "0")}`;
@@ -178,6 +178,247 @@ IMPORTANT: Return startTime and endTime as the exact millisecond timestamps from
 	}
 }
 
+// Helper to analyze large timestamp sets in batches
+async function analyzeTimestampsInBatches(
+	timestamps: number[],
+	customChunkPrompt?: string,
+): Promise<ChunkingResult> {
+	const MAX_TIMESTAMPS_PER_BATCH = 80;
+	const allTimeRanges: ChunkTimeRange[] = [];
+	let hasError = false;
+	let errorMessage = "";
+
+	// Process timestamps in batches
+	for (let i = 0; i < timestamps.length; i += MAX_TIMESTAMPS_PER_BATCH) {
+		const batchTimestamps = timestamps.slice(i, i + MAX_TIMESTAMPS_PER_BATCH);
+
+		// Create temporary items for this batch
+		const batchItems: chrome.history.HistoryItem[] = batchTimestamps.map(
+			(ts) => ({
+				lastVisitTime: ts,
+				url: "",
+				id: "",
+			}),
+		);
+
+		try {
+			const batchResult = await identifyChunksForBatch(
+				batchItems,
+				customChunkPrompt,
+			);
+
+			if (batchResult.isFallback) {
+				hasError = true;
+				errorMessage = batchResult.error || "Batch processing failed";
+			}
+
+			allTimeRanges.push(...batchResult.timeRanges);
+		} catch (error) {
+			hasError = true;
+			errorMessage = error instanceof Error ? error.message : String(error);
+			// Use fallback for this batch
+			const fallbackRanges = createHalfDayChunks(batchTimestamps);
+			allTimeRanges.push(...fallbackRanges);
+		}
+	}
+
+	// Merge adjacent or overlapping time ranges
+	const mergedRanges = mergeTimeRanges(allTimeRanges);
+
+	return {
+		timeRanges: mergedRanges,
+		isFallback: hasError,
+		error: hasError ? errorMessage : undefined,
+	};
+}
+
+// Helper to identify chunks for a batch (without recursion)
+async function identifyChunksForBatch(
+	items: chrome.history.HistoryItem[],
+	customChunkPrompt?: string,
+): Promise<ChunkingResult> {
+	if (items.length === 0) {
+		return {
+			timeRanges: [],
+			isFallback: false,
+		};
+	}
+
+	// Extract timestamps and sort them
+	const timestamps = items
+		.map((item) => item.lastVisitTime)
+		.filter((time): time is number => time !== undefined)
+		.sort((a, b) => a - b);
+
+	if (timestamps.length === 0) {
+		return {
+			timeRanges: [],
+			isFallback: false,
+		};
+	}
+
+	const prompt = `Group these ${timestamps.length} timestamps into browsing sessions.
+
+Timestamps with their millisecond values:
+${timestamps
+	.map((ts) => {
+		const d = new Date(ts);
+		return `${ts} = ${d.toLocaleDateString()} ${d.getHours()}:${String(d.getMinutes()).padStart(2, "0")}`;
+	})
+	.join("\n")}
+
+Rules:
+- Gap >30min = new session
+- Sessions can span days if continuous
+- Return at least 1 chunk
+- Use descriptive labels
+
+IMPORTANT: Return startTime and endTime as the exact millisecond timestamps from the list above (the numbers before the = sign).`;
+
+	const session = await createChromeAISession(
+		customChunkPrompt || DEFAULT_CHUNK_SYSTEM_PROMPT,
+	);
+
+	if (!session) {
+		// Fallback to half-day chunking
+		return {
+			timeRanges: createHalfDayChunks(timestamps),
+			error: "Failed to create Chrome AI session",
+			isFallback: true,
+		};
+	}
+
+	// Helper for retrying on quota errors
+	const retryWithBackoff = async <T>(
+		fn: () => Promise<T>,
+		maxRetries = 3,
+		baseDelay = 2000,
+	): Promise<T> => {
+		for (let i = 0; i < maxRetries; i++) {
+			try {
+				return await fn();
+			} catch (error) {
+				const errorMessage =
+					error instanceof Error ? error.message.toLowerCase() : "";
+				const isQuotaError = errorMessage.includes("quota exceeded");
+				const isInputTooLong =
+					errorMessage.includes("input too long") ||
+					errorMessage.includes("context full");
+				const isLastAttempt = i === maxRetries - 1;
+
+				// Don't retry if input is too long - it won't get shorter
+				if (isInputTooLong) {
+					console.error("Input exceeds token limits, not retrying");
+					throw error;
+				}
+
+				if (!isQuotaError || isLastAttempt) {
+					throw error;
+				}
+
+				// Exponential backoff: 2s, 4s, 8s
+				const delay = baseDelay * 2 ** i;
+				await new Promise((resolve) => setTimeout(resolve, delay));
+			}
+		}
+		throw new Error("Max retries exceeded");
+	};
+
+	try {
+		const response = await retryWithBackoff(async () => {
+			return await session.prompt(prompt, {
+				responseConstraint: CHUNK_SCHEMA,
+			});
+		});
+
+		let parsed: { chunks?: ChunkTimeRange[] };
+		try {
+			parsed = JSON.parse(response);
+		} catch (parseError) {
+			return {
+				timeRanges: createHalfDayChunks(timestamps),
+				rawResponse: response,
+				error: `Failed to parse JSON: ${parseError}`,
+				isFallback: true,
+			};
+		}
+
+		if (!parsed.chunks || !Array.isArray(parsed.chunks)) {
+			return {
+				timeRanges: createHalfDayChunks(timestamps),
+				rawResponse: response,
+				error: "Response missing 'chunks' array",
+				isFallback: true,
+			};
+		}
+
+		// Validate and clean up chunks
+		const validChunks: ChunkTimeRange[] = parsed.chunks
+			.filter(
+				(chunk: ChunkTimeRange) =>
+					typeof chunk.startTime === "number" &&
+					typeof chunk.endTime === "number" &&
+					chunk.startTime < chunk.endTime,
+			)
+			.sort(
+				(a: ChunkTimeRange, b: ChunkTimeRange) => a.startTime - b.startTime,
+			);
+
+		// If AI didn't return any valid chunks, fall back to simple chunking
+		if (validChunks.length === 0) {
+			return {
+				timeRanges: createHalfDayChunks(timestamps),
+				rawResponse: response,
+				error: "AI returned no valid chunks",
+				isFallback: true,
+			};
+		}
+
+		return {
+			timeRanges: validChunks,
+			rawResponse: response,
+			isFallback: false,
+		};
+	} catch (error) {
+		return {
+			timeRanges: createHalfDayChunks(timestamps),
+			error: error instanceof Error ? error.message : String(error),
+			isFallback: true,
+		};
+	} finally {
+		session.destroy();
+	}
+}
+
+// Helper to merge overlapping or adjacent time ranges
+function mergeTimeRanges(ranges: ChunkTimeRange[]): ChunkTimeRange[] {
+	if (ranges.length === 0) return [];
+
+	// Sort by start time
+	const sorted = [...ranges].sort((a, b) => a.startTime - b.startTime);
+	const merged: ChunkTimeRange[] = [];
+
+	let current = sorted[0];
+	for (let i = 1; i < sorted.length; i++) {
+		const next = sorted[i];
+
+		// If ranges overlap or are adjacent (within 1 minute), merge them
+		if (current.endTime >= next.startTime - 60000) {
+			current = {
+				startTime: current.startTime,
+				endTime: Math.max(current.endTime, next.endTime),
+				description: `${current.description} + ${next.description}`,
+			};
+		} else {
+			merged.push(current);
+			current = next;
+		}
+	}
+	merged.push(current);
+
+	return merged;
+}
+
 // Fallback chunking that creates half-day chunks (12am-12pm, 12pm-12am)
 export function createHalfDayChunks(timestamps: number[]): ChunkTimeRange[] {
 	if (timestamps.length === 0) return [];
@@ -273,6 +514,68 @@ export function createHistoryChunks(
 
 	// First, try to create chunks with the provided time ranges
 	let chunks = mapItemsToRanges(timeRanges, isFallback);
+
+	// Validate coverage if not a fallback and we have chunks
+	if (!isFallback && chunks.length > 0) {
+		// Validate that all items are covered
+		const coveredItems = new Set<string>();
+		chunks.forEach((chunk) => {
+			chunk.items.forEach((item) => {
+				if (item.id) coveredItems.add(item.id);
+			});
+		});
+
+		// Find uncovered items
+		const uncoveredItems = items.filter((item) => {
+			return item.id && !coveredItems.has(item.id) && item.lastVisitTime;
+		});
+
+		// If there are uncovered items, create fallback chunks for them
+		if (uncoveredItems.length > 0) {
+			console.log(
+				`Found ${uncoveredItems.length} uncovered items, creating fallback chunks`,
+			);
+
+			const uncoveredTimestamps = uncoveredItems
+				.map((item) => item.lastVisitTime)
+				.filter((time): time is number => !!time);
+
+			if (uncoveredTimestamps.length > 0) {
+				const fallbackRanges = createHalfDayChunks(uncoveredTimestamps);
+				const fallbackChunks = fallbackRanges
+					.map((range, index) => {
+						const chunkItems = uncoveredItems.filter((item) => {
+							if (!item.lastVisitTime) return false;
+							return (
+								item.lastVisitTime >= range.startTime &&
+								item.lastVisitTime <= range.endTime
+							);
+						});
+
+						if (chunkItems.length > 0) {
+							return {
+								startTime: new Date(range.startTime),
+								endTime: new Date(range.endTime),
+								items: chunkItems,
+								chunkIndex: chunks.length + index,
+								totalChunks: chunks.length + fallbackRanges.length,
+								isFallback: true,
+							} as HistoryChunk;
+						}
+						return null;
+					})
+					.filter((chunk): chunk is HistoryChunk => chunk !== null);
+
+				chunks = [...chunks, ...fallbackChunks];
+
+				// Update total chunks count for all chunks
+				chunks.forEach((chunk, index) => {
+					chunk.chunkIndex = index;
+					chunk.totalChunks = chunks.length;
+				});
+			}
+		}
+	}
 
 	// If no chunks were created and it wasn't already a fallback, use the fallback logic
 	if (chunks.length === 0 && !isFallback) {
