@@ -1,4 +1,4 @@
-import { createChromeAISession } from "./chrome-ai";
+import { createChromeAISession, promptChromeAI } from "./chrome-ai";
 import { buildChunkingPrompt, DEFAULT_CHUNK_SYSTEM_PROMPT } from "./constants";
 import type { ChunkTimeRange, HistoryChunk } from "./memory";
 import { CHUNK_SCHEMA } from "./schemas";
@@ -66,21 +66,15 @@ export async function identifyChunks(
 			try {
 				return await fn();
 			} catch (error) {
-				const errorMessage =
-					error instanceof Error ? error.message.toLowerCase() : "";
-				const isQuotaError = errorMessage.includes("quota exceeded");
-				const isInputTooLong =
-					errorMessage.includes("input too long") ||
-					errorMessage.includes("context full");
 				const isLastAttempt = i === maxRetries - 1;
 
-				// Don't retry if input is too long - it won't get shorter
-				if (isInputTooLong) {
-					console.error("Input exceeds token limits, not retrying");
-					throw error;
-				}
-
-				if (!isQuotaError || isLastAttempt) {
+				// Only retry on quota errors
+				if (
+					!(
+						error instanceof DOMException && error.name === "QuotaExceededError"
+					) ||
+					isLastAttempt
+				) {
 					throw error;
 				}
 
@@ -95,7 +89,7 @@ export async function identifyChunks(
 	try {
 		const startTime = performance.now();
 		const response = await retryWithBackoff(async () => {
-			return await session.prompt(prompt, {
+			return await promptChromeAI(session, prompt, {
 				responseConstraint: CHUNK_SCHEMA,
 			});
 		});
@@ -286,21 +280,15 @@ async function identifyChunksForBatch(
 			try {
 				return await fn();
 			} catch (error) {
-				const errorMessage =
-					error instanceof Error ? error.message.toLowerCase() : "";
-				const isQuotaError = errorMessage.includes("quota exceeded");
-				const isInputTooLong =
-					errorMessage.includes("input too long") ||
-					errorMessage.includes("context full");
 				const isLastAttempt = i === maxRetries - 1;
 
-				// Don't retry if input is too long - it won't get shorter
-				if (isInputTooLong) {
-					console.error("Input exceeds token limits, not retrying");
-					throw error;
-				}
-
-				if (!isQuotaError || isLastAttempt) {
+				// Only retry on quota errors
+				if (
+					!(
+						error instanceof DOMException && error.name === "QuotaExceededError"
+					) ||
+					isLastAttempt
+				) {
 					throw error;
 				}
 
@@ -315,7 +303,7 @@ async function identifyChunksForBatch(
 	try {
 		const startTime = performance.now();
 		const response = await retryWithBackoff(async () => {
-			return await session.prompt(prompt, {
+			return await promptChromeAI(session, prompt, {
 				responseConstraint: CHUNK_SCHEMA,
 			});
 		});

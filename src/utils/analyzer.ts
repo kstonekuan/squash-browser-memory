@@ -4,7 +4,7 @@ import type {
 	UserProfile,
 	WorkflowPattern,
 } from "../types";
-import { createChromeAISession } from "./chrome-ai";
+import { createChromeAISession, promptChromeAI } from "./chrome-ai";
 import { createHistoryChunks, identifyChunks } from "./chunking";
 import {
 	buildAnalysisPrompt,
@@ -304,21 +304,15 @@ async function retryWithBackoff<T>(
 		try {
 			return await fn();
 		} catch (error) {
-			const errorMessage =
-				error instanceof Error ? error.message.toLowerCase() : "";
-			const isQuotaError = errorMessage.includes("quota exceeded");
-			const isInputTooLong =
-				errorMessage.includes("input too long") ||
-				errorMessage.includes("context full");
 			const isLastAttempt = i === maxRetries - 1;
 
-			// Don't retry if input is too long - it won't get shorter
-			if (isInputTooLong) {
-				console.error("Input exceeds token limits, not retrying");
-				throw error;
-			}
-
-			if (!isQuotaError || isLastAttempt) {
+			// Only retry on quota errors, not on other errors
+			if (
+				!(
+					error instanceof DOMException && error.name === "QuotaExceededError"
+				) ||
+				isLastAttempt
+			) {
 				throw error;
 			}
 
@@ -359,13 +353,6 @@ async function retryWithBackoff<T>(
 		}
 	}
 	throw new Error("Max retries exceeded");
-}
-
-// Simple token counter (approximate but consistent)
-function countTokens(text: string): number {
-	// Rough approximation: 1 token ≈ 4 characters
-	// This is conservative to avoid underestimating
-	return Math.ceil(text.length / 3.5);
 }
 
 // Hide tracking URL parameters to reduce token usage and protect privacy
@@ -491,7 +478,7 @@ async function mergeAnalysisResults(
 		}
 
 		const startTime = performance.now();
-		const response = await session.prompt(mergePrompt, {
+		const response = await promptChromeAI(session, mergePrompt, {
 			responseConstraint: ANALYSIS_SCHEMA,
 		});
 		const endTime = performance.now();
@@ -572,10 +559,6 @@ async function analyzeChunkWithSubdivision(
 	processedItems: number;
 	results: { userProfile: UserProfile; patterns: WorkflowPattern[] } | null;
 }> {
-	const TOKEN_LIMIT = 1024;
-	const SAFETY_MARGIN = 200; // Large margin to account for system prompt, response formatting, and long URLs
-	const MAX_TOKENS = TOKEN_LIMIT - SAFETY_MARGIN;
-
 	// First, try to analyze the entire chunk
 	try {
 		// Build a test prompt to check token count
@@ -616,11 +599,8 @@ async function analyzeChunkWithSubdivision(
 			};
 		});
 
-		const testPrompt = buildAnalysisPrompt(items, testHistoryData);
-		const tokenCount = countTokens(testPrompt);
-
-		if (tokenCount <= MAX_TOKENS) {
-			// Fits within limits, analyze normally
+		// First, try to analyze the entire chunk
+		try {
 			// Step 1: Analyze the chunk
 			const chunkResults = await analyzeChunk(
 				items,
@@ -642,43 +622,71 @@ async function analyzeChunkWithSubdivision(
 						);
 
 			return { processedItems: items.length, results: mergedResults };
+		} catch (error) {
+			// Check if it's a token limit error (QuotaExceededError)
+			if (
+				error instanceof DOMException &&
+				error.name === "QuotaExceededError"
+			) {
+				console.log(
+					`Chunk with ${items.length} items exceeds token limit, subdividing...`,
+				);
+			} else {
+				// Not a token limit error, re-throw
+				throw error;
+			}
 		}
 
-		// Too large, need to subdivide
-		console.log(
-			`Chunk with ${items.length} items (${tokenCount} tokens) exceeds limit, subdividing...`,
+		// Need to subdivide the chunk
+
+		// Binary search for the right size using the Chrome AI API
+		const session = await createChromeAISession(
+			customSystemPrompt || DEFAULT_SYSTEM_PROMPT,
 		);
 
-		// Binary search for the right size
+		if (!session) {
+			throw new Error("Chrome AI is not available for measuring tokens.");
+		}
+
 		let left = 1;
 		let right = items.length;
 		let optimalSize = 1; // Start with minimum of 1 item
 
-		while (left <= right) {
-			const mid = Math.floor((left + right) / 2);
-			const testItems = items.slice(0, mid);
-			const testData = testHistoryData.slice(0, mid);
-			const testPrompt = buildAnalysisPrompt(testItems, testData);
-			const testTokenCount = countTokens(testPrompt);
+		try {
+			while (left <= right) {
+				const mid = Math.floor((left + right) / 2);
+				const testItems = items.slice(0, mid);
+				const testData = testHistoryData.slice(0, mid);
+				const testPrompt = buildAnalysisPrompt(testItems, testData);
 
-			if (testTokenCount <= MAX_TOKENS) {
-				optimalSize = mid;
-				left = mid + 1;
-			} else {
-				right = mid - 1;
+				try {
+					const testTokenCount = await session.measureInputUsage(testPrompt, {
+						responseConstraint: ANALYSIS_SCHEMA,
+					});
+					console.log(`Testing ${mid} items: ${testTokenCount} tokens`);
+
+					// Chrome AI has a 1024 token limit, leave some margin
+					if (testTokenCount <= 900) {
+						optimalSize = mid;
+						left = mid + 1;
+					} else {
+						right = mid - 1;
+					}
+				} catch {
+					// If measurement fails, assume it's too large
+					console.log(
+						`Measurement failed for ${mid} items, assuming too large`,
+					);
+					right = mid - 1;
+				}
 			}
+
+			console.log(
+				`Optimal subdivision size: ${optimalSize} items per sub-chunk`,
+			);
+		} finally {
+			session.destroy();
 		}
-
-		console.log(`Optimal subdivision size: ${optimalSize} items per sub-chunk`);
-
-		// Double-check the optimal size actually works
-		const verifyItems = items.slice(0, optimalSize);
-		const verifyData = testHistoryData.slice(0, optimalSize);
-		const verifyPrompt = buildAnalysisPrompt(verifyItems, verifyData);
-		const verifyTokenCount = countTokens(verifyPrompt);
-		console.log(
-			`Verification: ${optimalSize} items = ${verifyTokenCount} tokens (limit: ${MAX_TOKENS})`,
-		);
 
 		// Process in sub-chunks
 		let currentMemory = memory;
@@ -805,23 +813,6 @@ async function analyzeChunk(
 
 	// Build the analysis prompt
 	const prompt = buildAnalysisPrompt(items, historyData);
-	const tokenCount = countTokens(prompt);
-
-	// This should have been checked by the caller
-	if (tokenCount > 1024 - 200) {
-		console.error("Token limit exceeded in analyzeChunk:");
-		console.error("- Items:", items.length);
-		console.error("- Token count:", tokenCount);
-		console.error("- Prompt length:", prompt.length, "characters");
-		console.error("- historyData sample:", JSON.stringify(historyData[0]));
-		console.error(
-			"- First item URL:",
-			`${items[0]?.url?.substring(0, 100)}...`,
-		);
-		throw new Error(
-			`analyzeChunk called with too many items: ${items.length} items, ${tokenCount} tokens`,
-		);
-	}
 
 	const session = await createChromeAISession(
 		customSystemPrompt || DEFAULT_SYSTEM_PROMPT,
@@ -832,9 +823,7 @@ async function analyzeChunk(
 	}
 
 	try {
-		console.log(
-			`Analyzing chunk with ${items.length} items, ${tokenCount} tokens`,
-		);
+		console.log(`Analyzing chunk with ${items.length} items`);
 		const response = await retryWithBackoff(
 			async () => {
 				// Check abort before making request
@@ -861,7 +850,7 @@ async function analyzeChunk(
 				}
 
 				const startTime = performance.now();
-				const result = await session.prompt(prompt, {
+				const result = await promptChromeAI(session, prompt, {
 					responseConstraint: ANALYSIS_SCHEMA,
 				});
 				const endTime = performance.now();
