@@ -40,7 +40,7 @@ export function buildAnalysisPrompt(
 		v: number;
 	}>,
 ): string {
-	return `Analyze this browsing history data and create a user profile:
+	return `Analyze this browsing history data and create a detailed user profile with specific, rich insights:
 
 DATA CHUNK (${items.length} items):
 Time: ${items[0]?.lastVisitTime ? new Date(items[0].lastVisitTime).toLocaleDateString() : "unknown"} to ${items[items.length - 1]?.lastVisitTime ? new Date(items[items.length - 1]?.lastVisitTime || 0).toLocaleDateString() : "unknown"}
@@ -48,23 +48,45 @@ Time: ${items[0]?.lastVisitTime ? new Date(items[0].lastVisitTime).toLocaleDateS
 Data (d=domain, p=path, q=query params, t=title, ts=timestamp, v=visits):
 ${JSON.stringify(historyData)}
 
-Create a profile including:
-- Profession based on browsing patterns
-- Key interests (up to 10)
-- Current goals or aspirations (up to 6)
-- Recent obsessions or topics of intense focus (up to 5)
-- Lifecycle hints like trip planning, job hunting, side projects (up to 4)
-- Personal preferences like tech stack, travel style, sports teams (up to 8)
-- Work patterns (up to 8)
-- Personality traits with evidence (up to 8)
-- Technology use patterns (up to 10)
-- Summary of the user
+Create a rich, detailed profile with SPECIFIC insights (not generic descriptions):
+
+**PROFESSION** (infer from evidence):
+Examples: "Senior UX Designer contracting for SaaS health-tech apps (remote)", "Frontend Engineer specializing in React + TypeScript", "Digital Marketing Manager at fintech startup"
+
+**KEY INTERESTS** (up to 10, be specific):
+Examples: "Figma micro-interactions", "zero-waste travel", "EU Digital Services Act", "water-color journaling", "techno festivals", "language-learning hacks", "van-life conversions"
+
+**CURRENT GOALS** (up to 6, actionable aspirations):
+Examples: "Land a 6-month remote retainer", "redesign onboarding flow for mental-health app", "reach B2 level Portuguese", "cycle Camino de Santiago", "publish UX case-study on Medium", "build Notion template shop"
+
+**RECENT OBSESSIONS** (up to 5, intense current focus):
+Examples: "Figma variables beta", "Interrail Global Pass pricing", "Airbnb vs Coliving cost spreadsheet", "dark patterns podcast", "Lisbon vs Porto coworking reviews"
+
+**LIFECYCLE HINTS** (up to 4, life events/transitions):
+Examples: "Planning digital-nomad visa renewal", "scouting winter base in Chiang Mai", "exploring freelance marketplace fees", "researching camper-van insurance"
+
+**PERSONAL PREFERENCES** (up to 8, specific choices):
+Examples: {category: "Style", preference: "Minimalist capsule wardrobe"}, {category: "Travel", preference: "prefers night trains over flights"}, {category: "Diet", preference: "vegetarian"}, {category: "UI", preference: "always dark-theme"}, {category: "Music", preference: "loves techno at 124 BPM"}
+
+**WORK PATTERNS** (up to 8, behavioral insights):
+Examples: "Deep-work sprints with Pomodoro", "async Loom feedback", "Monday stand-ups in CET mornings", "Figma late-night bursts", "Slack status 🌍 roaming"
+
+**PERSONALITY TRAITS** (up to 8, with evidence):
+Examples: "Adventurous: posts IG reels from new cities", "Eco-conscious: calculates carbon offsets", "Educator: writes UX blogs", "Empathetic: runs user interviews herself"
+
+**TECHNOLOGY USE** (up to 10, specific tools/patterns):
+Examples: "Figma + FigJam daily workflow", "Webflow prototypes", "Notion CRM", "Google Fi eSIM", "Raycast quick-actions", "Chrome DevTools for accessibility audits"
+
+**SUMMARY** (one engaging sentence):
+Example: "Remote UX designer living the nomad life—sketching SaaS dashboards by day, scouting Lisbon surf hostels by night, and hunting for the perfect dark-mode micro-interaction."
 
 Also identify workflow patterns:
 - Repetitive sequences of sites/actions
 - Time patterns (daily, weekly, etc.)
 - Automation opportunities
 - Include frequency and specific URLs as evidence
+
+CRITICAL: Be specific, not generic. Use evidence from the browsing data to create vivid, detailed insights about this person's life, work, and interests.
 
 IMPORTANT: Return only valid JSON matching the schema. Do not include markdown formatting, code blocks, or any other text.`;
 }
@@ -80,7 +102,7 @@ export function buildMergePrompt(
 		patterns: WorkflowPattern[];
 	},
 ): string {
-	return `Merge new analysis results with existing memory:
+	return `Intelligently merge new analysis results with existing memory to create a richer, more accurate profile:
 
 EXISTING MEMORY (from ${existingMemory.totalItemsAnalyzed} previously analyzed items):
 ${JSON.stringify(existingMemory)}
@@ -88,36 +110,89 @@ ${JSON.stringify(existingMemory)}
 NEW ANALYSIS RESULTS:
 ${JSON.stringify(newResults)}
 
-MERGE RULES:
-1. CONSOLIDATE patterns - CRITICAL:
-   - DETECT and MERGE similar patterns. Examples:
-     * "Daily GitHub PR review" + "Checking GitHub pull requests" = ONE pattern
-     * "Google search for programming" + "Search Google for code" = ONE pattern
-     * "Reading Reddit programming" + "Browsing r/programming" = ONE pattern
-   - When merging, ADD frequencies together
-   - Keep ONLY 10-15 most frequent/important patterns total
-   - Remove patterns with frequency < 3 unless highly significant
-   - NEVER have two patterns that describe the same activity
+INTELLIGENT MERGE RULES - Treat fields differently based on stability:
 
-2. LIMIT lists strictly:
-   - interests: MAX 10 items (remove least relevant)
-   - currentGoals: MAX 6 items
-   - recentObsessions: MAX 5 items
-   - lifecycleHints: MAX 4 items
-   - personalPreferences: MAX 8 items
-   - workPatterns: MAX 8 items
-   - personalityTraits: MAX 8 items  
-   - technologyUse: MAX 10 items
-   - patterns: MAX 15 items
+**=== STABLE BACKGROUND (Core Identity) - RESISTANT TO CHANGE ===**
+Require strong evidence to modify. Evolve slowly and carefully.
 
-3. UPDATE don't APPEND:
-   - If you see "Software Developer" already in profession, don't add "Developer" 
-   - Merge similar interests: "machine learning" + "ML" = just "machine learning"
-   - Update existing entries rather than creating duplicates
+1. **PROFESSION EVOLUTION** - High evidence threshold:
+   Examples: "UX Designer" → "Senior UX Designer" → "Senior UX Designer contracting for SaaS health-tech apps (remote)"
+   Only update with substantial new evidence of role change
 
-4. The response must have FEWER or EQUAL items than the input, never more!
+2. **PERSONALITY TRAITS** - Strengthen existing, rarely replace:
+   Examples: 
+   - "Adventurous" + "Travel posts" → "Adventurous: posts IG reels from new cities"
+   - "Eco-conscious" + "Carbon tracking" → "Eco-conscious: calculates carbon offsets"
+   Build evidence, don't contradict established traits
 
-Return the MERGED result that intelligently combines both old and new information.
+3. **PERSONAL PREFERENCES** - Consolidate similar, preserve core values:
+   Examples:
+   - Style: "Minimalist" + "Capsule wardrobe" → "Minimalist capsule wardrobe"
+   - Travel: "Train travel" + "Environmental" → "prefers night trains over flights"
+   - UI: "Dark mode" + "Always" → "always dark-theme"
+   Deep preferences rarely change completely
+
+4. **TECHNOLOGY USE** - Add new tools, preserve established patterns:
+   Examples:
+   - "Figma" + "FigJam" → "Figma + FigJam daily workflow"
+   - "Chrome" + "Accessibility" → "Chrome DevTools for accessibility audits"
+   People add tools but maintain core workflows
+
+**=== CURRENT CONTEXT (Dynamic/Active) - EMBRACE CHANGE ===**
+Update frequently. Replace outdated with recent. Show progression.
+
+5. **CURRENT GOALS** - Replace completed, update in progress:
+   Examples:
+   - "Find freelance work" → "Land a 6-month remote retainer" (more specific)
+   - "Learn Portuguese" → "reach B2 level Portuguese" (progression)
+   - Remove completed goals, keep active/evolving ones
+
+6. **RECENT OBSESSIONS** - Fresh obsessions replace older ones:
+   Examples: Keep "Figma variables beta" over "General design tools"
+   Prioritize specific technical problems over broad interests
+   Replace with most recent intense focus
+
+7. **LIFECYCLE HINTS** - Track life event progression:
+   Examples:
+   - "Planning to travel" → "Planning digital-nomad visa renewal" → "Settled in Chiang Mai base"
+   - "Freelance research" → "exploring freelance marketplace fees" → "Joined Upwork Pro"
+   Show clear progression through life events
+
+8. **INTERESTS** - Mix of stable core + evolving specific interests:
+   Examples: 
+   - Keep core: "Design" but evolve specifics: "Figma micro-interactions"
+   - Keep lifestyle: "Travel" but update focus: "zero-waste travel"
+   Some interests are stable, others evolve with current focus
+
+9. **WORK PATTERNS** - Update with new habits, keep established patterns:
+   Examples:
+   - "Focused work" + "Pomodoro technique" → "Deep-work sprints with Pomodoro"
+   - "Video feedback" + "Async communication" → "async Loom feedback"
+   Work habits can change but core patterns often persist
+
+10. **SUMMARY NARRATIVE** - Always refresh to reflect current state:
+    Combine: profession + lifestyle + current activities + personality + goals
+    Example: "Remote UX designer living the nomad life—sketching SaaS dashboards by day, scouting Lisbon surf hostels by night, and hunting for the perfect dark-mode micro-interaction."
+    Should capture current moment in person's life
+
+11. **WORKFLOW PATTERNS** - CONSOLIDATE similar activities:
+    Examples:
+    - "Daily GitHub PR review" + "Checking GitHub pull requests" = "Daily GitHub PR review and triage" (frequency: sum both)
+    - "Google programming search" + "Stack Overflow research" = "Technical problem research workflow"
+
+**CRITICAL MERGE PRINCIPLES:**
+- EVOLVE entries with new evidence (don't just add)
+- Keep MOST SPECIFIC and RECENT information
+- REMOVE outdated/completed items
+- STRENGTHEN existing entries with new context
+- CREATE NARRATIVE COHERENCE across all fields
+
+**STRICT LIMITS** (must not exceed):
+- interests: MAX 10 | currentGoals: MAX 6 | recentObsessions: MAX 5 | lifecycleHints: MAX 4
+- personalPreferences: MAX 8 | workPatterns: MAX 8 | personalityTraits: MAX 8 | technologyUse: MAX 10
+- patterns: MAX 15
+
+Return the EVOLVED profile that tells a coherent, specific story about this person's current life and work.
 
 IMPORTANT: Return only valid JSON matching the schema. Do not include markdown formatting, code blocks, or any other text.`;
 }
