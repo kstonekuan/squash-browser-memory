@@ -23,7 +23,7 @@ import { ANALYSIS_SCHEMA } from "./schemas";
 export { clearMemory } from "./memory";
 
 // Export for testing
-export { shortenUrlParams };
+export { hideTrackingParams };
 
 // Calculate statistics from Chrome history items
 export function calculateStats(items: chrome.history.HistoryItem[]): {
@@ -306,8 +306,8 @@ function countTokens(text: string): number {
 	return Math.ceil(text.length / 3.5);
 }
 
-// Shorten long URL parameter values to reduce token usage
-function shortenUrlParams(
+// Hide tracking URL parameters to reduce token usage and protect privacy
+function hideTrackingParams(
 	params: Record<string, string>,
 ): Record<string, string> {
 	const shortened: Record<string, string> = {};
@@ -483,7 +483,7 @@ async function analyzeChunkWithSubdivision(
 					url.searchParams.forEach((value, key) => {
 						params[key] = value;
 					});
-					urlParts.params = shortenUrlParams(params);
+					urlParts.params = hideTrackingParams(params);
 				}
 			} catch {
 				const match = item.url?.match(/^https?:\/\/([^/]+)/);
@@ -651,7 +651,7 @@ async function analyzeChunk(
 				url.searchParams.forEach((value, key) => {
 					params[key] = value;
 				});
-				urlParts.params = shortenUrlParams(params);
+				urlParts.params = hideTrackingParams(params);
 			}
 		} catch {
 			// Invalid URL - try to extract domain from URL string

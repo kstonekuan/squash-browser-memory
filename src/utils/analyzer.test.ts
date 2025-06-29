@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { calculateStats, shortenUrlParams } from "./analyzer";
+import { calculateStats, hideTrackingParams } from "./analyzer";
 import { buildAnalysisPrompt } from "./constants";
 
 describe("calculateStats", () => {
@@ -231,7 +231,7 @@ describe("token counting and subdivision", () => {
 	});
 });
 
-describe("shortenUrlParams", () => {
+describe("hideTrackingParams", () => {
 	it("should hide tracking parameters", () => {
 		const params = {
 			// Google Analytics
@@ -250,7 +250,7 @@ describe("shortenUrlParams", () => {
 			ref: "homepage",
 		};
 
-		const result = shortenUrlParams(params);
+		const result = hideTrackingParams(params);
 
 		// All tracking params should be hidden
 		expect(result.utm_source).toBe("<hidden>");
@@ -272,7 +272,7 @@ describe("shortenUrlParams", () => {
 			search: "javascript async await tutorial",
 		};
 
-		const result = shortenUrlParams(params);
+		const result = hideTrackingParams(params);
 
 		// Search queries should be preserved in full
 		expect(result.q).toBe(
@@ -291,7 +291,7 @@ describe("shortenUrlParams", () => {
 				"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c", // JWT token
 		};
 
-		const result = shortenUrlParams(params);
+		const result = hideTrackingParams(params);
 
 		// All non-tracking params should be preserved in full
 		expect(result.data).toBe("a".repeat(150));
@@ -316,7 +316,7 @@ describe("shortenUrlParams", () => {
 				"This is a very long description that exceeds one hundred characters and should be truncated to maintain reasonable token usage in the prompt",
 		};
 
-		const result = shortenUrlParams(params);
+		const result = hideTrackingParams(params);
 
 		expect(result.q).toBe(
 			"typescript generic constraints explained with examples",
@@ -332,7 +332,7 @@ describe("shortenUrlParams", () => {
 	});
 
 	it("should handle empty params object", () => {
-		const result = shortenUrlParams({});
+		const result = hideTrackingParams({});
 		expect(result).toEqual({});
 	});
 
@@ -344,7 +344,7 @@ describe("shortenUrlParams", () => {
 			SID: "session123",
 		};
 
-		const result = shortenUrlParams(params);
+		const result = hideTrackingParams(params);
 
 		expect(result.UTM_SOURCE).toBe("<hidden>");
 		expect(result.Utm_Medium).toBe("<hidden>");
@@ -361,7 +361,7 @@ describe("shortenUrlParams", () => {
 			__hstc: "another_tracking_value",
 		};
 
-		const result = shortenUrlParams(params);
+		const result = hideTrackingParams(params);
 
 		expect(result.ga_session_id).toBe("<hidden>");
 		expect(result.ga_client_id).toBe("<hidden>");
@@ -385,7 +385,7 @@ describe("shortenUrlParams", () => {
 			sei: "qBxhaKShA86d4-EP6K3H8Q4",
 		};
 
-		const result = shortenUrlParams(params);
+		const result = hideTrackingParams(params);
 
 		// Search query should be preserved
 		expect(result.q).toBe(
