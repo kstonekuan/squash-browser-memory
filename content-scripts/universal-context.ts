@@ -1037,9 +1037,6 @@ class ContextButtonInjector {
 				<div style="padding: 16px; text-align: center; color: #6b7280;">
 					<div style="font-size: 24px; margin-bottom: 8px;">💭</div>
 					<div>No relevant context found</div>
-					<div style="font-size: 12px; margin-top: 4px;">
-						String matching only (semantic search available in sidepanel)
-					</div>
 				</div>
 			`;
 			return;
@@ -1088,13 +1085,7 @@ class ContextButtonInjector {
 			})
 			.join("");
 
-		const statusHtml = `
-			<div style="padding: 8px 12px; background: #f9fafb; border-top: 1px solid #f3f4f6; font-size: 11px; color: #6b7280;">
-				📝 String matching (full semantic search available in extension sidepanel)
-			</div>
-		`;
-
-		this.dropdownElement.innerHTML = suggestionsHtml + statusHtml;
+		this.dropdownElement.innerHTML = suggestionsHtml;
 
 		// Add click handlers and hover effects for suggestions
 		this.dropdownElement
