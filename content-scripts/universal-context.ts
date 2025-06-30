@@ -574,7 +574,7 @@ class SimpleContextMatcher {
 			}
 		};
 
-		// Helper function to safely add array items
+		// Helper function to safely add array items (for string arrays)
 		const addArrayItems = (array: any, category: string) => {
 			if (Array.isArray(array)) {
 				for (const item of array) {
@@ -583,23 +583,68 @@ class SimpleContextMatcher {
 			}
 		};
 
+		// Helper function to add object arrays with specific property extraction
+		const addObjectArray = (
+			array: any,
+			category: string,
+			textExtractor: (item: any) => string,
+		) => {
+			if (Array.isArray(array)) {
+				for (const item of array) {
+					if (item && typeof item === "object") {
+						const text = textExtractor(item);
+						addContext(text, category);
+					}
+				}
+			}
+		};
+
 		// Add profession
 		addContext(profile.profession, "profession");
 
-		// Add interests
+		// Add interests (string array)
 		addArrayItems(profile.interests, "interests");
 
-		// Add current goals
+		// Add current goals (string array)
 		addArrayItems(profile.currentGoals, "goals");
 
-		// Add personal preferences
-		addArrayItems(profile.personalPreferences, "preferences");
+		// Add lifecycle hints (string array)
+		addArrayItems(profile.lifecycleHints, "lifecycle");
 
-		// Add personality traits
-		addArrayItems(profile.personalityTraits, "traits");
+		// Add personal preferences (object array: {category, preference})
+		addObjectArray(
+			profile.personalPreferences,
+			"preferences",
+			(item) => `${item.category}: ${item.preference}`,
+		);
 
-		// Add recent obsessions
+		// Add personality traits (object array: {trait, evidence})
+		addObjectArray(
+			profile.personalityTraits,
+			"traits",
+			(item) => item.trait + (item.evidence ? ` (${item.evidence})` : ""),
+		);
+
+		// Add technology use (object array: {category, level, tools})
+		addObjectArray(
+			profile.technologyUse,
+			"technology",
+			(item) =>
+				`${item.category} (${item.level}): ${Array.isArray(item.tools) ? item.tools.join(", ") : item.tools || ""}`,
+		);
+
+		// Add work patterns (object array: {type, description})
+		addObjectArray(
+			profile.workPatterns,
+			"patterns",
+			(item) => `${item.type}: ${item.description}`,
+		);
+
+		// Add recent obsessions (string array)
 		addArrayItems(profile.recentObsessions, "obsessions");
+
+		// Add summary as a single context item
+		addContext(profile.summary, "summary");
 
 		console.log("Extracted contexts:", contexts);
 		return contexts;
@@ -914,7 +959,6 @@ class ContextButtonInjector {
 
 	private async toggleSuggestions() {
 		if (!this.currentInput || this.currentInput.trim().length < 3) {
-			alert("Type at least 3 characters to get context suggestions");
 			return;
 		}
 
@@ -1217,6 +1261,9 @@ class ContextButtonInjector {
 			traits: "🧠",
 			interests: "✨",
 			obsessions: "🔥",
+			technology: "💻",
+			lifecycle: "🔄",
+			summary: "📋",
 		};
 		return icons[category] || "📝";
 	}
@@ -1230,6 +1277,9 @@ class ContextButtonInjector {
 			traits: "background: #e0e7ff; color: #4338ca;",
 			interests: "background: #fce7f3; color: #be185d;",
 			obsessions: "background: #fee2e2; color: #dc2626;",
+			technology: "background: #dbeafe; color: #1d4ed8;",
+			lifecycle: "background: #f3e8ff; color: #7c3aed;",
+			summary: "background: #f0f9ff; color: #0369a1;",
 		};
 		return colors[category] || "background: #f3f4f6; color: #374151;";
 	}
