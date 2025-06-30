@@ -294,7 +294,10 @@ class SimplePlatformAdapter {
 		button.type = "button";
 		button.id = "history-analyzer-context-button";
 		button.className = this.config.styling.buttonStyles;
-		button.setAttribute("aria-label", "Add context from memory");
+		button.setAttribute(
+			"aria-label",
+			"Add context from memory (Shift+Click for quick profile)",
+		);
 		button.setAttribute("data-testid", "context-selection-button");
 
 		// ChatGPT specific styling
@@ -863,11 +866,18 @@ class ContextButtonInjector {
 	private createContextButton(): HTMLButtonElement {
 		const button = this.platformAdapter.createContextButton();
 
-		// Add click handler for suggestions dropdown
+		// Add click handler with shortcut support
 		button.addEventListener("click", (e) => {
 			e.preventDefault();
 			e.stopPropagation();
-			this.toggleSuggestions();
+
+			// Shift+Click = Quick insert structured profile
+			if (e.shiftKey) {
+				this.insertStructuredProfile();
+			} else {
+				// Regular click = Show dropdown suggestions
+				this.toggleSuggestions();
+			}
 		});
 
 		// Update button state based on current input
@@ -1042,6 +1052,33 @@ class ContextButtonInjector {
 			return;
 		}
 
+		// Add header with "Insert All" button
+		const headerHtml = `
+			<div style="padding: 8px 12px; background: #f9fafb; border-bottom: 1px solid #f3f4f6; display: flex; justify-content: space-between; align-items: center;">
+				<span style="font-size: 12px; color: #6b7280; font-weight: 500;">
+					${suggestions.length} suggestion${suggestions.length !== 1 ? "s" : ""} found
+				</span>
+				<button 
+					type="button"
+					class="insert-all-btn"
+					style="
+						background: var(--brand-purple, #ab68ff);
+						color: white;
+						border: none;
+						border-radius: 6px;
+						padding: 4px 8px;
+						font-size: 11px;
+						font-weight: 600;
+						cursor: pointer;
+						transition: background-color 0.2s;
+					"
+					title="Insert structured profile (or Shift+Click context button)"
+				>
+					📄 Insert Profile
+				</button>
+			</div>
+		`;
+
 		const suggestionsHtml = suggestions
 			.map((suggestion, index) => {
 				const categoryIcon = this.getCategoryIcon(suggestion.category);
@@ -1085,7 +1122,26 @@ class ContextButtonInjector {
 			})
 			.join("");
 
-		this.dropdownElement.innerHTML = suggestionsHtml;
+		this.dropdownElement.innerHTML = headerHtml + suggestionsHtml;
+
+		// Add click handler for "Insert All" button
+		const insertAllBtn = this.dropdownElement.querySelector(".insert-all-btn");
+		if (insertAllBtn) {
+			insertAllBtn.addEventListener("click", () => {
+				this.insertStructuredProfile();
+			});
+
+			// Add hover effect
+			insertAllBtn.addEventListener("mouseenter", () => {
+				(insertAllBtn as HTMLElement).style.backgroundColor =
+					"var(--brand-purple-dark, #9333ea)";
+			});
+
+			insertAllBtn.addEventListener("mouseleave", () => {
+				(insertAllBtn as HTMLElement).style.backgroundColor =
+					"var(--brand-purple, #ab68ff)";
+			});
+		}
 
 		// Add click handlers and hover effects for suggestions
 		this.dropdownElement
@@ -1121,6 +1177,146 @@ class ContextButtonInjector {
 		console.log("Context suggestion selected:", suggestion);
 	}
 
+	private replaceInputText(text: string) {
+		if (!this.chatInput) return;
+
+		const element = this.chatInput.element;
+		const isContentEditable = element.contentEditable === "true";
+
+		if (isContentEditable) {
+			// For contentEditable divs (like ChatGPT), we need to handle newlines properly
+			// Clear the element first
+			element.innerHTML = "";
+
+			// Split text by newlines and create text nodes with <div> or <br> elements
+			const lines = text.split("\n");
+			lines.forEach((line, index) => {
+				if (line.trim() === "") {
+					// Empty line - add a <br> for spacing
+					element.appendChild(document.createElement("br"));
+				} else {
+					// Non-empty line - add as text node
+					const textNode = document.createTextNode(line);
+					element.appendChild(textNode);
+				}
+
+				// Add line break after each line except the last one
+				if (index < lines.length - 1) {
+					element.appendChild(document.createElement("br"));
+				}
+			});
+
+			element.dispatchEvent(new Event("input", { bubbles: true }));
+		} else {
+			(element as HTMLInputElement | HTMLTextAreaElement).value = text;
+			element.dispatchEvent(new Event("input", { bubbles: true }));
+			element.dispatchEvent(new Event("change", { bubbles: true }));
+		}
+
+		element.focus();
+	}
+
+	private async insertStructuredProfile() {
+		if (!this.chatInput) return;
+
+		try {
+			// Get only the matching suggestions for current input
+			const suggestions = await this.matcher.getSuggestions(this.currentInput);
+
+			// Convert suggestions to context format
+			const matchingContexts = suggestions.map((s) => ({
+				text: s.text,
+				category: s.category,
+			}));
+
+			if (matchingContexts.length === 0) {
+				console.log("No matching contexts to insert");
+				return;
+			}
+
+			const formattedProfile = this.formatStructuredProfile(matchingContexts);
+
+			const currentText = this.chatInput.getCurrentText();
+			const newText = currentText
+				? `${currentText}\n -- Context --\n${formattedProfile}`
+				: formattedProfile;
+
+			// Use direct replacement to avoid double-insertion
+			this.replaceInputText(newText);
+			this.hideSuggestions();
+
+			console.log(
+				"Structured profile inserted with",
+				matchingContexts.length,
+				"matching contexts",
+			);
+		} catch (error) {
+			console.error("Failed to insert structured profile:", error);
+		}
+	}
+
+	private formatStructuredProfile(
+		contexts: Array<{ text: string; category: string }>,
+	): string {
+		const sections = [];
+
+		// Background section
+		const profession = contexts.find((c) => c.category === "profession")?.text;
+		const summary = contexts.find((c) => c.category === "summary")?.text;
+
+		if (profession || summary) {
+			let background = "Background: ";
+			if (profession) {
+				background += `I'm a ${profession.toLowerCase()}`;
+			}
+			if (summary && summary !== profession) {
+				background += profession ? `. ${summary}` : summary;
+			} else if (!summary && profession) {
+				background += ".";
+			}
+			sections.push(background);
+		}
+
+		// Technical skills section
+		const tech = contexts.filter((c) => c.category === "technology");
+		if (tech.length > 0) {
+			const skills = tech.map((t) => t.text).join(", ");
+			sections.push(`Technical skills: ${skills}`);
+		}
+
+		// Current focus section
+		const goals = contexts.filter((c) => c.category === "goals");
+		const obsessions = contexts.filter((c) => c.category === "obsessions");
+		const currentFocus = [...goals, ...obsessions];
+
+		if (currentFocus.length > 0) {
+			const focus = currentFocus.map((f) => f.text.toLowerCase()).join(", ");
+			sections.push(`Current focus: ${focus}`);
+		}
+
+		// Working style section
+		const traits = contexts.filter((c) => c.category === "traits");
+		const preferences = contexts.filter((c) => c.category === "preferences");
+		const workingStyle = [...traits, ...preferences];
+
+		if (workingStyle.length > 0) {
+			const style = workingStyle.map((w) => w.text.toLowerCase()).join(", ");
+			sections.push(`Working style: ${style}`);
+		}
+
+		// Interests section
+		const interests = contexts.filter((c) => c.category === "interests");
+		if (interests.length > 0) {
+			const interestList = interests
+				.map((i) => i.text.toLowerCase())
+				.join(", ");
+			sections.push(`Interests: ${interestList}`);
+		}
+
+		// Add a clean separator and join with single newlines
+		return sections.join("\n");
+	}
+
 	private positionDropdown() {
 		if (!this.dropdownElement || !this.buttonElement) return;
 
@@ -1130,11 +1326,11 @@ class ContextButtonInjector {
 		const dropdownHeight = 400; // max-height
 		const dropdownWidth = 320; // min-width
 
-		// Calculate position below the button
+		// Position below the button by default
 		let top = buttonRect.bottom + 4;
 		let left = buttonRect.left;
 
-		// Check if dropdown should open upward
+		// If dropdown would go off bottom of screen, position above
 		if (
 			top + dropdownHeight > viewportHeight &&
 			buttonRect.top > dropdownHeight
@@ -1142,12 +1338,12 @@ class ContextButtonInjector {
 			top = buttonRect.top - dropdownHeight - 4;
 		}
 
-		// Ensure dropdown doesn't go off screen horizontally
+		// If dropdown would go off right side, adjust left position
 		if (left + dropdownWidth > viewportWidth) {
 			left = viewportWidth - dropdownWidth - 10;
 		}
 
-		// Ensure dropdown doesn't go off screen to the left
+		// If dropdown would go off left side, adjust left position
 		if (left < 10) {
 			left = 10;
 		}
