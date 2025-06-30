@@ -1,0 +1,11 @@
+{
+	"$schema": "https://unpkg.com/knip@latest/schema.json",
+	"entry": ["src/sidepanel.ts", "background.js"],
+	"project": ["src/**/*.{ts,js,svelte}"],
+	"ignore": ["vite.config.ts", "vitest.config.ts"],
+	"ignoreDependencies": ["@tailwindcss/forms", "tailwindcss", "@types/chrome"],
+	"ignoreExportsUsedInFile": {
+		"interface": true,
+		"type": true
+	}
+}

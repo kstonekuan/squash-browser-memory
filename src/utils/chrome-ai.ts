@@ -5,20 +5,22 @@ import type {
 	AIProviderCapabilities,
 	AIProviderStatus,
 	AISession,
-	PromptOptions,
 } from "./ai-interface";
 
 /**
  * Chrome AI Session wrapper implementing AISession interface
  */
-export class ChromeAISession implements AISession {
+class ChromeAISession implements AISession {
 	private session: LanguageModel;
 
 	constructor(session: LanguageModel) {
 		this.session = session;
 	}
 
-	async prompt(text: string, options?: PromptOptions): Promise<string> {
+	async prompt(
+		text: string,
+		options?: LanguageModelPromptOptions,
+	): Promise<string> {
 		try {
 			return await this.session.prompt(text, options);
 		} catch (error) {
@@ -29,9 +31,17 @@ export class ChromeAISession implements AISession {
 
 	async measureInputUsage(
 		prompt: string,
-		options?: PromptOptions,
+		options?: LanguageModelPromptOptions,
 	): Promise<number> {
 		return await this.session.measureInputUsage(prompt, options);
+	}
+
+	get inputQuota(): number {
+		return this.session.inputQuota;
+	}
+
+	get inputUsage(): number {
+		return this.session.inputUsage;
 	}
 
 	destroy(): void {
@@ -74,17 +84,16 @@ export class ChromeAIProvider implements AIProvider {
 
 			const available = await LanguageModel.availability();
 
-			if (available === "available") {
-				return "available";
-			}
-			return "unavailable";
+			// Return the Chrome AI availability status directly
+			// This includes "available", "unavailable", "downloadable", "downloading"
+			return available;
 		} catch (error) {
 			console.error("Error getting AI model status:", error);
 			return "unavailable";
 		}
 	}
 
-	async createSession(systemPrompt?: string): Promise<AISession | null> {
+	async createSession(systemPrompt: string): Promise<AISession | null> {
 		try {
 			const isAvailable = await this.isAvailable();
 			if (!isAvailable) {
@@ -95,9 +104,7 @@ export class ChromeAIProvider implements AIProvider {
 				initialPrompts: [
 					{
 						role: "system",
-						content:
-							systemPrompt ||
-							"You are a helpful assistant that analyzes browsing patterns.",
+						content: systemPrompt,
 					},
 				],
 			});
@@ -118,57 +125,12 @@ export class ChromeAIProvider implements AIProvider {
 	}
 
 	getCapabilities(): AIProviderCapabilities {
+		// These are just fallback values - actual limits are determined dynamically from session.inputQuota
+		// Chrome AI's actual quota varies and should be checked via session.getInputQuota()
 		return {
-			maxInputTokens: 1024, // Chrome AI has a very limited context window
-			optimalChunkTokens: 800, // Leave some margin for system prompts and response constraint
+			maxInputTokens: 1024, // Fallback only - use session.getInputQuota() for actual value
+			optimalChunkTokens: 1024, // Fallback only - use session.getInputQuota() for actual value
 			supportsTokenMeasurement: true, // Chrome AI supports measureInputUsage
 		};
-	}
-}
-
-// Legacy functions for backward compatibility
-export async function isAIModelAvailable(): Promise<boolean> {
-	const provider = new ChromeAIProvider();
-	return provider.isAvailable();
-}
-
-export async function getAIModelStatus(): Promise<Availability> {
-	try {
-		if (typeof LanguageModel === "undefined") {
-			return "unavailable";
-		}
-
-		const available = await LanguageModel.availability();
-		return available;
-	} catch (error) {
-		console.error("Error getting AI model status:", error);
-		return "unavailable";
-	}
-}
-
-export async function createChromeAISession(
-	systemPrompt?: string,
-): Promise<LanguageModel | null> {
-	const provider = new ChromeAIProvider();
-	const session = await provider.createSession(systemPrompt);
-
-	if (session instanceof ChromeAISession) {
-		// @ts-ignore - Accessing private property for backward compatibility
-		return session.session;
-	}
-
-	return null;
-}
-
-export async function promptChromeAI(
-	session: LanguageModel,
-	text: string,
-	options?: { responseConstraint?: Record<string, unknown> },
-): Promise<string> {
-	try {
-		return await session.prompt(text, options);
-	} catch (error) {
-		console.error("Chrome AI Error:", error);
-		throw error;
 	}
 }

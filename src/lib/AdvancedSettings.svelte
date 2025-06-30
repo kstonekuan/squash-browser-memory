@@ -12,21 +12,29 @@ import {
 	getProviderDisplayName,
 } from "../utils/ai-provider-factory";
 import {
-	DEFAULT_CHUNK_SYSTEM_PROMPT,
-	DEFAULT_SYSTEM_PROMPT,
+	ANALYSIS_SYSTEM_PROMPT,
+	CHUNK_SYSTEM_PROMPT,
+	MERGE_SYSTEM_PROMPT,
 } from "../utils/constants";
 import { ANALYSIS_SCHEMA, CHUNK_SCHEMA } from "../utils/schemas";
 
-let { onPromptsChange } = $props<{
-	onPromptsChange?: (prompts: { system: string; chunk: string }) => void;
+let { onPromptsChange, onProviderChange } = $props<{
+	onPromptsChange?: (prompts: {
+		system: string;
+		chunk: string;
+		merge: string;
+	}) => void;
+	onProviderChange?: () => void;
 }>();
 
 let showPrompts = $state(false);
 let showAIProvider = $state(false);
-let editableSystemPrompt = $state(DEFAULT_SYSTEM_PROMPT);
-let editableChunkPrompt = $state(DEFAULT_CHUNK_SYSTEM_PROMPT);
+let editableSystemPrompt = $state(ANALYSIS_SYSTEM_PROMPT);
+let editableChunkPrompt = $state(CHUNK_SYSTEM_PROMPT);
+let editableMergePrompt = $state(MERGE_SYSTEM_PROMPT);
 let showAnalysisSchema = $state(false);
 let showChunkSchema = $state(false);
+let showMergeSchema = $state(false);
 
 // AI Provider state
 let currentProvider = $state<AIProviderType>("chrome");
@@ -83,6 +91,7 @@ async function handleProviderChange(provider: AIProviderType) {
 	config.provider = provider;
 	await saveAIConfig(config);
 	await updateProviderStatuses();
+	onProviderChange?.();
 }
 
 async function handleApiKeyChange() {
@@ -90,18 +99,21 @@ async function handleApiKeyChange() {
 		await setClaudeApiKey(claudeApiKey.trim());
 	}
 	await updateProviderStatuses();
+	onProviderChange?.();
 }
 
 function handlePromptChange() {
 	onPromptsChange?.({
 		system: editableSystemPrompt,
 		chunk: editableChunkPrompt,
+		merge: editableMergePrompt,
 	});
 }
 
 function resetPrompts() {
-	editableSystemPrompt = DEFAULT_SYSTEM_PROMPT;
-	editableChunkPrompt = DEFAULT_CHUNK_SYSTEM_PROMPT;
+	editableSystemPrompt = ANALYSIS_SYSTEM_PROMPT;
+	editableChunkPrompt = CHUNK_SYSTEM_PROMPT;
+	editableMergePrompt = MERGE_SYSTEM_PROMPT;
 	handlePromptChange();
 }
 
@@ -305,6 +317,40 @@ function getStatusColor(status: string): string {
 							<div class="mt-2 p-3 bg-gray-100 rounded-md">
 								<p class="text-xs font-medium text-gray-700 mb-1">Expected Output Schema:</p>
 								<pre class="text-xs text-gray-600 overflow-x-auto">{JSON.stringify(CHUNK_SCHEMA, null, 2)}</pre>
+							</div>
+						{/if}
+					</div>
+					
+					<!-- Merge Prompt -->
+					<div>
+						<div class="flex items-center justify-between mb-2">
+							<label for="merge-prompt" class="block text-sm font-medium text-gray-700">
+								Merge System Prompt
+							</label>
+							<button
+								type="button"
+								onclick={() => showMergeSchema = !showMergeSchema}
+								class="text-xs text-blue-600 hover:text-blue-800"
+							>
+								{showMergeSchema ? 'Hide' : 'Show'} Expected Output Schema
+							</button>
+						</div>
+						<textarea
+							id="merge-prompt"
+							bind:value={editableMergePrompt}
+							oninput={handlePromptChange}
+							rows="4"
+							class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+							placeholder="Enter custom merge prompt..."
+						></textarea>
+						<p class="mt-1 text-xs text-gray-500">
+							This prompt guides the AI when merging new analysis results with existing memory.
+						</p>
+						{#if showMergeSchema}
+							<div class="mt-2 p-3 bg-gray-100 rounded-md">
+								<p class="text-xs font-medium text-gray-700 mb-1">Expected Output Schema:</p>
+								<pre class="text-xs text-gray-600 overflow-x-auto">{JSON.stringify(ANALYSIS_SCHEMA, null, 2)}</pre>
+								<p class="mt-2 text-xs text-gray-500">Note: The merge operation uses the same schema as the analysis.</p>
 							</div>
 						{/if}
 					</div>

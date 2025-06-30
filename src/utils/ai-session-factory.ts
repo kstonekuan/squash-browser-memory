@@ -1,3 +1,5 @@
+/// <reference types="@types/dom-chromium-ai" />
+
 /**
  * AI Session Factory - Creates AI sessions based on current configuration
  */
@@ -39,53 +41,12 @@ export async function createAISession(
 export async function promptAI(
 	session: AISession,
 	text: string,
-	options?: { responseConstraint?: Record<string, unknown> },
+	options?: LanguageModelPromptOptions,
 ): Promise<string> {
 	try {
 		return await session.prompt(text, options);
 	} catch (error) {
 		console.error("AI Prompt Error:", error);
 		throw error;
-	}
-}
-
-/**
- * Check if AI is available with current configuration
- */
-export async function isAIAvailable(): Promise<boolean> {
-	try {
-		const config = await loadAIConfig();
-		const provider = getProvider(config);
-		return await provider.isAvailable();
-	} catch (error) {
-		console.error("Failed to check AI availability:", error);
-		return false;
-	}
-}
-
-/**
- * Get the current AI provider status
- */
-export async function getAIProviderStatus(): Promise<string> {
-	try {
-		const config = await loadAIConfig();
-		const provider = getProvider(config);
-		const status = await provider.getStatus();
-
-		switch (status) {
-			case "available":
-				return "Available";
-			case "needs-configuration":
-				return "Needs Configuration";
-			case "rate-limited":
-				return "Rate Limited";
-			case "unavailable":
-				return "Unavailable";
-			default:
-				return "Error";
-		}
-	} catch (error) {
-		console.error("Failed to get AI provider status:", error);
-		return "Error";
 	}
 }

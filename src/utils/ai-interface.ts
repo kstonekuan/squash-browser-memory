@@ -1,3 +1,5 @@
+/// <reference types="@types/dom-chromium-ai" />
+
 /**
  * AI Provider abstraction interface
  * Allows swapping between Chrome AI and remote AI providers
@@ -7,21 +9,30 @@ export interface AISession {
 	/**
 	 * Send a prompt to the AI and get a response
 	 */
-	prompt(text: string, options?: PromptOptions): Promise<string>;
+	prompt(text: string, options?: LanguageModelPromptOptions): Promise<string>;
 
 	/**
 	 * Measure token usage for a given prompt (if supported)
 	 */
-	measureInputUsage?(prompt: string, options?: PromptOptions): Promise<number>;
+	measureInputUsage?(
+		prompt: string,
+		options?: LanguageModelPromptOptions,
+	): Promise<number>;
+
+	/**
+	 * The input token quota/limit for this session (if available)
+	 */
+	inputQuota?: number;
+
+	/**
+	 * The current input token usage for this session (if available)
+	 */
+	inputUsage?: number;
 
 	/**
 	 * Clean up the session
 	 */
 	destroy(): void;
-}
-
-export interface PromptOptions {
-	responseConstraint?: Record<string, unknown>;
 }
 
 export interface AIProvider {
@@ -83,7 +94,9 @@ export type AIProviderStatus =
 	| "unavailable"
 	| "needs-configuration"
 	| "rate-limited"
-	| "error";
+	| "error"
+	| "downloadable" // Chrome AI specific - model can be downloaded
+	| "downloading"; // Chrome AI specific - model is downloading
 
 export type AIProviderType = "chrome" | "claude";
 

@@ -2,7 +2,7 @@
  * AI Provider Configuration Management
  */
 
-import type { AIProviderConfig, AIProviderType } from "./ai-interface";
+import type { AIProviderConfig } from "./ai-interface";
 
 const AI_CONFIG_KEY = "ai_provider_config";
 
@@ -50,23 +50,6 @@ export async function saveAIConfig(config: AIProviderConfig): Promise<void> {
 }
 
 /**
- * Get the currently configured AI provider type
- */
-export async function getCurrentProvider(): Promise<AIProviderType> {
-	const config = await loadAIConfig();
-	return config.provider;
-}
-
-/**
- * Update the AI provider type
- */
-export async function setProvider(provider: AIProviderType): Promise<void> {
-	const config = await loadAIConfig();
-	config.provider = provider;
-	await saveAIConfig(config);
-}
-
-/**
  * Set Claude API key
  */
 export async function setClaudeApiKey(apiKey: string): Promise<void> {
@@ -81,13 +64,4 @@ export async function setClaudeApiKey(apiKey: string): Promise<void> {
 export async function getClaudeApiKey(): Promise<string | undefined> {
 	const config = await loadAIConfig();
 	return config.claudeApiKey;
-}
-
-/**
- * Clear sensitive configuration data
- */
-export async function clearSensitiveConfig(): Promise<void> {
-	const config = await loadAIConfig();
-	delete config.claudeApiKey;
-	await saveAIConfig(config);
 }

@@ -56,25 +56,3 @@ export function getProviderDisplayName(type: AIProviderType): string {
 			return type;
 	}
 }
-
-/**
- * Check if a provider requires configuration
- */
-export function providerRequiresConfiguration(type: AIProviderType): boolean {
-	switch (type) {
-		case "chrome":
-			return false;
-		case "claude":
-			return true;
-		default:
-			return false;
-	}
-}
-
-/**
- * Reset provider instances (useful for testing or configuration changes)
- */
-export function resetProviders(): void {
-	chromeProvider = null;
-	claudeProvider = null;
-}

@@ -1,3 +1,5 @@
+/// <reference types="@types/dom-chromium-ai" />
+
 import type {
 	AnalysisResult,
 	ChunkInfo,
@@ -9,9 +11,10 @@ import { getProvider } from "./ai-provider-factory";
 import { createAISession, promptAI } from "./ai-session-factory";
 import { createHistoryChunks, identifyChunks } from "./chunking";
 import {
+	ANALYSIS_SYSTEM_PROMPT,
 	buildAnalysisPrompt,
 	buildMergePrompt,
-	DEFAULT_SYSTEM_PROMPT,
+	MERGE_SYSTEM_PROMPT,
 } from "./constants";
 import {
 	type AnalysisMemory,
@@ -124,6 +127,7 @@ export type ProgressCallback = (info: {
 export interface CustomPrompts {
 	systemPrompt?: string;
 	chunkPrompt?: string;
+	mergePrompt?: string;
 }
 
 // Analyze Chrome history items with memory and chunking
@@ -252,7 +256,7 @@ export async function analyzeHistoryItems(
 			const { processedItems, results } = await analyzeChunkWithSubdivision(
 				chunk.items,
 				memory,
-				customPrompts?.systemPrompt,
+				customPrompts,
 				onProgress,
 				abortSignal,
 				processedChunks,
@@ -508,7 +512,7 @@ async function mergeAnalysisResults(
 	);
 
 	const session = await createAISession(
-		customSystemPrompt || DEFAULT_SYSTEM_PROMPT,
+		customSystemPrompt || MERGE_SYSTEM_PROMPT,
 	);
 
 	if (!session) {
@@ -530,6 +534,7 @@ async function mergeAnalysisResults(
 		const startTime = performance.now();
 		const response = await promptAI(session, mergePrompt, {
 			responseConstraint: ANALYSIS_SCHEMA,
+			signal: abortSignal,
 		});
 		const endTime = performance.now();
 		const duration = ((endTime - startTime) / 1000).toFixed(2);
@@ -607,7 +612,7 @@ async function mergeAnalysisResults(
 async function analyzeChunkWithSubdivision(
 	items: chrome.history.HistoryItem[],
 	memory: AnalysisMemory,
-	customSystemPrompt?: string,
+	customPrompts?: CustomPrompts,
 	onProgress?: ProgressCallback,
 	abortSignal?: AbortSignal,
 	chunkNumber?: number,
@@ -618,6 +623,10 @@ async function analyzeChunkWithSubdivision(
 }> {
 	// First, try to analyze the entire chunk
 	try {
+		// For Chrome AI, we need to use the analysis system prompt
+		const analysisSystemPrompt =
+			customPrompts?.systemPrompt || ANALYSIS_SYSTEM_PROMPT;
+
 		// Build a test prompt to check token count
 		const testHistoryData = items.map((item) => {
 			const urlParts: {
@@ -661,7 +670,7 @@ async function analyzeChunkWithSubdivision(
 			// Step 1: Analyze the chunk
 			const chunkResults = await analyzeChunk(
 				items,
-				customSystemPrompt,
+				customPrompts?.systemPrompt,
 				onProgress,
 				abortSignal,
 			);
@@ -673,7 +682,7 @@ async function analyzeChunkWithSubdivision(
 					: await mergeAnalysisResults(
 							memory,
 							chunkResults,
-							customSystemPrompt,
+							customPrompts?.mergePrompt || MERGE_SYSTEM_PROMPT,
 							abortSignal,
 							onProgress,
 						);
@@ -700,9 +709,7 @@ async function analyzeChunkWithSubdivision(
 		// Need to subdivide the chunk
 
 		// Binary search for the right size using the AI API
-		const session = await createAISession(
-			customSystemPrompt || DEFAULT_SYSTEM_PROMPT,
-		);
+		const session = await createAISession(analysisSystemPrompt);
 
 		if (!session) {
 			throw new Error("AI is not available for measuring tokens.");
@@ -712,6 +719,19 @@ async function analyzeChunkWithSubdivision(
 		const config = await loadAIConfig();
 		const provider = getProvider(config);
 		const capabilities = provider.getCapabilities();
+
+		// For Chrome AI, get the actual quota from the session
+		let maxTokens = capabilities.optimalChunkTokens;
+		if (session.inputQuota !== undefined && session.inputUsage !== undefined) {
+			const quota = session.inputQuota;
+			const currentUsage = session.inputUsage;
+			const availableTokens = quota - currentUsage;
+			console.log(
+				`Chrome AI session: quota=${quota}, currentUsage=${currentUsage}, available=${availableTokens}`,
+			);
+			// Use all available tokens (inputQuota is only for input, not output)
+			maxTokens = availableTokens;
+		}
 
 		let left = 1;
 		let right = items.length;
@@ -731,13 +751,14 @@ async function analyzeChunkWithSubdivision(
 					) {
 						const testTokenCount = await session.measureInputUsage(testPrompt, {
 							responseConstraint: ANALYSIS_SCHEMA,
+							signal: abortSignal,
 						});
 						console.log(
 							`Testing ${mid} items: ${testTokenCount} tokens (${provider.getProviderName()})`,
 						);
 
-						// Use provider-specific token limit
-						if (testTokenCount <= capabilities.optimalChunkTokens) {
+						// Use dynamic token limit
+						if (testTokenCount <= maxTokens) {
 							optimalSize = mid;
 							left = mid + 1;
 						} else {
@@ -756,7 +777,7 @@ async function analyzeChunkWithSubdivision(
 							`Estimating ${mid} items = ${estimatedTokens} tokens (${provider.getProviderName()})`,
 						);
 
-						if (estimatedTokens <= capabilities.optimalChunkTokens) {
+						if (estimatedTokens <= maxTokens) {
 							optimalSize = mid;
 							left = mid + 1;
 						} else {
@@ -812,7 +833,7 @@ async function analyzeChunkWithSubdivision(
 			// Step 1: Analyze sub-chunk
 			const subResults = await analyzeChunk(
 				subItems,
-				customSystemPrompt,
+				analysisSystemPrompt,
 				undefined, // Don't pass onProgress to avoid duplicate updates
 				abortSignal,
 			);
@@ -825,7 +846,7 @@ async function analyzeChunkWithSubdivision(
 					: await mergeAnalysisResults(
 							currentMemory,
 							subResults,
-							customSystemPrompt,
+							customPrompts?.mergePrompt || MERGE_SYSTEM_PROMPT,
 							abortSignal,
 							onProgress,
 						);
@@ -917,7 +938,7 @@ async function analyzeChunk(
 	const prompt = buildAnalysisPrompt(items, historyData);
 
 	const session = await createAISession(
-		customSystemPrompt || DEFAULT_SYSTEM_PROMPT,
+		customSystemPrompt || ANALYSIS_SYSTEM_PROMPT,
 	);
 
 	if (!session) {
@@ -954,6 +975,7 @@ async function analyzeChunk(
 				const startTime = performance.now();
 				const result = await promptAI(session, prompt, {
 					responseConstraint: ANALYSIS_SCHEMA,
+					signal: abortSignal,
 				});
 				const endTime = performance.now();
 				const duration = ((endTime - startTime) / 1000).toFixed(2);

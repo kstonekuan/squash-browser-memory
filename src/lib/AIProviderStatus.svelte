@@ -3,7 +3,6 @@ import { onMount } from "svelte";
 import { loadAIConfig } from "../utils/ai-config";
 import type { AIProviderStatus } from "../utils/ai-interface";
 import { getProvider } from "../utils/ai-provider-factory";
-import { getAIModelStatus } from "../utils/chrome-ai";
 
 let status: Availability | AIProviderStatus | null = $state(null);
 let checking = $state(true);
@@ -15,13 +14,8 @@ onMount(async () => {
 		const provider = getProvider(config);
 		providerName = provider.getProviderName();
 
-		if (config.provider === "chrome") {
-			// For Chrome AI, use the legacy status check
-			status = await getAIModelStatus();
-		} else {
-			// For other providers, use the provider status
-			status = await provider.getStatus();
-		}
+		// Use the provider's getStatus method for all providers
+		status = await provider.getStatus();
 	} catch (error) {
 		console.error("Error checking AI provider status:", error);
 		status = "unavailable";

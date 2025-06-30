@@ -1,5 +1,5 @@
 import { createAISession, promptAI } from "./ai-session-factory";
-import { buildChunkingPrompt, DEFAULT_CHUNK_SYSTEM_PROMPT } from "./constants";
+import { buildChunkingPrompt, CHUNK_SYSTEM_PROMPT } from "./constants";
 import type { ChunkTimeRange, HistoryChunk } from "./memory";
 import { CHUNK_SCHEMA } from "./schemas";
 
@@ -77,7 +77,7 @@ export async function identifyChunks(
 	const prompt = buildChunkingPrompt(timestamps);
 
 	const session = await createAISession(
-		customChunkPrompt || DEFAULT_CHUNK_SYSTEM_PROMPT,
+		customChunkPrompt || CHUNK_SYSTEM_PROMPT,
 	);
 
 	if (!session) {
@@ -293,7 +293,7 @@ async function identifyChunksForBatch(
 	const prompt = buildChunkingPrompt(timestamps);
 
 	const session = await createAISession(
-		customChunkPrompt || DEFAULT_CHUNK_SYSTEM_PROMPT,
+		customChunkPrompt || CHUNK_SYSTEM_PROMPT,
 	);
 
 	if (!session) {

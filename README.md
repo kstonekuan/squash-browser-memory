@@ -101,3 +101,8 @@ Your privacy is paramount:
 
 - Chrome 138 or later with AI features enabled
 - The extension requires the "history" permission to access your browsing history
+
+## TODO
+
+- Clean up Chrome Built-In AI usage instructions
+- Test AI on non-dev chrome.

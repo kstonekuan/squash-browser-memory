@@ -14,7 +14,11 @@ let memoryAutoExpand = $state(false);
 let isAnalyzing = $state(false);
 let analysisPhase: AnalysisPhase = $state("idle");
 let rawHistoryData: chrome.history.HistoryItem[] | null = $state(null);
-let customPrompts = $state<{ systemPrompt?: string; chunkPrompt?: string }>({});
+let customPrompts = $state<{
+	systemPrompt?: string;
+	chunkPrompt?: string;
+	mergePrompt?: string;
+}>({});
 let chunkProgress = $state<{
 	current: number;
 	total: number;
@@ -23,6 +27,7 @@ let chunkProgress = $state<{
 let retryMessage = $state("");
 let subPhase: SubPhase | undefined = $state(undefined);
 let abortController: AbortController | null = null;
+let providerKey = $state(0); // Key to force AIProviderStatus re-render
 
 async function handleAnalysis(
 	event: CustomEvent<{ items: chrome.history.HistoryItem[] }>,
@@ -103,11 +108,21 @@ async function handleAnalysis(
 	}
 }
 
-function handlePromptsChange(prompts: { system: string; chunk: string }) {
+function handlePromptsChange(prompts: {
+	system: string;
+	chunk: string;
+	merge: string;
+}) {
 	customPrompts = {
 		systemPrompt: prompts.system || undefined,
 		chunkPrompt: prompts.chunk || undefined,
+		mergePrompt: prompts.merge || undefined,
 	};
+}
+
+function handleProviderChange() {
+	// Force re-render of AIProviderStatus by changing the key
+	providerKey += 1;
 }
 
 async function handleClearMemory() {
@@ -145,7 +160,9 @@ function handleDismissAnalysis() {
 		</header>
 
 		<div class="bg-white rounded-lg shadow-sm p-4 mb-4">
-			<AIProviderStatus />
+			{#key providerKey}
+				<AIProviderStatus />
+			{/key}
 
 			<div class="mt-4 pt-4 border-t border-gray-200">
 				<HistoryFetcher 
@@ -174,6 +191,7 @@ function handleDismissAnalysis() {
 		<div class="mt-4 space-y-4">
 			<AdvancedSettings 
 				onPromptsChange={handlePromptsChange}
+				onProviderChange={handleProviderChange}
 			/>
 			
 			<!-- Memory Management -->

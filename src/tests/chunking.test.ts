@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { createHalfDayChunks, createHistoryChunks } from "./chunking";
-import type { ChunkTimeRange } from "./memory";
+import { createHalfDayChunks, createHistoryChunks } from "../utils/chunking";
+import type { ChunkTimeRange, HistoryChunk } from "../utils/memory";
 
 // Helper function to create test history items
 function createTestHistoryItem(
@@ -207,7 +207,9 @@ describe("createHistoryChunks", () => {
 			const result = createHistoryChunks(items, []);
 
 			expect(result).toHaveLength(4); // 2 chunks per day
-			expect(result.every((chunk) => chunk.isFallback)).toBe(true);
+			expect(result.every((chunk: HistoryChunk) => chunk.isFallback)).toBe(
+				true,
+			);
 
 			// Verify chronological order
 			for (let i = 1; i < result.length; i++) {

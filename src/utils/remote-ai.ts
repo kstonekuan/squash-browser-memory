@@ -1,140 +1,102 @@
+/// <reference types="@types/dom-chromium-ai" />
+
 /**
  * Remote AI provider implementation using Claude API
  */
 
+import Anthropic from "@anthropic-ai/sdk";
 import type {
 	AIProvider,
 	AIProviderCapabilities,
 	AIProviderStatus,
 	AISession,
-	PromptOptions,
 } from "./ai-interface";
 
-const CLAUDE_API_URL = "https://api.anthropic.com/v1/messages";
-const CLAUDE_API_VERSION = "2023-06-01";
-const CLAUDE_MODEL = "claude-3-5-haiku-20241022";
+const CLAUDE_MODEL = "claude-3-5-haiku-latest";
 const CLAUDE_MAX_TOKENS = 8192;
 
-export class ClaudeSession implements AISession {
-	private apiKey: string;
-	private systemPrompt?: string;
+class ClaudeSession implements AISession {
+	private client: Anthropic;
+	private systemPrompt: string;
 
-	constructor(apiKey: string, systemPrompt?: string) {
-		this.apiKey = apiKey;
+	constructor(apiKey: string, systemPrompt: string) {
+		this.client = new Anthropic({
+			apiKey: apiKey,
+			dangerouslyAllowBrowser: true, // Required for browser usage
+		});
 		this.systemPrompt = systemPrompt;
 	}
 
-	async prompt(text: string, options?: PromptOptions): Promise<string> {
-		const headers = {
-			"Content-Type": "application/json",
-			"x-api-key": this.apiKey,
-			"anthropic-version": CLAUDE_API_VERSION,
-			"anthropic-dangerous-direct-browser-access": "true",
-		};
-
-		console.log("Claude API Headers being sent:", headers);
-		console.log("Requesting URL:", CLAUDE_API_URL);
-
-		const messages = [
-			{
-				role: "user",
-				content: text,
-			},
-		];
-
-		interface ClaudeRequestBody {
-			model: string;
-			max_tokens: number;
-			messages: Array<{ role: string; content: string }>;
-			system?: string;
-		}
-
-		const body: ClaudeRequestBody = {
-			model: CLAUDE_MODEL,
-			max_tokens: CLAUDE_MAX_TOKENS,
-			messages,
-		};
-
-		// Add system prompt if provided
-		if (this.systemPrompt) {
-			body.system = this.systemPrompt;
-		}
+	async prompt(
+		text: string,
+		options?: LanguageModelPromptOptions,
+	): Promise<string> {
+		console.log("Claude API: Sending message");
 
 		// Handle JSON schema constraint
+		let userContent = text;
 		if (options?.responseConstraint) {
 			// Add instruction to return JSON matching the schema
-			const jsonInstruction = `\n\nIMPORTANT: Respond with valid JSON only, matching this schema: ${JSON.stringify(options.responseConstraint)}`;
-			body.messages[0].content += jsonInstruction;
+			userContent += `\n\nIMPORTANT: Respond with valid JSON only, matching this schema: ${JSON.stringify(options.responseConstraint)}`;
 		}
 
 		try {
-			console.log("Request body:", JSON.stringify(body, null, 2));
-
-			const response = await fetch(CLAUDE_API_URL, {
-				method: "POST",
-				headers,
-				body: JSON.stringify(body),
-			});
-
-			console.log("Response status:", response.status);
 			console.log(
-				"Response headers:",
-				Object.fromEntries(response.headers.entries()),
+				"Request content (truncated):",
+				`${userContent.substring(0, 200)}...`,
 			);
 
-			if (!response.ok) {
-				const errorData = await response.json().catch(() => ({}));
+			const message = await this.client.messages.create(
+				{
+					model: CLAUDE_MODEL,
+					max_tokens: CLAUDE_MAX_TOKENS,
+					system: this.systemPrompt,
+					messages: [
+						{
+							role: "user",
+							content: userContent,
+						},
+					],
+				},
+				{
+					signal: options?.signal,
+				},
+			);
 
-				console.error("Claude API Error Response:", {
-					status: response.status,
-					statusText: response.statusText,
-					headers: Object.fromEntries(response.headers.entries()),
-					errorData,
-				});
+			console.log("Response received");
 
-				if (response.status === 429) {
+			// Handle the response content array
+			const content = message.content[0];
+			if (content.type === "text") {
+				return content.text;
+			}
+
+			throw new Error("Unexpected response type from Claude API");
+		} catch (error) {
+			console.error("Claude API Error:", error);
+
+			// Convert SDK errors to match existing error handling
+			if (error instanceof Anthropic.APIError) {
+				if (error.status === 429) {
 					throw new DOMException("Rate limit exceeded", "QuotaExceededError");
 				}
 
-				if (response.status === 401) {
+				if (error.status === 401) {
 					throw new Error(
 						"Invalid Claude API key. Please check your API key in Advanced Settings.",
 					);
 				}
 
-				if (response.status === 405) {
-					throw new Error(
-						"Method not allowed. This might be due to an invalid model name or API endpoint.",
-					);
-				}
-
-				throw new Error(
-					`Claude API error (${response.status}): ${
-						errorData.error?.message || errorData.message || response.statusText
-					}`,
-				);
+				throw new Error(`Claude API error (${error.status}): ${error.message}`);
 			}
 
-			const data = await response.json();
-
-			if (
-				!data.content ||
-				!Array.isArray(data.content) ||
-				data.content.length === 0
-			) {
-				throw new Error("Invalid response format from Claude API");
-			}
-
-			return data.content[0].text;
-		} catch (error) {
-			console.error("Claude API Error:", error);
 			throw error;
 		}
 	}
 
 	async measureInputUsage(
 		prompt: string,
-		options?: PromptOptions,
+		options?: LanguageModelPromptOptions,
 	): Promise<number> {
 		// Claude doesn't provide a direct token count API for input
 		// Use a rough estimation: ~4 characters per token
@@ -170,31 +132,27 @@ export class ClaudeProvider implements AIProvider {
 			return false;
 		}
 
-		// Use token counting API - it's free and doesn't consume tokens for generation
+		// Use SDK to check if API key is valid by making a minimal request
 		try {
-			const headers = {
-				"Content-Type": "application/json",
-				"x-api-key": this.apiKey,
-				"anthropic-version": CLAUDE_API_VERSION,
-				"anthropic-dangerous-direct-browser-access": "true",
-			};
+			const client = new Anthropic({
+				apiKey: this.apiKey,
+				dangerouslyAllowBrowser: true,
+			});
 
-			const response = await fetch(
-				"https://api.anthropic.com/v1/messages/count_tokens",
-				{
-					method: "POST",
-					headers,
-					body: JSON.stringify({
-						model: CLAUDE_MODEL,
-						messages: [{ role: "user", content: "test" }],
-					}),
-				},
-			);
+			// Use token counting which is cheaper and doesn't consume generation tokens
+			await client.messages.countTokens({
+				model: CLAUDE_MODEL,
+				messages: [{ role: "user", content: "test" }],
+			});
 
-			// API key is valid if we get any response (even errors about content)
-			// Token counting doesn't consume generation tokens but validates API access
-			return response.status !== 401 && response.status !== 403;
+			return true;
 		} catch (error) {
+			if (error instanceof Anthropic.APIError) {
+				// API key is invalid if we get 401 or 403
+				if (error.status === 401 || error.status === 403) {
+					return false;
+				}
+			}
 			console.error("Claude availability check failed:", error);
 			return false;
 		}
@@ -216,7 +174,7 @@ export class ClaudeProvider implements AIProvider {
 		}
 	}
 
-	async createSession(systemPrompt?: string): Promise<AISession | null> {
+	async createSession(systemPrompt: string): Promise<AISession | null> {
 		if (!this.apiKey) {
 			throw new Error("Claude API key is required");
 		}
