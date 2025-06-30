@@ -16,12 +16,8 @@ import {
 	buildMergePrompt,
 	MERGE_SYSTEM_PROMPT,
 } from "./constants";
-import {
-	type AnalysisMemory,
-	createEmptyMemory,
-	loadMemory,
-	saveMemory,
-} from "./memory";
+import { saveMemoryWithEmbeddings } from "./embeddings-memory";
+import { type AnalysisMemory, createEmptyMemory, loadMemory } from "./memory";
 import { ANALYSIS_SCHEMA } from "./schemas";
 
 // Re-export clearMemory for use in UI
@@ -281,7 +277,7 @@ export async function analyzeHistoryItems(
 				};
 
 				// Save memory after each chunk
-				await saveMemory(memory);
+				await saveMemoryWithEmbeddings(memory);
 			}
 
 			// Small delay between chunks to avoid quota issues
@@ -310,7 +306,7 @@ export async function analyzeHistoryItems(
 
 	// Final save with completion timestamp
 	memory.lastAnalyzedDate = new Date();
-	await saveMemory(memory);
+	await saveMemoryWithEmbeddings(memory);
 	console.log("Final memory saved with completion timestamp");
 
 	// Return final results from memory

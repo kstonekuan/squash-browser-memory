@@ -4,8 +4,16 @@
 	"version": "1.0.0",
 	"description": "Analyze your browsing history to find repetitive workflows that can be automated",
 	"minimum_chrome_version": "138",
-	"permissions": ["history", "storage", "sidePanel", "alarms", "notifications"],
-	"host_permissions": [],
+	"permissions": [
+		"history", 
+		"storage", 
+		"sidePanel", 
+		"alarms", 
+		"notifications",
+		"unlimitedStorage",
+		"activeTab"
+	],
+	"host_permissions": ["https://api.anthropic.com/*"],
 	"background": {
 		"service_worker": "background.js"
 	},
@@ -15,6 +23,19 @@
 	"action": {
 		"default_title": "Open History Analyzer in side panel"
 	},
+	"content_scripts": [
+		{
+			"matches": [
+				"https://chatgpt.com/*",
+				"https://chat.openai.com/*",
+				"https://claude.ai/*"
+			],
+			"js": ["content-scripts/universal-context.js"],
+			"type": "module",
+			"run_at": "document_end",
+			"all_frames": false
+		}
+	],
 	"icons": {
 		"16": "icons/icon-16.svg",
 		"48": "icons/icon-48.svg",
