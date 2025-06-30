@@ -11,6 +11,7 @@
 		"test:ui": "vitest --ui"
 	},
 	"dependencies": {
+		"@anthropic-ai/sdk": "0.55.0",
 		"@xenova/transformers": "^3.5.0",
 		"string-similarity": "^4.0.4"
 	},
@@ -35,8 +36,5 @@
 		"vite": "^6.3.5",
 		"vite-plugin-web-extension": "^4.4.4",
 		"vitest": "3.2.4"
-	},
-	"dependencies": {
-		"@anthropic-ai/sdk": "0.55.0"
 	}
 }
