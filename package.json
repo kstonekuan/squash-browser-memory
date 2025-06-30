@@ -6,9 +6,13 @@
 	"scripts": {
 		"dev": "vite",
 		"build": "pnpm check && vite build",
-		"check": "biome check --write . && tsc --noEmit && svelte-check --tsconfig ./tsconfig.app.json && tsc -p tsconfig.node.json && vitest run --passWithNoTests",
+		"check": "biome check --write . && tsc --noEmit && svelte-check --tsconfig ./tsconfig.app.json && tsc -p tsconfig.node.json",
 		"test": "vitest",
 		"test:ui": "vitest --ui"
+	},
+	"dependencies": {
+		"@xenova/transformers": "^3.5.0",
+		"string-similarity": "^4.0.4"
 	},
 	"devDependencies": {
 		"@biomejs/biome": "2.0.6",

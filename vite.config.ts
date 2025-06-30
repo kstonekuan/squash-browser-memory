@@ -38,6 +38,10 @@ export default defineConfig({
 					);
 				});
 
+				// Create content-scripts directory
+				const contentScriptsDir = resolve(__dirname, "dist/content-scripts");
+				mkdirSync(contentScriptsDir, { recursive: true });
+
 				console.log("Files copied successfully");
 			},
 		},
@@ -48,12 +52,15 @@ export default defineConfig({
 		rollupOptions: {
 			input: {
 				sidepanel: "sidepanel.html",
+				"content-scripts/universal-context":
+					"content-scripts/universal-context.ts",
 			},
 			output: {
 				entryFileNames: "[name].js",
 				chunkFileNames: "[name].js",
 				assetFileNames: "[name].[ext]",
 			},
+			external: ["@xenova/transformers", "string-similarity"],
 		},
 	},
 });
