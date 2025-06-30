@@ -499,19 +499,29 @@ class SimpleContextMatcher {
 		const contexts = this.extractContexts();
 
 		for (const context of contexts) {
-			const similarity = compareTwoStrings(
-				inputLower,
-				context.text.toLowerCase(),
-			);
+			try {
+				// Validate context structure
+				if (!context || typeof context.text !== "string" || !context.category) {
+					console.warn("Invalid context item:", context);
+					continue;
+				}
 
-			if (similarity >= 0.2) {
-				// 20% threshold (lowered for better matching)
-				suggestions.push({
-					text: context.text,
-					category: context.category,
-					relevanceScore: similarity,
-					matchType: "string",
-				});
+				const similarity = compareTwoStrings(
+					inputLower,
+					context.text.toLowerCase(),
+				);
+
+				if (similarity >= 0.2) {
+					// 20% threshold (lowered for better matching)
+					suggestions.push({
+						text: context.text,
+						category: context.category,
+						relevanceScore: similarity,
+						matchType: "string",
+					});
+				}
+			} catch (error) {
+				console.error("Error processing context:", context, error);
 			}
 		}
 
@@ -557,46 +567,41 @@ class SimpleContextMatcher {
 
 		const profile = this.memory.userProfile;
 
+		// Helper function to safely add context
+		const addContext = (value: any, category: string) => {
+			if (value && typeof value === "string" && value.trim()) {
+				contexts.push({ text: value.trim(), category });
+			}
+		};
+
+		// Helper function to safely add array items
+		const addArrayItems = (array: any, category: string) => {
+			if (Array.isArray(array)) {
+				for (const item of array) {
+					addContext(item, category);
+				}
+			}
+		};
+
 		// Add profession
-		if (profile.profession) {
-			contexts.push({ text: profile.profession, category: "profession" });
-		}
+		addContext(profile.profession, "profession");
 
 		// Add interests
-		if (profile.interests) {
-			for (const interest of profile.interests) {
-				contexts.push({ text: interest, category: "interests" });
-			}
-		}
+		addArrayItems(profile.interests, "interests");
 
 		// Add current goals
-		if (profile.currentGoals) {
-			for (const goal of profile.currentGoals) {
-				contexts.push({ text: goal, category: "goals" });
-			}
-		}
+		addArrayItems(profile.currentGoals, "goals");
 
 		// Add personal preferences
-		if (profile.personalPreferences) {
-			for (const pref of profile.personalPreferences) {
-				contexts.push({ text: pref, category: "preferences" });
-			}
-		}
+		addArrayItems(profile.personalPreferences, "preferences");
 
 		// Add personality traits
-		if (profile.personalityTraits) {
-			for (const trait of profile.personalityTraits) {
-				contexts.push({ text: trait, category: "traits" });
-			}
-		}
+		addArrayItems(profile.personalityTraits, "traits");
 
 		// Add recent obsessions
-		if (profile.recentObsessions) {
-			for (const obsession of profile.recentObsessions) {
-				contexts.push({ text: obsession, category: "obsessions" });
-			}
-		}
+		addArrayItems(profile.recentObsessions, "obsessions");
 
+		console.log("Extracted contexts:", contexts);
 		return contexts;
 	}
 
@@ -830,22 +835,31 @@ class ContextButtonInjector {
 		if (!this.currentInput || this.currentInput.trim().length < 3) {
 			button.classList.remove("active");
 			this.setButtonInactiveStyle(button);
+			this.updateSuggestionCount(button, 0); // Remove count badge
 			this.hideSuggestions();
 			return;
 		}
 
 		try {
 			const suggestions = await this.matcher.getSuggestions(this.currentInput);
-			if (suggestions.length > 0) {
+			if (Array.isArray(suggestions) && suggestions.length > 0) {
 				button.classList.add("active");
 				this.setButtonActiveStyle(button);
 				this.updateSuggestionCount(button, suggestions.length);
 			} else {
 				button.classList.remove("active");
 				this.setButtonInactiveStyle(button);
+				this.updateSuggestionCount(button, 0); // Remove count badge
 			}
 		} catch (error) {
-			console.error("Failed to get suggestions for button state:", error);
+			console.error("Failed to get suggestions for button state:", error, {
+				currentInput: this.currentInput,
+				hasMemory: !!this.matcher,
+			});
+			// On error, set to inactive state
+			button.classList.remove("active");
+			this.setButtonInactiveStyle(button);
+			this.updateSuggestionCount(button, 0); // Remove count badge
 		}
 	}
 
@@ -1009,8 +1023,6 @@ class ContextButtonInjector {
 						border-bottom: 1px solid #f3f4f6;
 						transition: background-color 0.2s ease;
 					"
-					onmouseover="this.style.backgroundColor='#f9fafb'"
-					onmouseout="this.style.backgroundColor='transparent'"
 				>
 					<div style="display: flex; align-items: center; gap: 6px; margin-bottom: 6px; font-size: 12px;">
 						<span style="font-size: 14px;">${categoryIcon}</span>
@@ -1040,12 +1052,21 @@ class ContextButtonInjector {
 
 		this.dropdownElement.innerHTML = suggestionsHtml + statusHtml;
 
-		// Add click handlers for suggestions
+		// Add click handlers and hover effects for suggestions
 		this.dropdownElement
 			.querySelectorAll(".suggestion-item")
 			.forEach((item, index) => {
 				item.addEventListener("click", () => {
 					this.selectSuggestion(suggestions[index]);
+				});
+
+				// Add hover effects
+				item.addEventListener("mouseenter", () => {
+					(item as HTMLElement).style.backgroundColor = "#f9fafb";
+				});
+
+				item.addEventListener("mouseleave", () => {
+					(item as HTMLElement).style.backgroundColor = "transparent";
 				});
 			});
 	}
