@@ -187,7 +187,6 @@ export function buildMergePrompt(
 	existingMemory: {
 		userProfile: UserProfile;
 		patterns: WorkflowPattern[];
-		totalItemsAnalyzed: number;
 	},
 	newResults: {
 		userProfile: UserProfile;
@@ -196,7 +195,7 @@ export function buildMergePrompt(
 ): string {
 	return `Merge the new analysis results with existing memory:
 
-EXISTING MEMORY (from ${existingMemory.totalItemsAnalyzed} previously analyzed items):
+EXISTING MEMORY:
 ${JSON.stringify(existingMemory)}
 
 NEW ANALYSIS RESULTS:

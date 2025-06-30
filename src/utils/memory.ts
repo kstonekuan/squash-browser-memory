@@ -6,7 +6,6 @@ export interface AnalysisMemory {
 	patterns: WorkflowPattern[];
 	lastAnalyzedDate: Date;
 	lastHistoryTimestamp: number; // Timestamp of the most recent history item analyzed
-	totalItemsAnalyzed: number;
 	version: string;
 }
 
@@ -48,7 +47,6 @@ export function createEmptyMemory(): AnalysisMemory {
 		patterns: [],
 		lastAnalyzedDate: new Date(0), // Start from epoch
 		lastHistoryTimestamp: 0, // No history analyzed yet
-		totalItemsAnalyzed: 0,
 		version: MEMORY_VERSION,
 	};
 }
@@ -156,7 +154,6 @@ export async function loadMemory(): Promise<AnalysisMemory | null> {
 		}
 
 		console.log("Loaded memory from chrome.storage.local:", {
-			itemsAnalyzed: stored.totalItemsAnalyzed,
 			patterns: stored.patterns.length,
 			lastAnalyzed: stored.lastAnalyzedDate,
 			lastAnalyzedType: typeof stored.lastAnalyzedDate,
@@ -182,7 +179,6 @@ export async function saveMemory(memory: AnalysisMemory): Promise<void> {
 
 		await chrome.storage.local.set({ [MEMORY_KEY]: memoryToSave });
 		console.log("Saved memory to chrome.storage.local:", {
-			itemsAnalyzed: memory.totalItemsAnalyzed,
 			patterns: memory.patterns.length,
 			lastAnalyzedDate: memory.lastAnalyzedDate,
 			lastAnalyzedDateISO: memoryToSave.lastAnalyzedDate,

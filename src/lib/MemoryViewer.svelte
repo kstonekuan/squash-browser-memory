@@ -183,7 +183,7 @@ function handleSectionToggle(isOpen: boolean) {
 function getMemoryBadge(): string {
 	if (loading) return "Loading...";
 	if (!memory) return "";
-	return `${memory.patterns.length} patterns • ${memory.totalItemsAnalyzed} items`;
+	return `${memory.patterns.length} patterns`;
 }
 </script>
 
@@ -233,7 +233,6 @@ function getMemoryBadge(): string {
 					<div class="flex items-center justify-between">
 						<div class="text-sm text-gray-600">
 							<p><strong>Last Updated:</strong> {formatDate(memory.lastAnalyzedDate)}</p>
-							<p><strong>Items Analyzed:</strong> {memory.totalItemsAnalyzed.toLocaleString()}</p>
 						</div>
 						<button
 							onclick={refreshMemory}

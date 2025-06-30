@@ -158,10 +158,7 @@ export async function analyzeHistoryItems(
 	if (!memory) {
 		memory = createEmptyMemory();
 	}
-	console.log(
-		"Memory loaded, items previously analyzed:",
-		memory.totalItemsAnalyzed,
-	);
+	console.log("Memory loaded, patterns found:", memory.patterns.length);
 
 	// Check if aborted before chunking
 	if (abortSignal?.aborted) {
@@ -253,7 +250,7 @@ export async function analyzeHistoryItems(
 				`Processing chunk ${i + 1}/${totalChunks} with ${chunk.items.length} items`,
 			);
 			// Analyze this chunk - if it's too large, subdivide it
-			const { processedItems, results } = await analyzeChunkWithSubdivision(
+			const { results } = await analyzeChunkWithSubdivision(
 				chunk.items,
 				memory,
 				customPrompts,
@@ -280,7 +277,6 @@ export async function analyzeHistoryItems(
 						memory.lastHistoryTimestamp,
 						mostRecentInChunk,
 					),
-					totalItemsAnalyzed: memory.totalItemsAnalyzed + processedItems,
 					version: memory.version,
 				};
 
@@ -303,11 +299,7 @@ export async function analyzeHistoryItems(
 				) {
 					console.error("Additional context for UnknownError:");
 					console.error("- Chunk had", chunk.items.length, "items");
-					console.error(
-						"- Memory has",
-						memory.totalItemsAnalyzed,
-						"previously analyzed items",
-					);
+					console.error("- Memory has", memory.patterns.length, "patterns");
 					console.error("- This was chunk", i + 1, "of", totalChunks);
 				}
 			}
@@ -497,8 +489,8 @@ async function mergeAnalysisResults(
 		throw new Error("Analysis cancelled");
 	}
 
-	// If memory is empty, just return the new results
-	if (memory.totalItemsAnalyzed === 0) {
+	// If memory is empty (no patterns), just return the new results
+	if (memory.patterns.length === 0 && !memory.userProfile.profession) {
 		return newResults;
 	}
 
@@ -506,7 +498,6 @@ async function mergeAnalysisResults(
 		{
 			userProfile: memory.userProfile,
 			patterns: memory.patterns,
-			totalItemsAnalyzed: memory.totalItemsAnalyzed,
 		},
 		newResults,
 	);
@@ -677,7 +668,7 @@ async function analyzeChunkWithSubdivision(
 
 			// Step 2: Merge with existing memory (skip if memory is empty)
 			const mergedResults =
-				memory.totalItemsAnalyzed === 0
+				memory.patterns.length === 0 && !memory.userProfile.profession
 					? chunkResults
 					: await mergeAnalysisResults(
 							memory,
@@ -840,8 +831,10 @@ async function analyzeChunkWithSubdivision(
 
 			// Step 2: Merge with current memory (skip if current memory is from original empty memory)
 			const mergedResults =
-				currentMemory.totalItemsAnalyzed === memory.totalItemsAnalyzed &&
-				memory.totalItemsAnalyzed === 0
+				currentMemory.patterns.length === 0 &&
+				!currentMemory.userProfile.profession &&
+				memory.patterns.length === 0 &&
+				!memory.userProfile.profession
 					? subResults
 					: await mergeAnalysisResults(
 							currentMemory,
@@ -867,7 +860,6 @@ async function analyzeChunkWithSubdivision(
 					currentMemory.lastHistoryTimestamp,
 					mostRecentInSubChunk,
 				),
-				totalItemsAnalyzed: currentMemory.totalItemsAnalyzed + subItems.length,
 				version: currentMemory.version,
 			};
 

@@ -62,9 +62,7 @@ const { result, onDismiss } = $props<{
   </div>
   
   <!-- Chunks Display Section -->
-  {#if result.chunks}
-    <ChunkDisplay chunks={result.chunks} />
-  {/if}
+  <ChunkDisplay chunks={result.chunks || []} />
   
   <!-- Chunking Debug Info -->
   <ChunkDebugInfo rawResponse={result.chunkingRawResponse} error={result.chunkingError} />
