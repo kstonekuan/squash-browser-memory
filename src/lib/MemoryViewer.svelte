@@ -2,10 +2,12 @@
 import { onMount } from "svelte";
 import type { AnalysisMemory } from "../utils/memory";
 import { loadMemory } from "../utils/memory";
+import CollapsibleSection from "./CollapsibleSection.svelte";
 
 const { autoExpand = false } = $props<{ autoExpand?: boolean }>();
 
-let showMemory = $state(false);
+let showMemory = $state(autoExpand);
+let sectionIsOpen = $state(autoExpand);
 let tooltip = $state<{
 	show: boolean;
 	text: string;
@@ -45,7 +47,7 @@ onMount(() => {
 		[key: string]: chrome.storage.StorageChange;
 	}) => {
 		// Check if the memory key changed
-		if (changes.history_analysis_memory && showMemory) {
+		if (changes.history_analysis_memory && sectionIsOpen) {
 			console.log("Memory updated in storage, refreshing...");
 			refreshMemory();
 		}
@@ -165,45 +167,27 @@ function hideTooltip() {
 
 // Load memory when showing for first time
 $effect(() => {
-	if (showMemory && !hasAttemptedLoad && !loading) {
+	if (sectionIsOpen && !hasAttemptedLoad && !loading) {
 		loadMemoryData();
 	}
 });
 
-// Auto-expand when requested
-$effect(() => {
-	if (autoExpand && !showMemory) {
-		showMemory = true;
+// Handle section toggle
+function handleSectionToggle(isOpen: boolean) {
+	sectionIsOpen = isOpen;
+	if (isOpen && !hasAttemptedLoad && !loading) {
+		loadMemoryData();
 	}
-});
+}
+
+function getMemoryBadge(): string {
+	if (loading) return "Loading...";
+	if (!memory) return "";
+	return `${memory.patterns.length} patterns • ${memory.totalItemsAnalyzed} items`;
+}
 </script>
 
-<div class="border border-gray-200 rounded-lg">
-	<button
-		type="button"
-		onclick={() => showMemory = !showMemory}
-		class="w-full px-4 py-3 flex items-center justify-between bg-gray-50 hover:bg-gray-100 transition-colors rounded-t-lg"
-	>
-		<span class="font-medium text-gray-700">Memory</span>
-		<div class="flex items-center space-x-2">
-			{#if memory && !loading}
-				<span class="text-xs text-gray-500">
-					{memory.patterns.length} patterns • {memory.totalItemsAnalyzed} items analyzed
-				</span>
-			{/if}
-			<svg 
-				class={`w-5 h-5 text-gray-500 transition-transform ${showMemory ? 'rotate-180' : ''}`}
-				fill="none" 
-				stroke="currentColor" 
-				viewBox="0 0 24 24"
-			>
-				<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-			</svg>
-		</div>
-	</button>
-	
-	{#if showMemory}
-		<div class="border-t border-gray-200">
+<CollapsibleSection title="Memory" defaultOpen={showMemory} badge={getMemoryBadge()} onToggle={handleSectionToggle}>
 			<!-- MCP Server Feature (Coming Soon) -->
 			<div class="p-4 border-b border-gray-200 bg-gray-50">
 				<div class="flex items-center justify-between">
@@ -555,9 +539,7 @@ $effect(() => {
 					{/if}
 				</div>
 			{/if}
-		</div>
-	{/if}
-</div>
+</CollapsibleSection>
 
 <!-- Custom Tooltip -->
 {#if tooltip.show}

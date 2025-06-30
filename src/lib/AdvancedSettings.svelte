@@ -22,6 +22,7 @@ import {
 	MERGE_SYSTEM_PROMPT,
 } from "../utils/constants";
 import { ANALYSIS_SCHEMA, CHUNK_SCHEMA } from "../utils/schemas";
+import CollapsibleSection from "./CollapsibleSection.svelte";
 
 let { onPromptsChange, onProviderChange } = $props<{
 	onPromptsChange?: (prompts: {
@@ -32,9 +33,6 @@ let { onPromptsChange, onProviderChange } = $props<{
 	onProviderChange?: () => void;
 }>();
 
-let showPrompts = $state(false);
-let showAIProvider = $state(false);
-let showAutoAnalysis = $state(false);
 let editableSystemPrompt = $state(ANALYSIS_SYSTEM_PROMPT);
 let editableChunkPrompt = $state(CHUNK_SYSTEM_PROMPT);
 let editableMergePrompt = $state(MERGE_SYSTEM_PROMPT);
@@ -195,25 +193,7 @@ function formatLastRunTime(): string {
 
 <div class="space-y-4">
 	<!-- AI Provider Selection -->
-	<div class="border border-gray-200 rounded-lg">
-		<button
-			type="button"
-			onclick={() => showAIProvider = !showAIProvider}
-			class="w-full px-4 py-3 flex items-center justify-between bg-gray-50 hover:bg-gray-100 transition-colors rounded-t-lg"
-		>
-			<span class="font-medium text-gray-700">AI Provider Settings</span>
-			<svg 
-				class={`w-5 h-5 text-gray-500 transition-transform ${showAIProvider ? 'rotate-180' : ''}`}
-				fill="none" 
-				stroke="currentColor" 
-				viewBox="0 0 24 24"
-			>
-				<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-			</svg>
-		</button>
-		
-		{#if showAIProvider}
-			<div class="p-4 border-t border-gray-200">
+	<CollapsibleSection title="AI Provider Settings">
 				<div class="space-y-4">
 					<!-- Provider Selection -->
 					<fieldset>
@@ -292,30 +272,10 @@ function formatLastRunTime(): string {
 						</div>
 					</div>
 				</div>
-			</div>
-		{/if}
-	</div>
+	</CollapsibleSection>
 
 	<!-- Prompt Customization Section -->
-	<div class="border border-gray-200 rounded-lg">
-		<button
-			type="button"
-			onclick={() => showPrompts = !showPrompts}
-			class="w-full px-4 py-3 flex items-center justify-between bg-gray-50 hover:bg-gray-100 transition-colors rounded-t-lg"
-		>
-			<span class="font-medium text-gray-700">Customize AI Prompts</span>
-			<svg 
-				class={`w-5 h-5 text-gray-500 transition-transform ${showPrompts ? 'rotate-180' : ''}`}
-				fill="none" 
-				stroke="currentColor" 
-				viewBox="0 0 24 24"
-			>
-				<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-			</svg>
-		</button>
-		
-		{#if showPrompts}
-			<div class="p-4 border-t border-gray-200">
+	<CollapsibleSection title="Customize AI Prompts">
 				<div class="space-y-4">
 					<!-- System Prompt -->
 					<div>
@@ -426,31 +386,10 @@ function formatLastRunTime(): string {
 						</button>
 					</div>
 				</div>
-			</div>
-		{/if}
-	</div>
+	</CollapsibleSection>
 	
 	<!-- Auto-Analysis Settings -->
-	<div class="border border-gray-200 rounded-lg">
-		<button
-			type="button"
-			onclick={() => showAutoAnalysis = !showAutoAnalysis}
-			data-settings-section="auto-analysis"
-			class="w-full px-4 py-3 flex items-center justify-between bg-gray-50 hover:bg-gray-100 transition-colors rounded-t-lg"
-		>
-			<span class="font-medium text-gray-700">Automatic Ambient Analysis</span>
-			<svg 
-				class={`w-5 h-5 text-gray-500 transition-transform ${showAutoAnalysis ? 'rotate-180' : ''}`}
-				fill="none" 
-				stroke="currentColor" 
-				viewBox="0 0 24 24"
-			>
-				<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-			</svg>
-		</button>
-		
-		{#if showAutoAnalysis}
-			<div class="p-4 border-t border-gray-200">
+	<CollapsibleSection title="Automatic Ambient Analysis" data-settings-section="auto-analysis">
 				<div class="space-y-4">
 					<!-- Enable/Disable Toggle -->
 					<div class="flex items-center justify-between">
@@ -544,7 +483,5 @@ function formatLastRunTime(): string {
 						</p>
 					{/if}
 				</div>
-			</div>
-		{/if}
-	</div>
+	</CollapsibleSection>
 </div>

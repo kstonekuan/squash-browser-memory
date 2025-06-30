@@ -1,10 +1,10 @@
 <script lang="ts">
+import CollapsibleSection from "./CollapsibleSection.svelte";
+
 let { rawResponse = "", error = "" } = $props<{
 	rawResponse?: string;
 	error?: string;
 }>();
-
-let showDebug = $state(false);
 
 function formatJson(json: string): string {
 	try {
@@ -17,25 +17,12 @@ function formatJson(json: string): string {
 </script>
 
 {#if (rawResponse || error)}
-<div class="bg-white rounded-lg shadow-md">
-	<button
-		type="button"
-		onclick={() => showDebug = !showDebug}
-		class="w-full px-6 py-4 text-left text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-500 flex items-center justify-between"
-	>
-		<span>Chunking Debug Info {error ? '(Error)' : ''}</span>
-		<svg 
-			class={`w-5 h-5 transition-transform ${showDebug ? 'rotate-180' : ''}`} 
-			fill="none" 
-			stroke="currentColor" 
-			viewBox="0 0 24 24"
-		>
-			<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-		</svg>
-	</button>
-	
-	{#if showDebug}
-		<div class="border-t border-gray-200">
+<CollapsibleSection 
+	title="Chunking Debug Info"
+	badge={error ? "Error" : ""}
+	badgeColor={error ? "red" : "gray"}
+	class="bg-white shadow-md"
+>
 			<div class="p-4 space-y-3">
 				{#if error}
 					<div class="bg-red-50 border border-red-200 rounded-md p-3">
@@ -53,7 +40,5 @@ function formatJson(json: string): string {
 					<p class="text-sm text-gray-500 italic">No raw response available (chunking succeeded on first try)</p>
 				{/if}
 			</div>
-		</div>
-	{/if}
-</div>
+</CollapsibleSection>
 {/if}

@@ -5,6 +5,7 @@ import AmbientAnalysisCard from "./lib/AmbientAnalysisCard.svelte";
 import type { AnalysisPhase, SubPhase } from "./lib/AnalysisProgress.svelte";
 import AnalysisProgress from "./lib/AnalysisProgress.svelte";
 import AnalysisResults from "./lib/AnalysisResults.svelte";
+import CollapsibleSection from "./lib/CollapsibleSection.svelte";
 import HistoryFetcher from "./lib/HistoryFetcher.svelte";
 import MemoryViewer from "./lib/MemoryViewer.svelte";
 import type { AnalysisResult } from "./types";
@@ -191,27 +192,26 @@ function handleDismissAnalysis() {
 		<!-- Memory Viewer -->
 		<MemoryViewer autoExpand={memoryAutoExpand} />
 
-		<!-- Advanced Settings and Memory Management -->
-		<div class="mt-4 space-y-4">
+		<!-- Memory Management -->
+		<CollapsibleSection title="Memory Management" class="mt-4">
+			<p class="text-sm text-gray-600 mb-4">
+				Analysis memory helps improve results by remembering patterns from previous sessions.
+			</p>
+			<button
+				type="button"
+				onclick={handleClearMemory}
+				class="px-3 py-1.5 text-xs font-medium text-red-700 bg-red-50 border border-red-200 rounded hover:bg-red-100 focus:outline-none focus:ring-2 focus:ring-offset-0 focus:ring-red-500"
+			>
+				Clear Memory
+			</button>
+		</CollapsibleSection>
+
+		<!-- Advanced Settings (no longer wrapped in Developer Tools) -->
+		<div class="mt-4">
 			<AdvancedSettings 
 				onPromptsChange={handlePromptsChange}
 				onProviderChange={handleProviderChange}
 			/>
-			
-			<!-- Memory Management -->
-			<div class="bg-white rounded-lg shadow-sm p-4">
-				<h3 class="text-sm font-medium text-gray-900 mb-2">Memory Management</h3>
-				<p class="text-xs text-gray-600 mb-3">
-					Analysis memory helps improve results by remembering patterns from previous sessions.
-				</p>
-				<button
-					type="button"
-					onclick={handleClearMemory}
-					class="px-3 py-1.5 text-xs font-medium text-red-700 bg-red-50 border border-red-200 rounded hover:bg-red-100 focus:outline-none focus:ring-2 focus:ring-offset-0 focus:ring-red-500"
-				>
-					Clear Memory
-				</button>
-			</div>
 		</div>
 	</div>
 </main>

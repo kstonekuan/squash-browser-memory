@@ -2,13 +2,12 @@
 import type { AnalysisResult } from "../types";
 import ChunkDebugInfo from "./ChunkDebugInfo.svelte";
 import ChunkDisplay from "./ChunkDisplay.svelte";
+import CollapsibleSection from "./CollapsibleSection.svelte";
 
 const { result, onDismiss } = $props<{
 	result: AnalysisResult;
 	onDismiss: () => void;
 }>();
-
-let showRawAnalysis = $state(false);
 </script>
 
 <div class="space-y-4 mb-8">
@@ -71,25 +70,7 @@ let showRawAnalysis = $state(false);
   <ChunkDebugInfo rawResponse={result.chunkingRawResponse} error={result.chunkingError} />
   
   <!-- Raw Analysis Data Section -->
-  <div class="bg-white rounded-lg shadow-md">
-    <button
-      type="button"
-      onclick={() => showRawAnalysis = !showRawAnalysis}
-      class="w-full px-4 py-3 text-left text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-500 flex items-center justify-between"
-    >
-      <span>Raw Analysis Output</span>
-      <svg 
-        class={`w-4 h-4 transition-transform ${showRawAnalysis ? 'rotate-180' : ''}`} 
-        fill="none" 
-        stroke="currentColor" 
-        viewBox="0 0 24 24"
-      >
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-      </svg>
-    </button>
-    
-    {#if showRawAnalysis}
-      <div class="border-t border-gray-200">
+  <CollapsibleSection title="Raw Analysis Output" class="bg-white shadow-md">
         <div class="p-3 max-h-80 overflow-y-auto">
           <pre class="text-xs font-mono whitespace-pre-wrap break-words bg-gray-50 p-3 rounded">{JSON.stringify(result, null, 2)}</pre>
         </div>
@@ -98,7 +79,5 @@ let showRawAnalysis = $state(false);
             Raw analysis output from the AI model.
           </p>
         </div>
-      </div>
-    {/if}
-  </div>
+  </CollapsibleSection>
 </div>
