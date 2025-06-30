@@ -4,8 +4,8 @@
 	"version": "1.0.0",
 	"description": "Analyze your browsing history to find repetitive workflows that can be automated",
 	"minimum_chrome_version": "138",
-	"permissions": ["history", "storage", "sidePanel", "unlimitedStorage"],
-	"host_permissions": ["https://api.anthropic.com/*"],
+	"permissions": ["history", "storage", "sidePanel", "alarms", "notifications"],
+	"host_permissions": [],
 	"background": {
 		"service_worker": "background.js"
 	},

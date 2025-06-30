@@ -1,6 +1,7 @@
 <script lang="ts">
 import AdvancedSettings from "./lib/AdvancedSettings.svelte";
 import AIProviderStatus from "./lib/AIProviderStatus.svelte";
+import AmbientAnalysisCard from "./lib/AmbientAnalysisCard.svelte";
 import type { AnalysisPhase, SubPhase } from "./lib/AnalysisProgress.svelte";
 import AnalysisProgress from "./lib/AnalysisProgress.svelte";
 import AnalysisResults from "./lib/AnalysisResults.svelte";
@@ -171,6 +172,9 @@ function handleDismissAnalysis() {
 				/>
 			</div>
 		</div>
+
+		<!-- Ambient Analysis Card - Prominent position -->
+		<AmbientAnalysisCard />
 
 		<AnalysisProgress 
 			phase={analysisPhase} 

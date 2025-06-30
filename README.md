@@ -1,108 +1,112 @@
 # History Workflow Analyzer
 
-A Chrome extension that analyzes your browsing history to identify repetitive workflows and suggest optimizations using Chrome's built-in AI.
+An intelligent Chrome extension that analyzes your browsing history to identify repetitive workflows, discover behavioral patterns, and suggest optimizations.
 
 ## Features
 
-- **Chrome AI Integration**: Use Chrome's built-in AI (Gemini Nano) for completely local, private analysis
-- **Direct History Access**: No need to export/import files - the extension reads your browsing history directly
-- **Side Panel UI**: Works alongside your browsing without taking up a full tab
-- **Identify Repetitive Workflows**: Discovers recurring sequences of browsing behavior that could be automated or made more efficient
-- **Customizable Prompts**: Advanced options to customize the AI prompts used for analysis
-- **Progress Tracking**: See each phase of the analysis process
-- **Privacy-First**: Your history never leaves your device - all analysis is performed locally using Chrome AI
+- **Dual AI Providers**: Choose between Chrome's built-in AI (Gemini Nano) for 100% local, private analysis or a remote provider (Anthropic's Claude) for more powerful insights.
+- **Ambient Background Analysis**: Enable hourly, automatic analysis of your recent browsing history. The extension works quietly in the background to find patterns without interrupting you.
+- **Incremental Learning with Memory**: The extension remembers past analyses and builds a long-term understanding of your habits, leading to smarter, more refined suggestions over time.
+- **Advanced Settings**:
+    - Switch between AI providers.
+    - Customize the AI prompts used for analysis, data chunking, and memory integration.
+    - Configure API keys for remote providers.
+    - Manage ambient analysis settings and notifications.
+- **Robust & Resilient**: Designed with intelligent error handling, including automatic retries and fallbacks, to ensure smooth analysis even with large history datasets.
+- **Privacy-First Design**: Your data stays on your device by default. The extension provides clear warnings and requires explicit consent before using any remote service.
+- **Side Panel UI**: A clean and intuitive interface that works alongside your browsing without needing a full tab.
+
+## How It Works
+
+The extension uses a multi-stage pipeline to analyze your history:
+
+1.  **History Fetching**: Gathers your browsing history within a selected date range.
+2.  **Intelligent Chunking**: Uses AI to group raw history items into logical browsing sessions or "chunks."
+3.  **Pattern Analysis**: Each chunk is analyzed by the AI to identify recurring sequences and user behavior.
+4.  **Memory Integration**: New findings are merged with the long-term memory, refining existing patterns and improving the user profile.
+5.  **Results Display**: Aggregated results, patterns, and suggestions are displayed in the side panel.
+
+## Ambient Analysis
+
+You can enable **Ambient Analysis** in the "Advanced Settings" section. When enabled, the extension will automatically:
+
+- Run an analysis every hour on new browsing data.
+- Use the same privacy-first principles as manual analysis.
+- Send notifications (if enabled) on success or failure.
+
+This feature allows the extension to proactively discover patterns without requiring you to perform manual analysis.
+
+## MCP Server Integration (Coming Soon)
+
+Soon, you'll be able to expose your browsing patterns and profile as an MCP (Model Context Protocol) server. This exciting feature will allow other AI tools and applications to understand your work patterns, preferences, and habits.
+
+### Planned Features:
+- **Expose User Profile**: Share your profession, interests, and work patterns with authorized tools
+- **Pattern API**: Allow other tools to query your repetitive workflows and habits
+- **Privacy Controls**: Fine-grained control over what data is exposed
+- **Integration Examples**: Use your browsing patterns to enhance coding assistants, productivity tools, and more
+
+This feature will enable a new level of personalization across your AI-powered tools, all while maintaining your privacy and control over your data.
 
 ## Installation
 
-1. Clone the repository
-2. Install dependencies:
-   ```bash
-   pnpm install
-   ```
-3. Build the extension:
-   ```bash
-   pnpm build
-   ```
-4. Load the extension in Chrome:
-   - Open `chrome://extensions/`
-   - Enable "Developer mode" in the top right corner
-   - Click "Load unpacked"
-   - Select the `dist` folder
-   - The extension will be loaded and the icon will appear in your toolbar
+1.  Clone the repository.
+2.  Install dependencies: `pnpm install`
+3.  Build the extension: `pnpm build`
+4.  Load the extension in Chrome:
+    - Open `chrome://extensions/`.
+    - Enable "Developer mode".
+    - Click "Load unpacked" and select the `dist` folder.
 
-## Usage
+## AI Providers
 
-1. Click the extension icon in your toolbar
-2. The History Analyzer will open in a side panel
-3. Select a date range for your browsing history
-4. Click "Analyze History" to find repetitive workflows
-5. View the identified workflow patterns and optimization suggestions
+### 1. Chrome AI (Local)
 
-## Chrome AI Requirements
+- **How it works**: Uses Chrome's built-in AI (Gemini Nano). Your browsing history **never leaves your device**.
+- **Requirements**: Chrome version 138 or later.
+- **Best for**: Users who prioritize privacy and want to perform analysis without an internet connection.
 
-To use the local Chrome AI feature:
-- Chrome version 131 or later (released December 2024)
-- The AI model will download automatically on first use (~20MB)
-- All processing happens on your device - no internet required after download
+### 2. Anthropic Claude (Remote)
+
+- **How it works**: Uses the Anthropic Claude API. This sends your browsing history to Anthropic's servers.
+- **Requirements**: A Claude API key from the [Anthropic Console](https://console.anthropic.com/).
+- **Best for**: Users who want potentially more powerful analysis and are comfortable with their data being processed by a remote service.
 
 ## Development
+
+For a detailed technical overview, please see [ARCHITECTURE.md](./ARCHITECTURE.md).
 
 ### Prerequisites
 
 - Node.js
 - pnpm
-- Chrome 131+ (for Chrome AI features)
+- Chrome 138+
 
 ### Commands
 
-- `pnpm dev` - Start development server with hot reload
-- `pnpm build` - Run checks and build the extension
-- `pnpm check` - Run all quality checks (Biome, TypeScript, Svelte, tests)
-- `pnpm test` - Run tests in watch mode
-- `pnpm test:ui` - Run tests with UI
-
-For development with hot reload:
-```bash
-pnpm dev
-```
-Then load the extension from the `dist` directory and reload it when you make changes.
-
-### Check Command
-
-Always run `pnpm check` before committing or after making significant changes. This command runs:
-- Biome linting and formatting
-- TypeScript type checking
-- Svelte checking
-- Unit tests
-
-The check command is automatically run before builds to ensure code quality.
-
-### Build Output
-
-- Chrome extension: `dist/`
-
-## Technology Stack
-
-- **Frontend**: Svelte 5, TypeScript, Tailwind CSS
-- **Build Tool**: Vite
-- **AI**: Chrome's built-in Language Model API (Gemini Nano)
-- **Linting/Formatting**: Biome
-- **Testing**: Vitest
+- `pnpm dev`: Start development server with hot reload.
+- `pnpm build`: Run checks and build the extension.
+- `pnpm check`: Run all quality checks (Biome, TypeScript, Svelte, tests).
+- `pnpm test`: Run tests in watch mode.
 
 ## Privacy Notice
 
-Your privacy is paramount:
-- Your browsing history never leaves your device
-- Complete local processing with Chrome AI - no external API calls
-- No data is stored on any external servers
-- The extension requires only the "history" permission to access your browsing history
+Your privacy is paramount. Please review the "AI Providers" section to understand how your data is handled. When using the local Chrome AI, your history never leaves your device. When using a remote provider, your data is sent to that provider's servers.
 
-## Requirements
+## Requirements & Permissions
 
-- Chrome 138 or later with AI features enabled
-- The extension requires the "history" permission to access your browsing history
+**Requirements**
+- Chrome 138 or later (for local AI features).
+
+**Permissions**
+The extension requires the following permissions:
+- `history`: To read browsing history for analysis.
+- `storage`: To save user settings (e.g., API keys, provider choice).
+- `sidePanel`: To show the extension UI in the browser side panel.
+- `alarms`: To schedule the hourly ambient analysis.
+- `notifications`: To show the status of background analysis.
 
 ## TODO
 
 - Clean up Chrome Built-In AI usage instructions
-- Test AI on non-dev chrome.
+- Test AI on non-dev chrome
