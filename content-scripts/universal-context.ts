@@ -378,32 +378,41 @@ class SimplePlatformAdapter {
 	}
 }
 
+// Type for memory data structure
+interface MemoryData {
+	userProfile?: {
+		profession?: string;
+		interests?: string[];
+		goals?: string[];
+		preferences?: string[];
+		traits?: string[];
+		obsessions?: string[];
+		[key: string]: unknown;
+	};
+	[key: string]: unknown;
+}
+
 // Simple storage interface for Chrome extension
-class SimpleStorage {
-	static async getMemory(): Promise<any> {
-		return new Promise((resolve) => {
-			// First, let's see what's actually in storage
-			chrome.storage.local.get(null, (allItems) => {
-				console.log(
-					"All items in chrome.storage.local:",
-					Object.keys(allItems),
-				);
+async function getMemory(): Promise<MemoryData | null> {
+	return new Promise((resolve) => {
+		// First, let's see what's actually in storage
+		chrome.storage.local.get(null, (allItems) => {
+			console.log("All items in chrome.storage.local:", Object.keys(allItems));
 
-				chrome.storage.local.get(["history_analysis_memory"], (result) => {
-					console.log("Looking for history_analysis_memory:", result);
-					resolve(result.history_analysis_memory || null);
-				});
+			chrome.storage.local.get(["history_analysis_memory"], (result) => {
+				console.log("Looking for history_analysis_memory:", result);
+				resolve(result.history_analysis_memory || null);
 			});
 		});
-	}
+	});
+}
 
-	static async saveMemory(memory: any): Promise<void> {
-		return new Promise((resolve) => {
-			chrome.storage.local.set({ history_analysis_memory: memory }, () => {
-				resolve();
-			});
+export async function saveMemory(memory: MemoryData): Promise<void> {
+	return new Promise((resolve) => {
+		chrome.storage.local.set({ history_analysis_memory: memory }, () => {
+			resolve();
 		});
-	}
+	});
 }
 
 // Simple string similarity function
@@ -415,8 +424,8 @@ function compareTwoStrings(str1: string, str2: string): number {
 	const b = str2.toLowerCase();
 
 	// Get bigrams
-	const bigrams1 = [];
-	const bigrams2 = [];
+	const bigrams1: string[] = [];
+	const bigrams2: string[] = [];
 
 	for (let i = 0; i < a.length - 1; i++) {
 		bigrams1.push(a.substring(i, i + 2));
@@ -443,11 +452,11 @@ function compareTwoStrings(str1: string, str2: string): number {
 
 // Simple context matcher using string similarity only
 class SimpleContextMatcher {
-	private memory: any = null;
+	private memory: MemoryData | null = null;
 
 	async initialize(): Promise<void> {
 		try {
-			this.memory = await SimpleStorage.getMemory();
+			this.memory = await getMemory();
 			console.log("Simple context matcher initialized", {
 				hasMemory: !!this.memory,
 				hasUserProfile: !!this.memory?.userProfile,
@@ -571,14 +580,14 @@ class SimpleContextMatcher {
 		const profile = this.memory.userProfile;
 
 		// Helper function to safely add context
-		const addContext = (value: any, category: string) => {
+		const addContext = (value: unknown, category: string) => {
 			if (value && typeof value === "string" && value.trim()) {
 				contexts.push({ text: value.trim(), category });
 			}
 		};
 
 		// Helper function to safely add array items (for string arrays)
-		const addArrayItems = (array: any, category: string) => {
+		const addArrayItems = (array: unknown, category: string) => {
 			if (Array.isArray(array)) {
 				for (const item of array) {
 					addContext(item, category);
@@ -588,9 +597,9 @@ class SimpleContextMatcher {
 
 		// Helper function to add object arrays with specific property extraction
 		const addObjectArray = (
-			array: any,
+			array: unknown,
 			category: string,
-			textExtractor: (item: any) => string,
+			textExtractor: (item: unknown) => string,
 		) => {
 			if (Array.isArray(array)) {
 				for (const item of array) {
@@ -615,33 +624,35 @@ class SimpleContextMatcher {
 		addArrayItems(profile.lifecycleHints, "lifecycle");
 
 		// Add personal preferences (object array: {category, preference})
-		addObjectArray(
-			profile.personalPreferences,
-			"preferences",
-			(item) => `${item.category}: ${item.preference}`,
-		);
+		addObjectArray(profile.personalPreferences, "preferences", (item) => {
+			const obj = item as { category?: string; preference?: string };
+			return `${obj.category || ""}: ${obj.preference || ""}`;
+		});
 
 		// Add personality traits (object array: {trait, evidence})
-		addObjectArray(
-			profile.personalityTraits,
-			"traits",
-			(item) => item.trait + (item.evidence ? ` (${item.evidence})` : ""),
-		);
+		addObjectArray(profile.personalityTraits, "traits", (item) => {
+			const obj = item as { trait?: string; evidence?: string };
+			return (obj.trait || "") + (obj.evidence ? ` (${obj.evidence})` : "");
+		});
 
 		// Add technology use (object array: {category, level, tools})
-		addObjectArray(
-			profile.technologyUse,
-			"technology",
-			(item) =>
-				`${item.category} (${item.level}): ${Array.isArray(item.tools) ? item.tools.join(", ") : item.tools || ""}`,
-		);
+		addObjectArray(profile.technologyUse, "technology", (item) => {
+			const obj = item as {
+				category?: string;
+				level?: string;
+				tools?: string[] | string;
+			};
+			const tools = Array.isArray(obj.tools)
+				? obj.tools.join(", ")
+				: obj.tools || "";
+			return `${obj.category || ""} (${obj.level || ""}): ${tools}`;
+		});
 
 		// Add work patterns (object array: {type, description})
-		addObjectArray(
-			profile.workPatterns,
-			"patterns",
-			(item) => `${item.type}: ${item.description}`,
-		);
+		addObjectArray(profile.workPatterns, "patterns", (item) => {
+			const obj = item as { type?: string; description?: string };
+			return `${obj.type || ""}: ${obj.description || ""}`;
+		});
 
 		// Add recent obsessions (string array)
 		addArrayItems(profile.recentObsessions, "obsessions");
@@ -1258,7 +1269,7 @@ class ContextButtonInjector {
 	private formatStructuredProfile(
 		contexts: Array<{ text: string; category: string }>,
 	): string {
-		const sections = [];
+		const sections: string[] = [];
 
 		// Background section
 		const profession = contexts.find((c) => c.category === "profession")?.text;
