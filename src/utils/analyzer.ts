@@ -946,12 +946,12 @@ async function analyzeChunk(
 				}
 				console.log("Sending analysis prompt to AI...");
 				console.log(
-					"Prompt preview (first 200 chars):",
-					`${prompt.substring(0, 200)}...`,
+					"Prompt:",
+					`${prompt}`,
 				);
 				console.log(
 					"Using response schema:",
-					`${JSON.stringify(ANALYSIS_SCHEMA).substring(0, 100)}...`,
+					`${JSON.stringify(ANALYSIS_SCHEMA)}...`,
 				);
 
 				// Notify progress that we're sending analysis prompt
