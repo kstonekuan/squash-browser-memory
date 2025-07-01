@@ -57,7 +57,7 @@ export default defineConfig({
 				chunkFileNames: "[name].js",
 				assetFileNames: "[name].[ext]",
 			},
-			external: ["@xenova/transformers", "string-similarity"],
+			external: ["string-similarity"],
 		},
 	},
 });

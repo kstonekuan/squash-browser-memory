@@ -3,8 +3,8 @@ import { createEventDispatcher, onMount } from "svelte";
 import type { PlatformType } from "../utils/platform-adapter";
 import {
 	type ContextSuggestion,
-	getSemanticMatcher,
-} from "../utils/semantic-matcher";
+	getSimpleContextMatcher,
+} from "../utils/simple-context-matcher";
 
 export let platform: PlatformType = "generic";
 export let currentInput = "";
@@ -23,12 +23,7 @@ let error = "";
 let selectedIndex = -1;
 let containerElement: HTMLDivElement;
 
-const matcher = getSemanticMatcher({
-	maxSuggestions,
-	semanticThreshold: 0.4,
-	stringThreshold: 0.3,
-	debounceMs: 300,
-});
+const matcher = getSimpleContextMatcher();
 
 // Initialize matcher and load suggestions
 onMount(async () => {
@@ -58,7 +53,7 @@ async function updateSuggestions(input: string) {
 	error = "";
 
 	try {
-		suggestions = await matcher.getSuggestionsDebounced(input.trim());
+		suggestions = await matcher.getSuggestions(input.trim(), maxSuggestions);
 		selectedIndex = -1;
 	} catch (err) {
 		console.error("Failed to get suggestions:", err);
@@ -176,8 +171,6 @@ function getCategoryColor(category: ContextSuggestion["category"]): string {
 
 // Check if button should show active state
 $: hasRelevantSuggestions = suggestions.length > 0;
-$: isModelLoading = matcher.isModelLoading();
-$: isSemanticAvailable = matcher.isSemanticAvailable();
 </script>
 
 <!-- Context Button -->
@@ -186,7 +179,7 @@ $: isSemanticAvailable = matcher.isSemanticAvailable();
 		type="button"
 		class="context-button {platform === 'chatgpt' ? 'chatgpt-style' : 'generic-style'}"
 		class:active={hasRelevantSuggestions}
-		class:loading={isModelLoading}
+		class:loading={loading}
 		aria-label="Add context from memory"
 		aria-expanded={isVisible}
 		aria-haspopup="listbox"
@@ -198,7 +191,7 @@ $: isSemanticAvailable = matcher.isSemanticAvailable();
 		</svg>
 		
 		<!-- Loading indicator -->
-		{#if isModelLoading}
+		{#if loading}
 			<div class="loading-spinner"></div>
 		{/if}
 		
@@ -230,9 +223,6 @@ $: isSemanticAvailable = matcher.isSemanticAvailable();
 				<div class="suggestion-item empty-item">
 					<span class="empty-icon">💭</span>
 					<span>No relevant context found</span>
-					{#if !isSemanticAvailable}
-						<small class="text-gray-500">Semantic search loading...</small>
-					{/if}
 				</div>
 			{:else}
 				{#each suggestions as suggestion, index}
@@ -253,7 +243,7 @@ $: isSemanticAvailable = matcher.isSemanticAvailable();
 							<span class="relevance-score">
 								{Math.round(suggestion.relevanceScore * 100)}%
 							</span>
-							<span class="match-type-badge {suggestion.matchType === 'semantic' ? 'semantic' : 'string'}">
+							<span class="match-type-badge {suggestion.matchType}">
 								{suggestion.matchType}
 							</span>
 						</div>
@@ -264,15 +254,9 @@ $: isSemanticAvailable = matcher.isSemanticAvailable();
 				{/each}
 			{/if}
 			
-			<!-- Footer with model status -->
+			<!-- Footer with status -->
 			<div class="suggestions-footer">
-				{#if isSemanticAvailable}
-					<span class="status-indicator semantic">🧠 Semantic matching active</span>
-				{:else if isModelLoading}
-					<span class="status-indicator loading">⏳ Loading semantic model...</span>
-				{:else}
-					<span class="status-indicator fallback">📝 String matching only</span>
-				{/if}
+				<span class="status-indicator string">📝 String matching</span>
 			</div>
 		</div>
 	{/if}

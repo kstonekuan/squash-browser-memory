@@ -12,7 +12,6 @@
 	},
 	"dependencies": {
 		"@anthropic-ai/sdk": "0.55.0",
-		"@xenova/transformers": "^3.5.0",
 		"string-similarity": "^4.0.4"
 	},
 	"devDependencies": {
