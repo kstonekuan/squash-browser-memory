@@ -1211,22 +1211,11 @@ class ContextButtonInjector {
 		// For workflow patterns, format the full pattern data instead of just the description
 		if (suggestion.category === "workflow" && suggestion.workflowPattern) {
 			const pattern = suggestion.workflowPattern;
-			textToInsert = `**Workflow Pattern: ${pattern.pattern}**
-Description: ${pattern.description}
-Frequency: ${pattern.frequency}x
-URLs: ${pattern.urls.join(", ")}
-${pattern.timePattern ? `Time Pattern: ${pattern.timePattern}` : ""}
-Suggestion: ${pattern.suggestion}
-Automation Potential: ${pattern.automationPotential}`;
+			textToInsert = `${pattern.pattern} / Description: ${pattern.description} / Frequency: ${pattern.frequency}x / URLs: ${pattern.urls.join(", ")} / Suggestion: ${pattern.suggestion}`;
 		}
 
-		// Insert the text into the chat input
-		const currentText = this.chatInput.getCurrentText();
-		const newText = currentText
-			? `${currentText}\n\n${textToInsert}`
-			: textToInsert;
-
-		this.chatInput.insertText(newText);
+		// Insert the text - insertText method already handles appending to current text
+		this.chatInput.insertText(textToInsert);
 		this.hideSuggestions();
 
 		console.log("Context suggestion selected:", suggestion);
@@ -1278,10 +1267,11 @@ Automation Potential: ${pattern.automationPotential}`;
 			// Get only the matching suggestions for current input
 			const suggestions = await this.matcher.getSuggestions(this.currentInput);
 
-			// Convert suggestions to context format
+			// Convert suggestions to context format, preserving workflow pattern data
 			const matchingContexts = suggestions.map((s) => ({
 				text: s.text,
 				category: s.category,
+				workflowPattern: s.workflowPattern,
 			}));
 
 			if (matchingContexts.length === 0) {
@@ -1293,7 +1283,7 @@ Automation Potential: ${pattern.automationPotential}`;
 
 			const currentText = this.chatInput.getCurrentText();
 			const newText = currentText
-				? `${currentText}\n -- Context --\n${formattedProfile}`
+				? `${currentText}\n\n-- Context --\n${formattedProfile}`
 				: formattedProfile;
 
 			// Use direct replacement to avoid double-insertion
@@ -1311,7 +1301,11 @@ Automation Potential: ${pattern.automationPotential}`;
 	}
 
 	private formatStructuredProfile(
-		contexts: Array<{ text: string; category: string }>,
+		contexts: Array<{
+			text: string;
+			category: string;
+			workflowPattern?: WorkflowPattern;
+		}>,
 	): string {
 		const sections: string[] = [];
 
@@ -1366,6 +1360,23 @@ Automation Potential: ${pattern.automationPotential}`;
 				.map((i) => i.text.toLowerCase())
 				.join(", ");
 			sections.push(`Interests: ${interestList}`);
+		}
+
+		// Workflow patterns section
+		const workflowPatterns = contexts.filter(
+			(c) => c.category === "workflow" && c.workflowPattern,
+		);
+		if (workflowPatterns.length > 0) {
+			sections.push("Workflow Patterns:");
+			for (const context of workflowPatterns) {
+				const pattern = context.workflowPattern!;
+				sections.push(`**${pattern.pattern}**`);
+				sections.push(` - Description: ${pattern.description}`);
+				sections.push(` - Frequency: ${pattern.frequency}x`);
+				sections.push(` - URLs: ${pattern.urls.join(", ")}`);
+				sections.push(` - Suggestion: ${pattern.suggestion}`);
+				sections.push(""); // Add spacing between patterns
+			}
 		}
 
 		// Add a clean separator and join with single newlines
