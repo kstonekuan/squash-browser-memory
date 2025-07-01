@@ -37,39 +37,11 @@ export const ANALYSIS_SCHEMA = {
 		userProfile: {
 			type: "object",
 			properties: {
-				// === Stable Background (Core Identity) ===
-				profession: { type: "string", maxLength: 100 },
-				personalityTraits: {
+				// === Stable Background ===
+				coreIdentities: {
 					type: "array",
-					items: {
-						type: "object",
-						properties: {
-							trait: { type: "string", maxLength: 50 },
-							evidence: { type: "string", maxLength: 150 },
-						},
-						required: ["trait", "evidence"],
-					},
-					maxItems: 8,
-				},
-				technologyUse: {
-					type: "array",
-					items: {
-						type: "object",
-						properties: {
-							category: { type: "string", maxLength: 50 },
-							level: {
-								type: "string",
-								enum: ["beginner", "intermediate", "advanced", "expert"],
-							},
-							tools: {
-								type: "array",
-								items: { type: "string", maxLength: 50 },
-								maxItems: 5,
-							},
-						},
-						required: ["category", "level", "tools"],
-					},
-					maxItems: 10,
+					items: { type: "string", maxLength: 80 },
+					maxItems: 5,
 				},
 				personalPreferences: {
 					type: "array",
@@ -84,37 +56,15 @@ export const ANALYSIS_SCHEMA = {
 					maxItems: 8,
 				},
 
-				// === Current Context (Dynamic/Active) ===
-				currentGoals: {
+				// === Current Context ===
+				currentTasks: {
 					type: "array",
 					items: { type: "string", maxLength: 80 },
-					maxItems: 6,
-				},
-				recentObsessions: {
-					type: "array",
-					items: { type: "string", maxLength: 60 },
-					maxItems: 5,
-				},
-				lifecycleHints: {
-					type: "array",
-					items: { type: "string", maxLength: 60 },
-					maxItems: 4,
-				},
-				interests: {
-					type: "array",
-					items: { type: "string", maxLength: 50 },
 					maxItems: 10,
 				},
-				workPatterns: {
+				currentInterests: {
 					type: "array",
-					items: {
-						type: "object",
-						properties: {
-							type: { type: "string", maxLength: 50 },
-							description: { type: "string", maxLength: 100 },
-						},
-						required: ["type", "description"],
-					},
+					items: { type: "string", maxLength: 60 },
 					maxItems: 8,
 				},
 
@@ -122,15 +72,10 @@ export const ANALYSIS_SCHEMA = {
 				summary: { type: "string", maxLength: 500 },
 			},
 			required: [
-				"profession",
-				"personalityTraits",
-				"technologyUse",
+				"coreIdentities",
 				"personalPreferences",
-				"currentGoals",
-				"recentObsessions",
-				"lifecycleHints",
-				"interests",
-				"workPatterns",
+				"currentTasks",
+				"currentInterests",
 				"summary",
 			],
 		},

@@ -490,7 +490,10 @@ async function mergeAnalysisResults(
 	}
 
 	// If memory is empty (no patterns), just return the new results
-	if (memory.patterns.length === 0 && !memory.userProfile.profession) {
+	if (
+		memory.patterns.length === 0 &&
+		memory.userProfile.coreIdentities.length === 0
+	) {
 		return newResults;
 	}
 
@@ -573,16 +576,11 @@ async function mergeAnalysisResults(
 		// Validate and enforce limits
 		const validatedProfile = {
 			...parsed.userProfile,
-			interests: parsed.userProfile.interests?.slice(0, 10) || [],
-			currentGoals: parsed.userProfile.currentGoals?.slice(0, 6) || [],
-			recentObsessions: parsed.userProfile.recentObsessions?.slice(0, 5) || [],
-			lifecycleHints: parsed.userProfile.lifecycleHints?.slice(0, 4) || [],
+			coreIdentities: parsed.userProfile.coreIdentities?.slice(0, 5) || [],
 			personalPreferences:
 				parsed.userProfile.personalPreferences?.slice(0, 8) || [],
-			workPatterns: parsed.userProfile.workPatterns?.slice(0, 8) || [],
-			personalityTraits:
-				parsed.userProfile.personalityTraits?.slice(0, 8) || [],
-			technologyUse: parsed.userProfile.technologyUse?.slice(0, 10) || [],
+			currentTasks: parsed.userProfile.currentTasks?.slice(0, 10) || [],
+			currentInterests: parsed.userProfile.currentInterests?.slice(0, 8) || [],
 		};
 
 		const validatedPatterns = parsed.patterns?.slice(0, 15) || [];
@@ -668,7 +666,8 @@ async function analyzeChunkWithSubdivision(
 
 			// Step 2: Merge with existing memory (skip if memory is empty)
 			const mergedResults =
-				memory.patterns.length === 0 && !memory.userProfile.profession
+				memory.patterns.length === 0 &&
+				memory.userProfile.coreIdentities.length === 0
 					? chunkResults
 					: await mergeAnalysisResults(
 							memory,
@@ -832,9 +831,9 @@ async function analyzeChunkWithSubdivision(
 			// Step 2: Merge with current memory (skip if current memory is from original empty memory)
 			const mergedResults =
 				currentMemory.patterns.length === 0 &&
-				!currentMemory.userProfile.profession &&
+				currentMemory.userProfile.coreIdentities.length === 0 &&
 				memory.patterns.length === 0 &&
-				!memory.userProfile.profession
+				memory.userProfile.coreIdentities.length === 0
 					? subResults
 					: await mergeAnalysisResults(
 							currentMemory,
@@ -1008,17 +1007,12 @@ async function analyzeChunk(
 			// Validate and enforce limits
 			const validatedProfile = {
 				...parsed.userProfile,
-				interests: parsed.userProfile.interests?.slice(0, 10) || [],
-				currentGoals: parsed.userProfile.currentGoals?.slice(0, 6) || [],
-				recentObsessions:
-					parsed.userProfile.recentObsessions?.slice(0, 5) || [],
-				lifecycleHints: parsed.userProfile.lifecycleHints?.slice(0, 4) || [],
+				coreIdentities: parsed.userProfile.coreIdentities?.slice(0, 5) || [],
 				personalPreferences:
 					parsed.userProfile.personalPreferences?.slice(0, 8) || [],
-				workPatterns: parsed.userProfile.workPatterns?.slice(0, 8) || [],
-				personalityTraits:
-					parsed.userProfile.personalityTraits?.slice(0, 8) || [],
-				technologyUse: parsed.userProfile.technologyUse?.slice(0, 10) || [],
+				currentTasks: parsed.userProfile.currentTasks?.slice(0, 10) || [],
+				currentInterests:
+					parsed.userProfile.currentInterests?.slice(0, 8) || [],
 			};
 
 			const validatedPatterns = parsed.patterns?.slice(0, 15) || [];

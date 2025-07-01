@@ -116,7 +116,7 @@ class SimplePlatformAdapter {
 					'div[contenteditable="true"]',
 				],
 				buttonClass: "context-btn",
-				insertionMethod: "insert",
+				insertionMethod: "append",
 				styling: {
 					buttonStyles:
 						"flex items-center justify-center w-8 h-8 rounded hover:bg-gray-600",
@@ -611,51 +611,20 @@ class SimpleContextMatcher {
 			}
 		};
 
-		// Add profession
-		addContext(profile.profession, "profession");
+		// Add core identities (string array)
+		addArrayItems(profile.coreIdentities, "identities");
 
-		// Add interests (string array)
-		addArrayItems(profile.interests, "interests");
+		// Add current tasks (string array)
+		addArrayItems(profile.currentTasks, "tasks");
 
-		// Add current goals (string array)
-		addArrayItems(profile.currentGoals, "goals");
-
-		// Add lifecycle hints (string array)
-		addArrayItems(profile.lifecycleHints, "lifecycle");
+		// Add current interests (string array)
+		addArrayItems(profile.currentInterests, "interests");
 
 		// Add personal preferences (object array: {category, preference})
 		addObjectArray(profile.personalPreferences, "preferences", (item) => {
 			const obj = item as { category?: string; preference?: string };
 			return `${obj.category || ""}: ${obj.preference || ""}`;
 		});
-
-		// Add personality traits (object array: {trait, evidence})
-		addObjectArray(profile.personalityTraits, "traits", (item) => {
-			const obj = item as { trait?: string; evidence?: string };
-			return (obj.trait || "") + (obj.evidence ? ` (${obj.evidence})` : "");
-		});
-
-		// Add technology use (object array: {category, level, tools})
-		addObjectArray(profile.technologyUse, "technology", (item) => {
-			const obj = item as {
-				category?: string;
-				level?: string;
-				tools?: string[] | string;
-			};
-			const tools = Array.isArray(obj.tools)
-				? obj.tools.join(", ")
-				: obj.tools || "";
-			return `${obj.category || ""} (${obj.level || ""}): ${tools}`;
-		});
-
-		// Add work patterns (object array: {type, description})
-		addObjectArray(profile.workPatterns, "patterns", (item) => {
-			const obj = item as { type?: string; description?: string };
-			return `${obj.type || ""}: ${obj.description || ""}`;
-		});
-
-		// Add recent obsessions (string array)
-		addArrayItems(profile.recentObsessions, "obsessions");
 
 		// Add summary as a single context item
 		addContext(profile.summary, "summary");

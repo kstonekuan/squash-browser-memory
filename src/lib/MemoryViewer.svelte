@@ -302,53 +302,26 @@ function getMemoryBadge(): string {
 									<span class="ml-2 text-xs text-gray-500 bg-gray-200 px-2 py-1 rounded-full">Core Identity</span>
 								</div>
 								
-								<!-- Profession -->
-								<div class="mb-3">
-									<h4 class="text-sm font-medium text-gray-600 mb-1">Profession</h4>
-									<p class="text-sm text-gray-800">
-										{memory.userProfile.profession}
-									</p>
-								</div>
-
-								<!-- Personality Traits -->
-								{#if memory.userProfile.personalityTraits.length > 0}
+								<!-- Core Identities -->
+								{#if memory.userProfile.coreIdentities.length > 0}
 									<div class="mb-3">
-										<h4 class="text-sm font-medium text-gray-600 mb-2">Personality Traits</h4>
+										<h4 class="text-sm font-medium text-gray-600 mb-2">Core Identities</h4>
 										<div class="flex flex-wrap gap-1">
-											{#each memory.userProfile.personalityTraits as trait}
+											{#each memory.userProfile.coreIdentities as identity}
 												<span 
-													class="inline-block px-2 py-1 text-xs bg-gray-200 text-gray-700 rounded-full cursor-pointer hover:bg-gray-300 transition-colors" 
+													class="inline-block px-2 py-1 text-xs bg-green-100 text-green-800 rounded-full cursor-pointer hover:bg-green-200 transition-colors" 
 													role="button"
 													tabindex="0"
-													onmouseenter={(e) => showTooltip(e, `${trait.trait} - ${trait.evidence}`)}
+													onmouseenter={(e) => showTooltip(e, identity)}
 													onmouseleave={hideTooltip}
 												>
-													{truncateText(trait.trait)}
+													{truncateText(identity)}
 												</span>
 											{/each}
 										</div>
 									</div>
 								{/if}
 
-								<!-- Technology Skills -->
-								{#if memory.userProfile.technologyUse.length > 0}
-									<div class="mb-3">
-										<h4 class="text-sm font-medium text-gray-600 mb-2">Technology Skills</h4>
-										<div class="flex flex-wrap gap-1">
-											{#each memory.userProfile.technologyUse as tech}
-												<span 
-													class="inline-block px-2 py-1 text-xs bg-gray-200 text-gray-700 rounded-full cursor-pointer hover:bg-gray-300 transition-colors" 
-													role="button"
-													tabindex="0"
-													onmouseenter={(e) => showTooltip(e, `${tech.category} (${tech.level}) - ${tech.tools.join(', ')}`)}
-													onmouseleave={hideTooltip}
-												>
-													{truncateText(tech.category)}
-												</span>
-											{/each}
-										</div>
-									</div>
-								{/if}
 
 								<!-- Personal Preferences -->
 								{#if memory.userProfile.personalPreferences.length > 0}
@@ -381,60 +354,20 @@ function getMemoryBadge(): string {
 									<span class="ml-2 text-xs text-orange-600 bg-orange-200 px-2 py-1 rounded-full">Active Now</span>
 								</div>
 
-								<!-- Current Goals -->
-								{#if memory.userProfile.currentGoals.length > 0}
+								<!-- Current Tasks -->
+								{#if memory.userProfile.currentTasks.length > 0}
 									<div class="mb-3">
-										<h4 class="text-sm font-medium text-orange-700 mb-2">Goals</h4>
+										<h4 class="text-sm font-medium text-orange-700 mb-2">Current Tasks</h4>
 										<div class="flex flex-wrap gap-1">
-											{#each memory.userProfile.currentGoals as goal}
+											{#each memory.userProfile.currentTasks as task}
 												<span 
 													class="inline-block px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded-full cursor-pointer hover:bg-blue-200 transition-colors" 
 													role="button"
 													tabindex="0"
-													onmouseenter={(e) => showTooltip(e, goal)}
+													onmouseenter={(e) => showTooltip(e, task)}
 													onmouseleave={hideTooltip}
 												>
-													{truncateText(goal)}
-												</span>
-											{/each}
-										</div>
-									</div>
-								{/if}
-
-								<!-- Recent Obsessions -->
-								{#if memory.userProfile.recentObsessions.length > 0}
-									<div class="mb-3">
-										<h4 class="text-sm font-medium text-orange-700 mb-2">Recent Obsessions</h4>
-										<div class="flex flex-wrap gap-1">
-											{#each memory.userProfile.recentObsessions as obsession}
-												<span 
-													class="inline-block px-2 py-1 text-xs bg-red-100 text-red-800 rounded-full cursor-pointer hover:bg-red-200 transition-colors" 
-													role="button"
-													tabindex="0"
-													onmouseenter={(e) => showTooltip(e, obsession)}
-													onmouseleave={hideTooltip}
-												>
-													{truncateText(obsession)}
-												</span>
-											{/each}
-										</div>
-									</div>
-								{/if}
-
-								<!-- Lifecycle Hints -->
-								{#if memory.userProfile.lifecycleHints.length > 0}
-									<div class="mb-3">
-										<h4 class="text-sm font-medium text-orange-700 mb-2">Life Events</h4>
-										<div class="flex flex-wrap gap-1">
-											{#each memory.userProfile.lifecycleHints as hint}
-												<span 
-													class="inline-block px-2 py-1 text-xs bg-indigo-100 text-indigo-800 rounded-full cursor-pointer hover:bg-indigo-200 transition-colors" 
-													role="button"
-													tabindex="0"
-													onmouseenter={(e) => showTooltip(e, hint)}
-													onmouseleave={hideTooltip}
-												>
-													{truncateText(hint)}
+													{truncateText(task)}
 												</span>
 											{/each}
 										</div>
@@ -442,13 +375,13 @@ function getMemoryBadge(): string {
 								{/if}
 
 								<!-- Current Interests -->
-								{#if memory.userProfile.interests.length > 0}
+								{#if memory.userProfile.currentInterests.length > 0}
 									<div class="mb-3">
-										<h4 class="text-sm font-medium text-orange-700 mb-2">Interests</h4>
+										<h4 class="text-sm font-medium text-orange-700 mb-2">Current Interests</h4>
 										<div class="flex flex-wrap gap-1">
-											{#each memory.userProfile.interests as interest}
+											{#each memory.userProfile.currentInterests as interest}
 												<span 
-													class="inline-block px-2 py-1 text-xs bg-green-100 text-green-800 rounded-full cursor-pointer hover:bg-green-200 transition-colors" 
+													class="inline-block px-2 py-1 text-xs bg-purple-100 text-purple-800 rounded-full cursor-pointer hover:bg-purple-200 transition-colors" 
 													role="button"
 													tabindex="0"
 													onmouseenter={(e) => showTooltip(e, interest)}
@@ -461,25 +394,6 @@ function getMemoryBadge(): string {
 									</div>
 								{/if}
 
-								<!-- Work Patterns -->
-								{#if memory.userProfile.workPatterns.length > 0}
-									<div class="mb-3">
-										<h4 class="text-sm font-medium text-orange-700 mb-2">Work Patterns</h4>
-										<div class="flex flex-wrap gap-1">
-											{#each memory.userProfile.workPatterns as pattern}
-												<span 
-													class="inline-block px-2 py-1 text-xs bg-yellow-100 text-yellow-800 rounded-full cursor-pointer hover:bg-yellow-200 transition-colors" 
-													role="button"
-													tabindex="0"
-													onmouseenter={(e) => showTooltip(e, `${pattern.type} - ${pattern.description}`)}
-													onmouseleave={hideTooltip}
-												>
-													{truncateText(pattern.type)}
-												</span>
-											{/each}
-										</div>
-									</div>
-								{/if}
 							</div>
 						</div>
 					{:else if activeTab === 'patterns'}

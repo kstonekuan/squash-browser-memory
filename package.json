@@ -11,8 +11,7 @@
 		"test:ui": "vitest --ui"
 	},
 	"dependencies": {
-		"@anthropic-ai/sdk": "0.55.0",
-		"string-similarity": "^4.0.4"
+		"@anthropic-ai/sdk": "0.55.0"
 	},
 	"devDependencies": {
 		"@biomejs/biome": "2.0.6",

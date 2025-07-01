@@ -18,11 +18,7 @@ export default defineConfig({
 					resolve(__dirname, "dist/manifest.json"),
 				);
 
-				// Copy background.js
-				copyFileSync(
-					resolve(__dirname, "background.js"),
-					resolve(__dirname, "dist/background.js"),
-				);
+				// background.js is built automatically by Vite
 
 				// Copy icons directory
 				const iconsDir = resolve(__dirname, "dist/icons");
@@ -30,7 +26,7 @@ export default defineConfig({
 
 				["16", "48", "128"].forEach((size) => {
 					copyFileSync(
-						resolve(__dirname, `icons/icon-${size}.svg`),
+						resolve(__dirname, `public/icons/icon-${size}.svg`),
 						resolve(iconsDir, `icon-${size}.svg`),
 					);
 				});
@@ -49,6 +45,7 @@ export default defineConfig({
 		rollupOptions: {
 			input: {
 				sidepanel: "sidepanel.html",
+				background: "src/background.ts",
 				"content-scripts/universal-context":
 					"content-scripts/universal-context.ts",
 			},
@@ -57,7 +54,6 @@ export default defineConfig({
 				chunkFileNames: "[name].js",
 				assetFileNames: "[name].[ext]",
 			},
-			external: ["string-similarity"],
 		},
 	},
 });

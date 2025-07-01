@@ -27,21 +27,16 @@ export interface ChunkTimeRange {
 }
 
 const MEMORY_KEY = "history_analysis_memory";
-const MEMORY_VERSION = "1.1.0"; // Added new UserProfile fields: currentGoals, recentObsessions, lifecycleHints, personalPreferences
+const MEMORY_VERSION = "1.4.0"; // Simplified structure: profession->coreIdentities, currentGoals->currentTasks, added currentInterests, removed lifecycleHints
 
 // Initialize empty memory
 export function createEmptyMemory(): AnalysisMemory {
 	return {
 		userProfile: {
-			profession: "Unknown",
-			interests: [],
-			currentGoals: [],
-			recentObsessions: [],
-			lifecycleHints: [],
+			coreIdentities: [],
 			personalPreferences: [],
-			workPatterns: [],
-			personalityTraits: [],
-			technologyUse: [],
+			currentTasks: [],
+			currentInterests: [],
 			summary: "No profile data yet.",
 		},
 		patterns: [],
@@ -122,18 +117,18 @@ export async function loadMemory(): Promise<AnalysisMemory | null> {
 			stored.lastHistoryTimestamp = 0;
 		}
 
-		// Handle new UserProfile fields (new in v1.1.0)
-		if (!stored.userProfile.currentGoals) {
-			stored.userProfile.currentGoals = [];
-		}
-		if (!stored.userProfile.recentObsessions) {
-			stored.userProfile.recentObsessions = [];
-		}
-		if (!stored.userProfile.lifecycleHints) {
-			stored.userProfile.lifecycleHints = [];
+		// Handle UserProfile fields (v1.4.0 structure)
+		if (!stored.userProfile.coreIdentities) {
+			stored.userProfile.coreIdentities = [];
 		}
 		if (!stored.userProfile.personalPreferences) {
 			stored.userProfile.personalPreferences = [];
+		}
+		if (!stored.userProfile.currentTasks) {
+			stored.userProfile.currentTasks = [];
+		}
+		if (!stored.userProfile.currentInterests) {
+			stored.userProfile.currentInterests = [];
 		}
 
 		// Validate the date conversion
