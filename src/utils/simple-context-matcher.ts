@@ -1,3 +1,4 @@
+import type { WorkflowPattern } from "../types";
 import type { AnalysisMemory } from "./memory";
 import { loadMemory } from "./memory";
 
@@ -6,6 +7,7 @@ export interface ContextSuggestion {
 	category: string;
 	relevanceScore: number;
 	matchType: "semantic" | "string";
+	workflowPattern?: WorkflowPattern; // Store full workflow pattern data when applicable
 }
 
 // Simple string similarity using Dice's coefficient (bigram similarity)
@@ -45,10 +47,32 @@ function calculateSimilarity(str1: string, str2: string): number {
 
 export class SimpleContextMatcher {
 	private memory: AnalysisMemory | null = null;
+	private preGeneratedContexts: Array<{
+		text: string;
+		category: string;
+		workflowPattern?: WorkflowPattern;
+	}> = [];
 
 	async initialize(): Promise<void> {
 		try {
 			this.memory = await loadMemory();
+			console.log("Memory loaded:", {
+				hasMemory: !!this.memory,
+				hasUserProfile: !!this.memory?.userProfile,
+				hasPatterns: !!this.memory?.patterns,
+				patternsCount: this.memory?.patterns?.length || 0,
+				patterns: this.memory?.patterns,
+			});
+
+			// Pre-generate contexts on initialization
+			this.preGeneratedContexts = this.extractContextsFromMemory();
+			console.log("Context suggestions pre-generated on content script load:", {
+				totalContexts: this.preGeneratedContexts.length,
+				workflowPatterns: this.preGeneratedContexts.filter(
+					(c) => c.category === "workflow",
+				).length,
+				contexts: this.preGeneratedContexts,
+			});
 		} catch (error) {
 			console.error("Failed to initialize context matcher:", error);
 		}
@@ -95,8 +119,8 @@ export class SimpleContextMatcher {
 		const suggestions: ContextSuggestion[] = [];
 		const inputLower = input.toLowerCase();
 
-		// Extract contexts from memory
-		const contexts = this.extractContextsFromMemory();
+		// Use pre-generated contexts instead of extracting each time
+		const contexts = this.preGeneratedContexts;
 
 		// Calculate similarity for each context
 		for (const context of contexts) {
@@ -111,6 +135,7 @@ export class SimpleContextMatcher {
 					category: context.category,
 					relevanceScore: similarity,
 					matchType: "string",
+					workflowPattern: context.workflowPattern,
 				});
 			}
 		}
@@ -152,16 +177,25 @@ export class SimpleContextMatcher {
 	private extractContextsFromMemory(): Array<{
 		text: string;
 		category: string;
+		workflowPattern?: WorkflowPattern;
 	}> {
 		if (!this.memory?.userProfile) return [];
 
-		const contexts: Array<{ text: string; category: string }> = [];
+		const contexts: Array<{
+			text: string;
+			category: string;
+			workflowPattern?: WorkflowPattern;
+		}> = [];
 		const profile = this.memory.userProfile;
 
 		// Helper function to safely add context
-		const addContext = (value: unknown, category: string) => {
+		const addContext = (
+			value: unknown,
+			category: string,
+			workflowPattern?: WorkflowPattern,
+		) => {
 			if (value && typeof value === "string" && value.trim()) {
-				contexts.push({ text: value.trim(), category });
+				contexts.push({ text: value.trim(), category, workflowPattern });
 			}
 		};
 
@@ -207,6 +241,22 @@ export class SimpleContextMatcher {
 
 		// Add summary as a single context item
 		addContext(profile.summary, "summary");
+
+		// Add workflow patterns - use description for lookup, store full pattern for insertion
+		if (this.memory.patterns && Array.isArray(this.memory.patterns)) {
+			console.log("Processing workflow patterns:", this.memory.patterns.length);
+			for (const pattern of this.memory.patterns) {
+				if (pattern && typeof pattern === "object" && pattern.description) {
+					addContext(pattern.description, "workflow", pattern);
+				}
+			}
+		} else {
+			console.log("No workflow patterns found in memory:", {
+				hasPatterns: !!this.memory?.patterns,
+				isArray: Array.isArray(this.memory?.patterns),
+				patterns: this.memory?.patterns,
+			});
+		}
 
 		return contexts;
 	}

@@ -21,11 +21,22 @@ interface ChatInputInfo {
 	addInputListener(callback: (text: string) => void): void;
 }
 
+interface WorkflowPattern {
+	pattern: string;
+	description: string;
+	frequency: number;
+	urls: string[];
+	timePattern?: string;
+	suggestion: string;
+	automationPotential: "high" | "medium" | "low";
+}
+
 interface ContextSuggestion {
 	text: string;
 	category: string;
 	relevanceScore: number;
 	matchType: "semantic" | "string";
+	workflowPattern?: WorkflowPattern;
 }
 
 type PlatformType = "chatgpt" | "claude" | "discord" | "slack" | "generic";
@@ -453,6 +464,11 @@ function compareTwoStrings(str1: string, str2: string): number {
 // Simple context matcher using string similarity only
 class SimpleContextMatcher {
 	private memory: MemoryData | null = null;
+	private preGeneratedContexts: Array<{
+		text: string;
+		category: string;
+		workflowPattern?: WorkflowPattern;
+	}> = [];
 
 	async initialize(): Promise<void> {
 		try {
@@ -462,6 +478,18 @@ class SimpleContextMatcher {
 				hasUserProfile: !!this.memory?.userProfile,
 				userProfile: this.memory?.userProfile,
 				memoryKeys: this.memory ? Object.keys(this.memory) : null,
+				hasPatterns: !!this.memory?.patterns,
+				patternsCount: this.memory?.patterns?.length || 0,
+			});
+
+			// Pre-generate contexts on initialization
+			this.preGeneratedContexts = this.extractContexts();
+			console.log("Context suggestions pre-generated on content script load:", {
+				totalContexts: this.preGeneratedContexts.length,
+				workflowPatterns: this.preGeneratedContexts.filter(
+					(c) => c.category === "workflow",
+				).length,
+				contexts: this.preGeneratedContexts,
 			});
 		} catch (error) {
 			console.error("Failed to initialize context matcher:", error);
@@ -507,8 +535,8 @@ class SimpleContextMatcher {
 		const suggestions: ContextSuggestion[] = [];
 		const inputLower = input.toLowerCase();
 
-		// Extract context from user profile
-		const contexts = this.extractContexts();
+		// Use pre-generated contexts instead of extracting each time
+		const contexts = this.preGeneratedContexts;
 
 		for (const context of contexts) {
 			try {
@@ -530,6 +558,7 @@ class SimpleContextMatcher {
 						category: context.category,
 						relevanceScore: similarity,
 						matchType: "string",
+						workflowPattern: context.workflowPattern,
 					});
 				}
 			} catch (error) {
@@ -572,17 +601,29 @@ class SimpleContextMatcher {
 			.slice(0, 5);
 	}
 
-	private extractContexts(): Array<{ text: string; category: string }> {
-		const contexts: Array<{ text: string; category: string }> = [];
+	private extractContexts(): Array<{
+		text: string;
+		category: string;
+		workflowPattern?: WorkflowPattern;
+	}> {
+		const contexts: Array<{
+			text: string;
+			category: string;
+			workflowPattern?: WorkflowPattern;
+		}> = [];
 
 		if (!this.memory?.userProfile) return contexts;
 
 		const profile = this.memory.userProfile;
 
 		// Helper function to safely add context
-		const addContext = (value: unknown, category: string) => {
+		const addContext = (
+			value: unknown,
+			category: string,
+			workflowPattern?: WorkflowPattern,
+		) => {
 			if (value && typeof value === "string" && value.trim()) {
-				contexts.push({ text: value.trim(), category });
+				contexts.push({ text: value.trim(), category, workflowPattern });
 			}
 		};
 
@@ -628,6 +669,26 @@ class SimpleContextMatcher {
 
 		// Add summary as a single context item
 		addContext(profile.summary, "summary");
+
+		// Add workflow patterns - use description for lookup, store full pattern for insertion
+		if (this.memory.patterns && Array.isArray(this.memory.patterns)) {
+			console.log("Processing workflow patterns:", this.memory.patterns.length);
+			for (const pattern of this.memory.patterns) {
+				if (pattern && typeof pattern === "object" && pattern.description) {
+					contexts.push({
+						text: pattern.description,
+						category: "workflow",
+						workflowPattern: pattern,
+					});
+				}
+			}
+		} else {
+			console.log("No workflow patterns found in memory:", {
+				hasPatterns: !!this.memory?.patterns,
+				isArray: Array.isArray(this.memory?.patterns),
+				patterns: this.memory?.patterns,
+			});
+		}
 
 		console.log("Extracted contexts:", contexts);
 		return contexts;
@@ -1145,11 +1206,25 @@ class ContextButtonInjector {
 	private selectSuggestion(suggestion: ContextSuggestion) {
 		if (!this.chatInput) return;
 
-		// Insert the suggestion text into the chat input
+		let textToInsert = suggestion.text;
+
+		// For workflow patterns, format the full pattern data instead of just the description
+		if (suggestion.category === "workflow" && suggestion.workflowPattern) {
+			const pattern = suggestion.workflowPattern;
+			textToInsert = `**Workflow Pattern: ${pattern.pattern}**
+Description: ${pattern.description}
+Frequency: ${pattern.frequency}x
+URLs: ${pattern.urls.join(", ")}
+${pattern.timePattern ? `Time Pattern: ${pattern.timePattern}` : ""}
+Suggestion: ${pattern.suggestion}
+Automation Potential: ${pattern.automationPotential}`;
+		}
+
+		// Insert the text into the chat input
 		const currentText = this.chatInput.getCurrentText();
 		const newText = currentText
-			? `${currentText} ${suggestion.text}`
-			: suggestion.text;
+			? `${currentText}\n\n${textToInsert}`
+			: textToInsert;
 
 		this.chatInput.insertText(newText);
 		this.hideSuggestions();
