@@ -22,20 +22,47 @@ let currentProvider = $state<AIProviderType>("chrome");
 let onlyNewHistory = $state(false);
 let lastHistoryTimestamp = $state(0);
 
-onMount(async () => {
-	try {
-		const config = await loadAIConfig();
-		currentProvider = config.provider;
+// Listen for storage changes to update provider
+onMount(() => {
+	// Load initial config
+	loadAIConfig()
+		.then((config) => {
+			currentProvider = config.provider;
+		})
+		.catch((error) => {
+			console.error("Failed to load AI config:", error);
+			currentProvider = "chrome"; // fallback
+		});
 
-		// Load memory to get the last analyzed timestamp
-		const memory = await loadMemory();
-		if (memory && memory.lastHistoryTimestamp > 0) {
-			lastHistoryTimestamp = memory.lastHistoryTimestamp;
+	// Load memory to get the last analyzed timestamp
+	loadMemory()
+		.then((memory) => {
+			if (memory && memory.lastHistoryTimestamp > 0) {
+				lastHistoryTimestamp = memory.lastHistoryTimestamp;
+			}
+		})
+		.catch((error) => {
+			console.error("Failed to load memory:", error);
+		});
+
+	// Listen for storage changes to update provider
+	const storageListener = (changes: {
+		[key: string]: chrome.storage.StorageChange;
+	}) => {
+		if (changes.ai_config) {
+			const newConfig = changes.ai_config.newValue;
+			if (newConfig?.provider) {
+				currentProvider = newConfig.provider;
+			}
 		}
-	} catch (error) {
-		console.error("Failed to load AI config or memory:", error);
-		currentProvider = "chrome"; // fallback
-	}
+	};
+
+	chrome.storage.onChanged.addListener(storageListener);
+
+	// Cleanup
+	return () => {
+		chrome.storage.onChanged.removeListener(storageListener);
+	};
 });
 
 function getPrivacyMessage(): string {
@@ -229,7 +256,7 @@ async function fetchHistory() {
 		{:else if isAmbientAnalysisRunning}
 			Ambient Analysis Running...
 		{:else}
-			Analyze History
+			Analyze History Now
 		{/if}
 	</button>
 	

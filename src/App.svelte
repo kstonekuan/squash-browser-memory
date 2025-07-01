@@ -349,11 +349,13 @@ onMount(() => {
 			{/key}
 
 			<div class="mt-4 pt-4 border-t border-gray-200">
-				<HistoryFetcher 
-					bind:isAnalyzing 
-					isAmbientAnalysisRunning={isAmbientAnalysisRunning}
-					on:analysis-request={handleAnalysis}
-				/>
+				{#key providerKey}
+					<HistoryFetcher 
+						bind:isAnalyzing 
+						isAmbientAnalysisRunning={isAmbientAnalysisRunning}
+						on:analysis-request={handleAnalysis}
+					/>
+				{/key}
 			</div>
 		</div>
 
