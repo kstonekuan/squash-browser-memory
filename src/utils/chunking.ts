@@ -76,6 +76,14 @@ export async function identifyChunks(
 
 	const prompt = buildChunkingPrompt(timestamps);
 
+	// Log the exact chunking prompt being sent to AI
+	console.log("\n=== CHUNKING PROMPT ===");
+	console.log("System Prompt:", customChunkPrompt || CHUNK_SYSTEM_PROMPT);
+	console.log("User Prompt:", prompt);
+	console.log("Prompt Length:", prompt.length, "characters");
+	console.log("Timestamp count:", timestamps.length);
+	console.log("======================\n");
+
 	const session = await createAISession(
 		customChunkPrompt || CHUNK_SYSTEM_PROMPT,
 	);
@@ -131,6 +139,13 @@ export async function identifyChunks(
 		console.log(
 			`Chunking LLM call completed in ${duration}s for ${items.length} items`,
 		);
+		console.log("\n=== CHUNKING RESPONSE ===");
+		console.log("Response Length:", response.length, "characters");
+		console.log(
+			"Response Preview (first 500 chars):",
+			response.substring(0, 500),
+		);
+		console.log("=========================\n");
 
 		let parsed: {
 			chunks?: Array<{
@@ -292,6 +307,14 @@ async function identifyChunksForBatch(
 
 	const prompt = buildChunkingPrompt(timestamps);
 
+	// Log the exact batch chunking prompt being sent to AI
+	console.log("\n=== BATCH CHUNKING PROMPT ===");
+	console.log("System Prompt:", customChunkPrompt || CHUNK_SYSTEM_PROMPT);
+	console.log("User Prompt:", prompt);
+	console.log("Prompt Length:", prompt.length, "characters");
+	console.log("Batch timestamp count:", timestamps.length);
+	console.log("=============================\n");
+
 	const session = await createAISession(
 		customChunkPrompt || CHUNK_SYSTEM_PROMPT,
 	);
@@ -347,6 +370,13 @@ async function identifyChunksForBatch(
 		console.log(
 			`Chunking LLM call completed in ${duration}s for ${items.length} items`,
 		);
+		console.log("\n=== CHUNKING RESPONSE ===");
+		console.log("Response Length:", response.length, "characters");
+		console.log(
+			"Response Preview (first 500 chars):",
+			response.substring(0, 500),
+		);
+		console.log("=========================\n");
 
 		let parsed: {
 			chunks?: Array<{

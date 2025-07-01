@@ -505,6 +505,15 @@ async function mergeAnalysisResults(
 		newResults,
 	);
 
+	// Log the exact merge prompt being sent to AI
+	console.log("\n=== MERGE PROMPT ===");
+	console.log("System Prompt:", customSystemPrompt || MERGE_SYSTEM_PROMPT);
+	console.log("User Prompt:", mergePrompt);
+	console.log("Prompt Length:", mergePrompt.length, "characters");
+	console.log("Existing patterns:", memory.patterns.length);
+	console.log("New patterns:", newResults.patterns.length);
+	console.log("===================\n");
+
 	const session = await createAISession(
 		customSystemPrompt || MERGE_SYSTEM_PROMPT,
 	);
@@ -535,6 +544,13 @@ async function mergeAnalysisResults(
 
 		console.log(`Merge LLM call completed in ${duration}s`);
 		console.log("Merge response received");
+		console.log("\n=== MERGE RESPONSE ===");
+		console.log("Response Length:", response.length, "characters");
+		console.log(
+			"Response Preview (first 500 chars):",
+			response.substring(0, 500),
+		);
+		console.log("======================\n");
 
 		// Notify that merge is complete
 		if (onProgress) {
@@ -928,6 +944,13 @@ async function analyzeChunk(
 	// Build the analysis prompt
 	const prompt = buildAnalysisPrompt(items, historyData);
 
+	// Log the exact prompt being sent to AI
+	console.log("\n=== ANALYSIS PROMPT ===");
+	console.log("System Prompt:", customSystemPrompt || ANALYSIS_SYSTEM_PROMPT);
+	console.log("User Prompt:", prompt);
+	console.log("Prompt Length:", prompt.length, "characters");
+	console.log("======================\n");
+
 	const session = await createAISession(
 		customSystemPrompt || ANALYSIS_SYSTEM_PROMPT,
 	);
@@ -945,10 +968,7 @@ async function analyzeChunk(
 					throw new Error("Analysis cancelled");
 				}
 				console.log("Sending analysis prompt to AI...");
-				console.log(
-					"Prompt:",
-					`${prompt}`,
-				);
+				console.log("Prompt:", `${prompt}`);
 				console.log(
 					"Using response schema:",
 					`${JSON.stringify(ANALYSIS_SCHEMA)}...`,
@@ -992,6 +1012,13 @@ async function analyzeChunk(
 			abortSignal,
 		);
 		console.log("Analysis response received");
+		console.log("\n=== ANALYSIS RESPONSE ===");
+		console.log("Response Length:", response.length, "characters");
+		console.log(
+			"Response Preview (first 500 chars):",
+			response.substring(0, 500),
+		);
+		console.log("=========================\n");
 
 		try {
 			// Clean the response to extract JSON from markdown if needed
