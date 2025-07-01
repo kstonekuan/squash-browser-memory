@@ -2,39 +2,7 @@ import { createAISession, promptAI } from "./ai-session-factory";
 import { buildChunkingPrompt, CHUNK_SYSTEM_PROMPT } from "./constants";
 import type { ChunkTimeRange, HistoryChunk } from "./memory";
 import { CHUNK_SCHEMA } from "./schemas";
-
-// Helper function to extract JSON from markdown-wrapped responses
-function extractJSONFromResponse(response: string): string {
-	// Remove markdown code fences if present
-	const codeBlockRegex = /```(?:json)?\s*([\s\S]*?)\s*```/;
-	const match = response.match(codeBlockRegex);
-
-	if (match) {
-		console.log(
-			"Found markdown-wrapped JSON in chunking response, extracting...",
-		);
-		return match[1].trim();
-	}
-
-	// If no code blocks, try to find JSON object boundaries
-	const jsonStartIndex = response.indexOf("{");
-	const jsonEndIndex = response.lastIndexOf("}");
-
-	if (
-		jsonStartIndex !== -1 &&
-		jsonEndIndex !== -1 &&
-		jsonEndIndex > jsonStartIndex
-	) {
-		const extractedJson = response.substring(jsonStartIndex, jsonEndIndex + 1);
-		if (extractedJson !== response.trim()) {
-			console.log("Extracted JSON from mixed content chunking response");
-		}
-		return extractedJson;
-	}
-
-	// Return as-is if no extraction needed
-	return response.trim();
-}
+import { extractJSONFromResponse, retryWithBackoff } from "./shared-utils";
 
 export interface ChunkingResult {
 	timeRanges: ChunkTimeRange[];
@@ -96,36 +64,6 @@ export async function identifyChunks(
 			isFallback: true,
 		};
 	}
-
-	// Helper for retrying on quota errors
-	const retryWithBackoff = async <T>(
-		fn: () => Promise<T>,
-		maxRetries = 3,
-		baseDelay = 2000,
-	): Promise<T> => {
-		for (let i = 0; i < maxRetries; i++) {
-			try {
-				return await fn();
-			} catch (error) {
-				const isLastAttempt = i === maxRetries - 1;
-
-				// Only retry on quota errors
-				if (
-					!(
-						error instanceof DOMException && error.name === "QuotaExceededError"
-					) ||
-					isLastAttempt
-				) {
-					throw error;
-				}
-
-				// Exponential backoff: 2s, 4s, 8s
-				const delay = baseDelay * 2 ** i;
-				await new Promise((resolve) => setTimeout(resolve, delay));
-			}
-		}
-		throw new Error("Max retries exceeded");
-	};
 
 	try {
 		const startTime = performance.now();
@@ -327,36 +265,6 @@ async function identifyChunksForBatch(
 			isFallback: true,
 		};
 	}
-
-	// Helper for retrying on quota errors
-	const retryWithBackoff = async <T>(
-		fn: () => Promise<T>,
-		maxRetries = 3,
-		baseDelay = 2000,
-	): Promise<T> => {
-		for (let i = 0; i < maxRetries; i++) {
-			try {
-				return await fn();
-			} catch (error) {
-				const isLastAttempt = i === maxRetries - 1;
-
-				// Only retry on quota errors
-				if (
-					!(
-						error instanceof DOMException && error.name === "QuotaExceededError"
-					) ||
-					isLastAttempt
-				) {
-					throw error;
-				}
-
-				// Exponential backoff: 2s, 4s, 8s
-				const delay = baseDelay * 2 ** i;
-				await new Promise((resolve) => setTimeout(resolve, delay));
-			}
-		}
-		throw new Error("Max retries exceeded");
-	};
 
 	try {
 		const startTime = performance.now();

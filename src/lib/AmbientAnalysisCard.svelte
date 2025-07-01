@@ -31,6 +31,25 @@ $effect(() => {
 	return unsubscribe;
 });
 
+// Query actual alarm time on mount and when enabled
+$effect(() => {
+	if (settings.enabled) {
+		chrome.runtime
+			.sendMessage({ type: "query-next-alarm-time" })
+			.then((response) => {
+				if (response?.nextRunTime) {
+					ambientSettings.update((s) => ({
+						...s,
+						nextAlarmTime: response.nextRunTime,
+					}));
+				}
+			})
+			.catch(() => {
+				// Ignore errors - background might not be ready
+			});
+	}
+});
+
 async function toggleAmbientAnalysis() {
 	toggling = true;
 	try {
@@ -90,6 +109,15 @@ function getStatusColor() {
 }
 
 function getNextAnalysisTime(): string {
+	// If we have the actual alarm time, use it
+	if (settings.nextAlarmTime) {
+		return new Date(settings.nextAlarmTime).toLocaleTimeString([], {
+			hour: "2-digit",
+			minute: "2-digit",
+		});
+	}
+
+	// Otherwise, estimate based on last run
 	if (!settings.lastRunTimestamp) {
 		// First run will be in 1 minute
 		const nextTime = new Date(Date.now() + 60000);

@@ -10,6 +10,7 @@ export interface AutoAnalysisSettings {
 	lastRunTimestamp?: number;
 	lastRunStatus?: "success" | "error";
 	lastRunError?: string;
+	nextAlarmTime?: number; // Actual scheduled Chrome alarm time
 }
 
 // Default settings

@@ -369,10 +369,6 @@ onMount(() => {
 			isAmbientAnalysis={isAmbientAnalysisRunning}
 		/>
 
-		{#if analysisResult}
-			<AnalysisResults result={analysisResult} onDismiss={handleDismissAnalysis} />
-		{/if}
-
 		<!-- Memory Viewer -->
 		<MemoryViewer autoExpand={memoryAutoExpand} />
 
@@ -390,13 +386,17 @@ onMount(() => {
 			</button>
 		</CollapsibleSection>
 
-		<!-- Advanced Settings (no longer wrapped in Developer Tools) -->
+		<!-- Advanced Settings -->
 		<div class="mt-4">
 			<AdvancedSettings 
 				onPromptsChange={handlePromptsChange}
 				onProviderChange={handleProviderChange}
 			/>
 		</div>
+
+		{#if analysisResult}
+			<AnalysisResults result={analysisResult} onDismiss={handleDismissAnalysis} />
+		{/if}
 	</div>
 </main>
 

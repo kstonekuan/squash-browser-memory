@@ -12,6 +12,7 @@ interface AutoAnalysisSettings {
 	lastRunTimestamp?: number;
 	lastRunStatus?: "success" | "error";
 	lastRunError?: string;
+	nextAlarmTime?: number; // Actual scheduled Chrome alarm time
 }
 
 // Default settings
@@ -310,7 +311,14 @@ let isAmbientAnalysisRunning = false;
 chrome.runtime.onMessage.addListener((request, _sender, sendResponse) => {
 	if (request.type === "toggle-auto-analysis") {
 		handleAutoAnalysisToggle(request.enabled)
-			.then(() => sendResponse({ success: true }))
+			.then(async () => {
+				// Get the next alarm time after toggling
+				const alarm = await chrome.alarms.get(ALARM_NAME);
+				sendResponse({
+					success: true,
+					nextRunTime: alarm ? alarm.scheduledTime : null,
+				});
+			})
 			.catch((error) => sendResponse({ success: false, error: error.message }));
 		return true; // Keep the message channel open for async response
 	}
@@ -327,6 +335,17 @@ chrome.runtime.onMessage.addListener((request, _sender, sendResponse) => {
 	if (request.type === "query-ambient-analysis-status") {
 		sendResponse({ isRunning: isAmbientAnalysisRunning });
 		return false; // Synchronous response
+	}
+
+	// Query next alarm time
+	if (request.type === "query-next-alarm-time") {
+		chrome.alarms.get(ALARM_NAME).then((alarm) => {
+			sendResponse({
+				nextRunTime: alarm ? alarm.scheduledTime : null,
+				alarmExists: !!alarm,
+			});
+		});
+		return true; // Async response
 	}
 
 	// Handle ambient analysis completion from side panel
@@ -348,6 +367,18 @@ chrome.runtime.onMessage.addListener((request, _sender, sendResponse) => {
 				);
 			}
 
+			// Get the next alarm time after completion
+			const alarm = await chrome.alarms.get(ALARM_NAME);
+			if (alarm) {
+				await saveAutoAnalysisSettings({
+					...settings,
+					lastRunTimestamp: Date.now(),
+					lastRunStatus: request.success ? "success" : "error",
+					lastRunError: request.error,
+					nextAlarmTime: alarm.scheduledTime,
+				});
+			}
+
 			isAmbientAnalysisRunning = false;
 			await broadcastAmbientAnalysisStatus("completed", {
 				itemCount: request.itemCount,
@@ -363,16 +394,29 @@ chrome.runtime.onMessage.addListener((request, _sender, sendResponse) => {
 // Handle toggling auto-analysis
 async function handleAutoAnalysisToggle(enabled: boolean) {
 	if (enabled) {
+		// Clear any existing alarm first
+		await chrome.alarms.clear(ALARM_NAME);
+
 		// Create the alarm if enabling
 		await chrome.alarms.create(ALARM_NAME, {
 			delayInMinutes: 1,
 			periodInMinutes: 60,
 		});
-		console.log("Auto-analysis enabled");
+
+		// Verify the alarm was created
+		const alarm = await chrome.alarms.get(ALARM_NAME);
+		if (alarm) {
+			console.log(
+				`Auto-analysis enabled. Next run: ${new Date(alarm.scheduledTime).toLocaleString()}`,
+			);
+		} else {
+			console.error("Failed to create ambient analysis alarm");
+			throw new Error("Failed to create alarm");
+		}
 	} else {
 		// Clear the alarm if disabling
-		await chrome.alarms.clear(ALARM_NAME);
-		console.log("Auto-analysis disabled");
+		const cleared = await chrome.alarms.clear(ALARM_NAME);
+		console.log(`Auto-analysis disabled. Alarm cleared: ${cleared}`);
 	}
 }
 

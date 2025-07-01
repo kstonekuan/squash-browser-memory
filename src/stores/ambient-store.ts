@@ -48,31 +48,46 @@ chrome.storage.onChanged.addListener((changes, areaName) => {
 
 // Helper function to toggle ambient analysis
 export async function toggleAmbientAnalysis(): Promise<void> {
-	ambientSettings.update((settings) => ({
-		...settings,
-		enabled: !settings.enabled,
-	}));
-
-	// Get current settings
+	// Get current settings first
 	let currentSettings: AutoAnalysisSettings;
 	const unsubscribe = ambientSettings.subscribe((s) => {
 		currentSettings = s;
 	});
 	unsubscribe();
 
+	const newEnabled = !currentSettings!.enabled;
+
+	// Update settings - if enabling, clear lastRunTimestamp to show "first run"
+	ambientSettings.update((settings) => ({
+		...settings,
+		enabled: newEnabled,
+		// Clear timestamp when enabling so UI shows "First analysis will run in 1 minute"
+		...(newEnabled ? { lastRunTimestamp: undefined } : {}),
+	}));
+
 	// Send message to background script
 	const response = await chrome.runtime.sendMessage({
 		type: "toggle-auto-analysis",
-		enabled: currentSettings!.enabled,
+		enabled: newEnabled,
 	});
 
 	if (!response?.success) {
 		// Revert on error
 		ambientSettings.update((settings) => ({
 			...settings,
-			enabled: !settings.enabled,
+			enabled: !newEnabled,
+			// Restore previous timestamp if reverting
+			lastRunTimestamp: currentSettings!.lastRunTimestamp,
 		}));
 		throw new Error(response?.error || "Failed to update auto-analysis");
+	}
+
+	// If we have the actual next run time from the alarm, store it
+	if (response.nextRunTime && newEnabled) {
+		ambientSettings.update((settings) => ({
+			...settings,
+			nextAlarmTime: response.nextRunTime,
+		}));
 	}
 }
 

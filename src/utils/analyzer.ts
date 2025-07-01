@@ -23,43 +23,18 @@ import {
 	saveMemory,
 } from "./memory";
 import { ANALYSIS_SCHEMA } from "./schemas";
+import {
+	calculateOptimalChunkSize,
+	extractJSONFromResponse,
+	getMostRecentTimestamp,
+	retryWithBackoff,
+} from "./shared-utils";
 
 // Re-export clearMemory for use in UI
 export { clearMemory } from "./memory";
 
 // Export for testing
 export { hideTrackingParams };
-
-// Helper function to extract JSON from markdown-wrapped responses
-function extractJSONFromResponse(response: string): string {
-	// Remove markdown code fences if present
-	const codeBlockRegex = /```(?:json)?\s*([\s\S]*?)\s*```/;
-	const match = response.match(codeBlockRegex);
-
-	if (match) {
-		console.log("Found markdown-wrapped JSON, extracting...");
-		return match[1].trim();
-	}
-
-	// If no code blocks, try to find JSON object boundaries
-	const jsonStartIndex = response.indexOf("{");
-	const jsonEndIndex = response.lastIndexOf("}");
-
-	if (
-		jsonStartIndex !== -1 &&
-		jsonEndIndex !== -1 &&
-		jsonEndIndex > jsonStartIndex
-	) {
-		const extractedJson = response.substring(jsonStartIndex, jsonEndIndex + 1);
-		if (extractedJson !== response.trim()) {
-			console.log("Extracted JSON from mixed content response");
-		}
-		return extractedJson;
-	}
-
-	// Return as-is if no extraction needed
-	return response.trim();
-}
 
 // Calculate statistics from Chrome history items
 export function calculateStats(items: chrome.history.HistoryItem[]): {
@@ -263,11 +238,7 @@ export async function analyzeHistoryItems(
 			// Update memory with merged results
 			if (results) {
 				// Find the most recent timestamp in this chunk
-				const chunkTimestamps = chunk.items
-					.map((item) => item.lastVisitTime || 0)
-					.filter((time) => time > 0);
-				const mostRecentInChunk =
-					chunkTimestamps.length > 0 ? Math.max(...chunkTimestamps) : 0;
+				const mostRecentInChunk = getMostRecentTimestamp(chunk.items);
 
 				memory = {
 					userProfile: results.userProfile,
@@ -336,69 +307,6 @@ export async function analyzeHistoryItems(
 		chunkingRawResponse: chunkingResult.rawResponse,
 		chunkingError: chunkingResult.error,
 	};
-}
-
-// Helper function to retry with exponential backoff
-async function retryWithBackoff<T>(
-	fn: () => Promise<T>,
-	maxRetries: number = 3,
-	baseDelay: number = 2000,
-	onProgress?: ProgressCallback,
-	abortSignal?: AbortSignal,
-): Promise<T> {
-	for (let i = 0; i < maxRetries; i++) {
-		try {
-			return await fn();
-		} catch (error) {
-			const isLastAttempt = i === maxRetries - 1;
-
-			// Only retry on quota errors, not on other errors
-			if (
-				!(
-					error instanceof DOMException && error.name === "QuotaExceededError"
-				) ||
-				isLastAttempt
-			) {
-				throw error;
-			}
-
-			// Exponential backoff: 2s, 4s, 8s
-			const delay = baseDelay * 2 ** i;
-			const retryMessage = `Quota exceeded. Retrying in ${delay / 1000} seconds...`;
-			console.log(retryMessage);
-
-			if (onProgress) {
-				onProgress({
-					phase: "retrying",
-					retryMessage,
-				});
-			}
-
-			// Check if already aborted before waiting
-			if (abortSignal?.aborted) {
-				throw new Error("Analysis cancelled");
-			}
-
-			// Wait with abort support
-			await new Promise<void>((resolve, reject) => {
-				const timeout = setTimeout(resolve, delay);
-
-				if (abortSignal) {
-					const abortHandler = () => {
-						clearTimeout(timeout);
-						reject(new Error("Analysis cancelled during retry"));
-					};
-
-					if (abortSignal.aborted) {
-						abortHandler();
-					} else {
-						abortSignal.addEventListener("abort", abortHandler, { once: true });
-					}
-				}
-			});
-		}
-	}
-	throw new Error("Max retries exceeded");
 }
 
 // Hide tracking URL parameters to reduce token usage and protect privacy
@@ -713,98 +621,56 @@ async function analyzeChunkWithSubdivision(
 		}
 
 		// Need to subdivide the chunk
-
-		// Binary search for the right size using the AI API
-		const session = await createAISession(analysisSystemPrompt);
-
-		if (!session) {
-			throw new Error("AI is not available for measuring tokens.");
-		}
+		console.log("Chunk too large, calculating optimal subdivision size...");
 
 		// Get provider capabilities for optimal chunking
 		const config = await loadAIConfig();
 		const provider = getProvider(config);
 		const capabilities = provider.getCapabilities();
 
-		// For Chrome AI, get the actual quota from the session
+		// Create a session for token measurement
+		const session = await createAISession(analysisSystemPrompt);
+		if (!session) {
+			throw new Error("AI is not available for measuring tokens.");
+		}
+
+		// Determine max tokens
 		let maxTokens = capabilities.optimalChunkTokens;
 		if (session.inputQuota !== undefined && session.inputUsage !== undefined) {
-			const quota = session.inputQuota;
-			const currentUsage = session.inputUsage;
-			const availableTokens = quota - currentUsage;
-			console.log(
-				`Chrome AI session: quota=${quota}, currentUsage=${currentUsage}, available=${availableTokens}`,
-			);
-			// Use all available tokens (inputQuota is only for input, not output)
+			const availableTokens = session.inputQuota - session.inputUsage;
+			console.log(`Chrome AI available tokens: ${availableTokens}`);
 			maxTokens = availableTokens;
 		}
 
-		let left = 1;
-		let right = items.length;
-		let optimalSize = 1; // Start with minimum of 1 item
-
-		try {
-			while (left <= right) {
-				const mid = Math.floor((left + right) / 2);
-				const testItems = items.slice(0, mid);
-				const testData = testHistoryData.slice(0, mid);
-				const testPrompt = buildAnalysisPrompt(testItems, testData);
-
-				try {
-					if (
-						capabilities.supportsTokenMeasurement &&
-						session.measureInputUsage
-					) {
-						const testTokenCount = await session.measureInputUsage(testPrompt, {
-							responseConstraint: ANALYSIS_SCHEMA,
-							signal: abortSignal,
-						});
-						console.log(
-							`Testing ${mid} items: ${testTokenCount} tokens (${provider.getProviderName()})`,
-						);
-
-						// Use dynamic token limit
-						if (testTokenCount <= maxTokens) {
-							optimalSize = mid;
-							left = mid + 1;
-						} else {
-							right = mid - 1;
-						}
-					} else {
-						// If provider doesn't support token measurement, use a conservative approach
-						// For Claude: estimate ~4 chars per token, ~50 tokens per item average
-						// For others: use very conservative estimate
-						const tokensPerItem = provider.getProviderName().includes("Claude")
-							? 50
-							: 25;
-						const estimatedTokens = mid * tokensPerItem;
-
-						console.log(
-							`Estimating ${mid} items = ${estimatedTokens} tokens (${provider.getProviderName()})`,
-						);
-
-						if (estimatedTokens <= maxTokens) {
-							optimalSize = mid;
-							left = mid + 1;
-						} else {
-							right = mid - 1;
-						}
-					}
-				} catch {
-					// If measurement fails, assume it's too large
-					console.log(
-						`Measurement failed for ${mid} items, assuming too large`,
-					);
-					right = mid - 1;
+		// Calculate optimal size using binary search
+		const optimalSize = await calculateOptimalChunkSize(
+			items,
+			maxTokens,
+			async (testItems) => {
+				if (
+					!capabilities.supportsTokenMeasurement ||
+					!session.measureInputUsage
+				) {
+					// Fallback to estimation
+					const tokensPerItem = provider.getProviderName().includes("Claude")
+						? 50
+						: 25;
+					return testItems.length * tokensPerItem;
 				}
-			}
 
-			console.log(
-				`Optimal subdivision size: ${optimalSize} items per sub-chunk`,
-			);
-		} finally {
-			session.destroy();
-		}
+				const testData = testHistoryData.slice(0, testItems.length);
+				const testPrompt = buildAnalysisPrompt(testItems, testData);
+				return await session.measureInputUsage(testPrompt, {
+					responseConstraint: ANALYSIS_SCHEMA,
+					signal: abortSignal,
+				});
+			},
+			provider.getProviderName().includes("Claude") ? 50 : 25,
+			abortSignal,
+		);
+
+		session.destroy();
+		console.log(`Optimal subdivision size: ${optimalSize} items per sub-chunk`);
 
 		// Process in sub-chunks
 		let currentMemory = memory;
@@ -861,11 +727,7 @@ async function analyzeChunkWithSubdivision(
 
 			// Update memory with merged results
 			// Find the most recent timestamp in this sub-chunk
-			const subChunkTimestamps = subItems
-				.map((item) => item.lastVisitTime || 0)
-				.filter((time) => time > 0);
-			const mostRecentInSubChunk =
-				subChunkTimestamps.length > 0 ? Math.max(...subChunkTimestamps) : 0;
+			const mostRecentInSubChunk = getMostRecentTimestamp(subItems);
 
 			currentMemory = {
 				userProfile: mergedResults.userProfile,
@@ -1008,7 +870,9 @@ async function analyzeChunk(
 			},
 			3,
 			2000,
-			onProgress,
+			onProgress
+				? (retryMessage) => onProgress({ phase: "retrying", retryMessage })
+				: undefined,
 			abortSignal,
 		);
 		console.log("Analysis response received");
@@ -1073,81 +937,7 @@ async function analyzeChunk(
 				`...${response.substring(response.length - 200)}`,
 			);
 
-			// Try to salvage the response by finding the last complete JSON object
-			if (
-				error instanceof SyntaxError &&
-				error.message.includes("Unterminated string")
-			) {
-				console.log("Attempting to salvage truncated JSON response...");
-
-				// Try to find the last complete object by looking for closing braces
-				let lastValidIndex = response.length;
-				let braceCount = 0;
-				let inString = false;
-				let escapeNext = false;
-
-				for (let i = 0; i < response.length; i++) {
-					const char = response[i];
-
-					if (escapeNext) {
-						escapeNext = false;
-						continue;
-					}
-
-					if (char === "\\") {
-						escapeNext = true;
-						continue;
-					}
-
-					if (char === '"' && !escapeNext) {
-						inString = !inString;
-						continue;
-					}
-
-					if (!inString) {
-						if (char === "{") braceCount++;
-						else if (char === "}") {
-							braceCount--;
-							if (braceCount === 0) {
-								lastValidIndex = i + 1;
-							}
-						}
-					}
-				}
-
-				if (lastValidIndex < response.length && lastValidIndex > 100) {
-					const truncatedResponse = response.substring(0, lastValidIndex);
-					console.log(
-						"Attempting to parse truncated response at index",
-						lastValidIndex,
-					);
-
-					try {
-						const salvaged = JSON.parse(truncatedResponse);
-						console.log("Successfully salvaged truncated response!");
-
-						// Return with default patterns if needed
-						return {
-							patterns: salvaged.patterns || [],
-							userProfile: salvaged.userProfile || {
-								profession: "Unknown",
-								interests: [],
-								workPatterns: [],
-								personalityTraits: [],
-								technologyUse: [],
-								summary:
-									"Analysis was partially completed due to response truncation.",
-							},
-						};
-					} catch (salvageError) {
-						console.error(
-							"Failed to salvage truncated response:",
-							salvageError,
-						);
-					}
-				}
-			}
-
+			// Let the error propagate - no complex recovery
 			throw error;
 		}
 	} finally {
