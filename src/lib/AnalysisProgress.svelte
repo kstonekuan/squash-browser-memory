@@ -16,6 +16,7 @@ let {
 	retryMessage = "",
 	onCancel,
 	subPhase = undefined,
+	isAmbientAnalysis = false,
 } = $props<{
 	phase: AnalysisPhase;
 	chunkProgress?: {
@@ -26,6 +27,7 @@ let {
 	retryMessage?: string;
 	onCancel?: () => void;
 	subPhase?: SubPhase;
+	isAmbientAnalysis?: boolean;
 }>();
 
 const phases = [
@@ -82,17 +84,35 @@ function getSubPhaseIcon(subPhase: SubPhase | undefined): string {
 }
 </script>
 
-{#if phase !== 'idle'}
+{#if phase !== 'idle' || isAmbientAnalysis}
 	<div class="bg-white rounded-lg shadow-md p-6 mb-8">
-		<h3 class="text-lg font-semibold text-gray-900 mb-4">Analysis Progress</h3>
+		<h3 class="text-lg font-semibold text-gray-900 mb-4">
+			{isAmbientAnalysis ? 'Ambient Analysis in Progress' : 'Analysis Progress'}
+		</h3>
 		
-		<div class="relative">
-			<!-- Progress line -->
-			<div class="absolute top-5 left-0 right-0 h-0.5 bg-gray-200"></div>
-			<div 
-				class="absolute top-5 left-0 h-0.5 bg-blue-600 transition-all duration-500"
-				style="width: {phase === 'error' ? '0%' : `${(getPhaseIndex(phase) + 1) / phases.length * 100}%`}"
-			></div>
+		{#if isAmbientAnalysis && phase === 'idle'}
+			<!-- Show pulsing animation for ambient analysis -->
+			<div class="flex flex-col items-center py-8">
+				<div class="mb-4">
+					<div class="animate-pulse rounded-full h-16 w-16 bg-blue-100 flex items-center justify-center">
+						<svg class="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+						</svg>
+					</div>
+				</div>
+				<p class="text-sm text-gray-600 text-center">
+					Analyzing your browsing history in the background...<br/>
+					<span class="text-xs text-gray-500 mt-1">This happens automatically every hour</span>
+				</p>
+			</div>
+		{:else}
+			<div class="relative">
+				<!-- Progress line -->
+				<div class="absolute top-5 left-0 right-0 h-0.5 bg-gray-200"></div>
+				<div 
+					class="absolute top-5 left-0 h-0.5 bg-blue-600 transition-all duration-500"
+					style="width: {phase === 'error' ? '0%' : `${(getPhaseIndex(phase) + 1) / phases.length * 100}%`}"
+				></div>
 			
 			<!-- Phase indicators -->
 			<div class="relative flex justify-between">
@@ -141,6 +161,7 @@ function getSubPhaseIcon(subPhase: SubPhase | undefined): string {
 				{/each}
 			</div>
 		</div>
+		{/if}
 		
 		{#if phase === 'retrying' && retryMessage}
 			<div class="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">

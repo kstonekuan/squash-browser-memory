@@ -1,43 +1,42 @@
 <script lang="ts">
-import { onMount } from "svelte";
 import {
-	type AutoAnalysisSettings,
-	loadAutoAnalysisSettings,
-	saveAutoAnalysisSettings,
-} from "../utils/ambient";
+	ambientSettings,
+	toggleAmbientAnalysis as toggleAmbient,
+} from "../stores/ambient-store";
+import type { AutoAnalysisSettings } from "../utils/ambient";
+
+let { analysisStatus = { status: "idle" } } = $props<{
+	analysisStatus?: {
+		status: "idle" | "running" | "completed" | "skipped" | "error";
+		message?: string;
+		itemCount?: number;
+		reason?: string;
+	};
+}>();
 
 let settings = $state<AutoAnalysisSettings>({
 	enabled: false,
 	notifyOnSuccess: true,
 	notifyOnError: true,
 });
-let loading = $state(true);
+let loading = $state(false);
 let toggling = $state(false);
 
-onMount(async () => {
-	settings = await loadAutoAnalysisSettings();
-	loading = false;
+// Subscribe to the store
+$effect(() => {
+	const unsubscribe = ambientSettings.subscribe((value) => {
+		settings = value;
+	});
+
+	return unsubscribe;
 });
 
 async function toggleAmbientAnalysis() {
 	toggling = true;
 	try {
-		settings.enabled = !settings.enabled;
-		await saveAutoAnalysisSettings(settings);
-
-		// Send message to background script to update alarm
-		const response = await chrome.runtime.sendMessage({
-			type: "toggle-auto-analysis",
-			enabled: settings.enabled,
-		});
-
-		if (!response?.success) {
-			throw new Error(response?.error || "Failed to update auto-analysis");
-		}
+		await toggleAmbient();
 	} catch (error) {
 		console.error("Failed to toggle ambient analysis:", error);
-		// Revert the toggle on error
-		settings.enabled = !settings.enabled;
 		alert("Failed to update ambient analysis settings");
 	} finally {
 		toggling = false;
@@ -68,15 +67,52 @@ function formatLastRunTime(): string {
 
 function getStatusIcon() {
 	if (loading) return "⏳";
-	if (settings.lastRunStatus === "error") return "❌";
+	if (analysisStatus.status === "running") return "🔄";
+	if (analysisStatus.status === "completed") return "✨";
+	if (analysisStatus.status === "skipped") return "⏭️";
+	if (analysisStatus.status === "error" || settings.lastRunStatus === "error")
+		return "❌";
 	if (settings.enabled) return "✅";
 	return "⏸️";
 }
 
 function getStatusColor() {
-	if (settings.lastRunStatus === "error") return "text-red-600 bg-red-50";
+	if (analysisStatus.status === "running")
+		return "text-blue-600 bg-blue-50 animate-pulse";
+	if (analysisStatus.status === "completed")
+		return "text-green-600 bg-green-50";
+	if (analysisStatus.status === "skipped")
+		return "text-yellow-600 bg-yellow-50";
+	if (analysisStatus.status === "error" || settings.lastRunStatus === "error")
+		return "text-red-600 bg-red-50";
 	if (settings.enabled) return "text-blue-600 bg-blue-50";
 	return "text-gray-600 bg-gray-50";
+}
+
+function getNextAnalysisTime(): string {
+	if (!settings.lastRunTimestamp) {
+		// First run will be in 1 minute
+		const nextTime = new Date(Date.now() + 60000);
+		return nextTime.toLocaleTimeString([], {
+			hour: "2-digit",
+			minute: "2-digit",
+		});
+	} else {
+		// Calculate next hourly run
+		const lastRun = new Date(settings.lastRunTimestamp);
+		const nextRun = new Date(lastRun.getTime() + 3600000); // Add 1 hour
+
+		// If next run is in the past, calculate the next future slot
+		let nextTime = nextRun;
+		while (nextTime.getTime() <= Date.now()) {
+			nextTime = new Date(nextTime.getTime() + 3600000);
+		}
+
+		return nextTime.toLocaleTimeString([], {
+			hour: "2-digit",
+			minute: "2-digit",
+		});
+	}
 }
 </script>
 
@@ -168,15 +204,49 @@ function getStatusColor() {
 		</div>
 	</div>
 
+	{#if analysisStatus.status !== "idle"}
+		<div class="mt-3 p-3 rounded-lg border-2 {
+			analysisStatus.status === 'running' ? 'border-blue-400 bg-blue-50' :
+			analysisStatus.status === 'completed' ? 'border-green-400 bg-green-50' :
+			analysisStatus.status === 'skipped' ? 'border-yellow-400 bg-yellow-50' :
+			analysisStatus.status === 'error' ? 'border-red-400 bg-red-50' : ''
+		}">
+			<div class="flex items-center gap-2">
+				<span class="text-lg {analysisStatus.status === 'running' ? 'animate-spin' : ''}">{getStatusIcon()}</span>
+				<div class="flex-1">
+					<p class="text-sm font-medium {
+						analysisStatus.status === 'running' ? 'text-blue-900' :
+						analysisStatus.status === 'completed' ? 'text-green-900' :
+						analysisStatus.status === 'skipped' ? 'text-yellow-900' :
+						analysisStatus.status === 'error' ? 'text-red-900' : ''
+					}">
+						{analysisStatus.message || 
+							(analysisStatus.status === 'running' ? 'Analyzing...' :
+							 analysisStatus.status === 'completed' ? 'Analysis completed' :
+							 analysisStatus.status === 'skipped' ? 'Analysis skipped' :
+							 'Analysis failed')}
+					</p>
+					{#if analysisStatus.itemCount !== undefined}
+						<p class="text-xs text-gray-600 mt-1">
+							Processed {analysisStatus.itemCount} new history items
+						</p>
+					{/if}
+					{#if analysisStatus.reason === "no-new-history"}
+						<p class="text-xs text-gray-600 mt-1">
+							Your browsing patterns haven't changed since the last analysis
+						</p>
+					{/if}
+				</div>
+			</div>
+		</div>
+	{/if}
+
 	{#if settings.enabled}
 		<div class="mt-3 p-3 rounded-lg {getStatusColor()}">
 			<p class="text-xs">
-				<strong>Next analysis:</strong> Within the next 
-				{#if settings.lastRunTimestamp}
-					{@const nextRun = 60 - Math.floor((Date.now() - settings.lastRunTimestamp) / 60000) % 60}
-					{nextRun} minute{nextRun !== 1 ? "s" : ""}
-				{:else}
-					60 minutes
+				<strong>Next analysis:</strong> {getNextAnalysisTime()}
+				{#if !settings.lastRunTimestamp}
+					<span class="text-gray-500">(first run)</span>
 				{/if}
 			</p>
 			<p class="text-xs mt-1">

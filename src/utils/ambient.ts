@@ -1,7 +1,7 @@
 /// <reference types="@types/dom-chromium-ai" />
 
 // Settings key for auto-analysis configuration
-const AUTO_ANALYSIS_SETTINGS_KEY = "auto_analysis_settings";
+export const AUTO_ANALYSIS_SETTINGS_KEY = "auto_analysis_settings";
 
 export interface AutoAnalysisSettings {
 	enabled: boolean;

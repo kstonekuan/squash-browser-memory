@@ -9,12 +9,7 @@
 		"src/utils/platform-adapter.ts",
 		"src/utils/simple-context-matcher.ts"
 	],
-	"ignoreDependencies": [
-		"@tailwindcss/forms",
-		"tailwindcss",
-		"@types/chrome",
-		"vite-plugin-web-extension"
-	],
+	"ignoreDependencies": ["@tailwindcss/forms", "tailwindcss", "@types/chrome"],
 	"ignoreExportsUsedInFile": {
 		"interface": true,
 		"type": true

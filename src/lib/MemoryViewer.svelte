@@ -200,14 +200,14 @@ function getMemoryBadge(): string {
 							<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01" />
 							</svg>
-							Expose MCP Server
+							MCP Server
 						</button>
 						<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
 							Coming Soon
 						</span>
 					</div>
 					<div class="text-xs text-gray-500 max-w-xs text-right">
-						Enable other AI tools to understand your browsing patterns
+						Enable other AI agents to access your browser memory
 					</div>
 				</div>
 			</div>

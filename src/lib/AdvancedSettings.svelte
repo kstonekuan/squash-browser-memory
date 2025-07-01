@@ -1,5 +1,10 @@
 <script lang="ts">
 import {
+	ambientSettings,
+	toggleAmbientAnalysis,
+	updateAmbientSettings,
+} from "../stores/ambient-store";
+import {
 	getClaudeApiKey,
 	loadAIConfig,
 	saveAIConfig,
@@ -11,11 +16,7 @@ import {
 	getProvider,
 	getProviderDisplayName,
 } from "../utils/ai-provider-factory";
-import {
-	type AutoAnalysisSettings,
-	loadAutoAnalysisSettings,
-	saveAutoAnalysisSettings,
-} from "../utils/ambient";
+import type { AutoAnalysisSettings } from "../utils/ambient";
 import {
 	ANALYSIS_SYSTEM_PROMPT,
 	CHUNK_SYSTEM_PROMPT,
@@ -56,6 +57,15 @@ let autoAnalysisSettings = $state<AutoAnalysisSettings>({
 	notifyOnError: true,
 });
 
+// Subscribe to the store
+$effect(() => {
+	const unsubscribe = ambientSettings.subscribe((value) => {
+		autoAnalysisSettings = value;
+	});
+
+	return unsubscribe;
+});
+
 // Load current configuration on mount
 (async () => {
 	const config = await loadAIConfig();
@@ -64,9 +74,6 @@ let autoAnalysisSettings = $state<AutoAnalysisSettings>({
 
 	// Check provider statuses
 	await updateProviderStatuses();
-
-	// Load auto-analysis settings
-	autoAnalysisSettings = await loadAutoAnalysisSettings();
 })();
 
 async function updateProviderStatuses() {
@@ -146,27 +153,14 @@ function getStatusColor(status: string): string {
 
 async function handleAutoAnalysisToggle() {
 	try {
-		// Save settings
-		await saveAutoAnalysisSettings(autoAnalysisSettings);
-
-		// Send message to background script to update alarm
-		const response = await chrome.runtime.sendMessage({
-			type: "toggle-auto-analysis",
-			enabled: autoAnalysisSettings.enabled,
-		});
-
-		if (!response?.success) {
-			throw new Error(response?.error || "Failed to update auto-analysis");
-		}
-
+		await toggleAmbientAnalysis();
 		console.log(
 			"Auto-analysis",
 			autoAnalysisSettings.enabled ? "enabled" : "disabled",
 		);
 	} catch (error) {
 		console.error("Failed to toggle auto-analysis:", error);
-		// Revert the toggle on error
-		autoAnalysisSettings.enabled = !autoAnalysisSettings.enabled;
+		alert("Failed to update auto-analysis settings");
 	}
 }
 
@@ -405,18 +399,15 @@ function formatLastRunTime(): string {
 							id="auto-analysis-toggle"
 							role="switch"
 							aria-checked={autoAnalysisSettings.enabled}
-							onclick={() => {
-								autoAnalysisSettings.enabled = !autoAnalysisSettings.enabled;
-								handleAutoAnalysisToggle();
-							}}
-							class={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+							onclick={handleAutoAnalysisToggle}
+							class={`relative inline-flex h-8 w-14 items-center rounded-full transition-colors ${
 								autoAnalysisSettings.enabled ? 'bg-blue-600' : 'bg-gray-200'
 							}`}
 						>
 							<span class="sr-only">Enable auto-analysis</span>
 							<span
-								class={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-									autoAnalysisSettings.enabled ? 'translate-x-6' : 'translate-x-1'
+								class={`inline-block h-6 w-6 transform rounded-full bg-white transition-transform shadow-sm ${
+									autoAnalysisSettings.enabled ? 'translate-x-7' : 'translate-x-1'
 								}`}
 							></span>
 						</button>
@@ -429,7 +420,7 @@ function formatLastRunTime(): string {
 								<input
 									type="checkbox"
 									bind:checked={autoAnalysisSettings.notifyOnSuccess}
-									onchange={() => saveAutoAnalysisSettings(autoAnalysisSettings)}
+									onchange={() => updateAmbientSettings({ notifyOnSuccess: autoAnalysisSettings.notifyOnSuccess })}
 									class="mr-2 text-blue-600 focus:ring-blue-500"
 								/>
 								<span class="text-sm text-gray-700">Notify on successful analysis</span>
@@ -439,7 +430,7 @@ function formatLastRunTime(): string {
 								<input
 									type="checkbox"
 									bind:checked={autoAnalysisSettings.notifyOnError}
-									onchange={() => saveAutoAnalysisSettings(autoAnalysisSettings)}
+									onchange={() => updateAmbientSettings({ notifyOnError: autoAnalysisSettings.notifyOnError })}
 									class="mr-2 text-blue-600 focus:ring-blue-500"
 								/>
 								<span class="text-sm text-gray-700">Notify on analysis errors</span>
@@ -478,7 +469,11 @@ function formatLastRunTime(): string {
 					
 					{#if autoAnalysisSettings.enabled}
 						<p class="text-xs text-gray-500">
-							Ambient analysis will run approximately every hour when Chrome is open.
+							{#if !autoAnalysisSettings.lastRunTimestamp}
+								First analysis will run in 1 minute, then every hour thereafter.
+							{:else}
+								Ambient analysis runs every hour when Chrome is open.
+							{/if}
 							Analysis only processes new history since the last run.
 						</p>
 					{/if}

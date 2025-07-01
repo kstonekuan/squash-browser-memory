@@ -45,25 +45,72 @@ async function createNotification(
 	message: string,
 	type: "success" | "error",
 ): Promise<void> {
-	const iconPath =
-		type === "success" ? "icons/icon-48.svg" : "icons/icon-48.svg";
+	try {
+		// Create a unique notification ID
+		const notificationId = `history-analyzer-${Date.now()}`;
 
-	// Create a unique notification ID
-	const notificationId = `history-analyzer-${Date.now()}`;
+		// Use the 48x48 icon for notifications
+		const iconUrl = chrome.runtime.getURL("icon-48.png");
 
-	await chrome.notifications.create(notificationId, {
-		type: "basic",
-		iconUrl: iconPath,
-		title,
-		message,
-		priority: type === "error" ? 2 : 1,
-	});
+		await chrome.notifications.create(notificationId, {
+			type: "basic",
+			iconUrl,
+			title,
+			message,
+			priority: type === "error" ? 2 : 1,
+		});
 
-	// Auto-clear success notifications after 10 seconds
-	if (type === "success") {
-		setTimeout(() => {
-			chrome.notifications.clear(notificationId);
-		}, 10000);
+		// Auto-clear success notifications after 10 seconds
+		if (type === "success") {
+			setTimeout(() => {
+				chrome.notifications.clear(notificationId);
+			}, 10000);
+		}
+	} catch (error) {
+		console.error("Failed to create notification:", error);
+		// Don't throw - notifications are not critical
+	}
+}
+
+// Send message to all tabs/side panels about ambient analysis status
+async function broadcastAmbientAnalysisStatus(
+	status: "started" | "completed" | "error" | "skipped",
+	details?: {
+		error?: string;
+		reason?: string;
+		itemCount?: number;
+		message?: string;
+	},
+): Promise<void> {
+	try {
+		// Send to all tabs
+		const tabs = await chrome.tabs.query({});
+		for (const tab of tabs) {
+			if (tab.id) {
+				chrome.tabs
+					.sendMessage(tab.id, {
+						type: "ambient-analysis-status",
+						status,
+						...details,
+					})
+					.catch(() => {
+						// Ignore errors - tab might not have content script
+					});
+			}
+		}
+
+		// Send to runtime (side panel)
+		chrome.runtime
+			.sendMessage({
+				type: "ambient-analysis-status",
+				status,
+				...details,
+			})
+			.catch(() => {
+				// Ignore errors - side panel might not be open
+			});
+	} catch (err) {
+		console.error("Failed to broadcast ambient analysis status:", err);
 	}
 }
 
@@ -79,7 +126,11 @@ async function runAmbientAnalysis(): Promise<void> {
 		return;
 	}
 
-	const _startTime = Date.now();
+	// Notify that ambient analysis has started
+	isAmbientAnalysisRunning = true;
+	await broadcastAmbientAnalysisStatus("started", {
+		message: "Checking for new browsing history...",
+	});
 
 	try {
 		// Load memory to get the last analyzed timestamp
@@ -121,28 +172,50 @@ async function runAmbientAnalysis(): Promise<void> {
 				lastRunTimestamp: Date.now(),
 				lastRunStatus: "success",
 			});
+
+			// Notify skipped
+			isAmbientAnalysisRunning = false;
+			await broadcastAmbientAnalysisStatus("skipped", {
+				reason: "no-new-history",
+				message: "No new browsing history since last analysis",
+			});
 			return;
 		}
 
-		// For the service worker, we'll just log that we found new items
-		// The full analysis would need to be done in the side panel
-		console.log(
-			"[Ambient Analysis] New history items found, analysis would be triggered here",
-		);
+		// Send message to trigger actual analysis in the side panel
+		console.log("[Ambient Analysis] Triggering analysis for new history items");
 
-		// Update settings with success
-		await saveAutoAnalysisSettings({
-			...settings,
-			lastRunTimestamp: Date.now(),
-			lastRunStatus: "success",
-			lastRunError: undefined,
-		});
+		// Send ambient-analysis-trigger message to side panel
+		try {
+			// Try to send to runtime (side panel)
+			await chrome.runtime.sendMessage({
+				type: "ambient-analysis-trigger",
+				historyItems: historyItems,
+				timestamp: Date.now(),
+			});
+			console.log("[Ambient Analysis] Analysis trigger sent to side panel");
+		} catch (_err) {
+			console.log(
+				"[Ambient Analysis] Side panel not available, will retry next hour",
+			);
+			// If side panel is not open, we'll skip this analysis
+			await saveAutoAnalysisSettings({
+				...settings,
+				lastRunTimestamp: Date.now(),
+				lastRunStatus: "success",
+				lastRunError: undefined,
+			});
 
-		// Send success notification if enabled
-		if (settings.notifyOnSuccess) {
-			const message = `Found ${historyItems.length} new history items to analyze.`;
-			await createNotification("New History Detected", message, "success");
+			isAmbientAnalysisRunning = false;
+			await broadcastAmbientAnalysisStatus("skipped", {
+				reason: "panel-closed",
+				message: "Side panel not open, will retry next hour",
+			});
+			return;
 		}
+
+		// Don't update success yet - wait for the side panel to complete
+		// The side panel will send back a message when done
 	} catch (error) {
 		console.error("[Ambient Analysis] Error:", error);
 
@@ -165,6 +238,13 @@ async function runAmbientAnalysis(): Promise<void> {
 				"error",
 			);
 		}
+
+		// Notify error
+		isAmbientAnalysisRunning = false;
+		await broadcastAmbientAnalysisStatus("error", {
+			error: errorMessage,
+			message: `Analysis failed: ${errorMessage}`,
+		});
 
 		// Re-throw to let the caller handle it
 		throw error;
@@ -223,6 +303,9 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
 	}
 });
 
+// Track ambient analysis state
+let isAmbientAnalysisRunning = false;
+
 // Listen for messages from the popup/side panel to enable/disable ambient analysis
 chrome.runtime.onMessage.addListener((request, _sender, sendResponse) => {
 	if (request.type === "toggle-auto-analysis") {
@@ -237,6 +320,42 @@ chrome.runtime.onMessage.addListener((request, _sender, sendResponse) => {
 		runAmbientAnalysis()
 			.then(() => sendResponse({ success: true }))
 			.catch((error) => sendResponse({ success: false, error: error.message }));
+		return true;
+	}
+
+	// Query ambient analysis status
+	if (request.type === "query-ambient-analysis-status") {
+		sendResponse({ isRunning: isAmbientAnalysisRunning });
+		return false; // Synchronous response
+	}
+
+	// Handle ambient analysis completion from side panel
+	if (request.type === "ambient-analysis-complete") {
+		(async () => {
+			const settings = await loadAutoAnalysisSettings();
+			await saveAutoAnalysisSettings({
+				...settings,
+				lastRunTimestamp: Date.now(),
+				lastRunStatus: request.success ? "success" : "error",
+				lastRunError: request.error,
+			});
+
+			if (request.success && settings.notifyOnSuccess) {
+				await createNotification(
+					"History Analysis Complete",
+					`Successfully analyzed ${request.itemCount || 0} new items`,
+					"success",
+				);
+			}
+
+			isAmbientAnalysisRunning = false;
+			await broadcastAmbientAnalysisStatus("completed", {
+				itemCount: request.itemCount,
+				message: `Analyzed ${request.itemCount || 0} new items`,
+			});
+
+			sendResponse({ success: true });
+		})();
 		return true;
 	}
 });

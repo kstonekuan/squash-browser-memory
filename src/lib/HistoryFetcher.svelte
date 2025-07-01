@@ -4,9 +4,11 @@ import { loadAIConfig } from "../utils/ai-config";
 import type { AIProviderType } from "../utils/ai-interface";
 import { loadMemory } from "../utils/memory";
 
-let { isAnalyzing = $bindable(false) } = $props<{
-	isAnalyzing?: boolean;
-}>();
+let { isAnalyzing = $bindable(false), isAmbientAnalysisRunning = false } =
+	$props<{
+		isAnalyzing?: boolean;
+		isAmbientAnalysisRunning?: boolean;
+	}>();
 
 const dispatch = createEventDispatcher();
 
@@ -83,7 +85,7 @@ function getEndTime(): number {
 }
 
 async function fetchHistory() {
-	if (isFetching || isAnalyzing) return;
+	if (isFetching || isAnalyzing || isAmbientAnalysisRunning) return;
 
 	error = "";
 	isFetching = true;
@@ -216,13 +218,16 @@ async function fetchHistory() {
 
 	<button
 		onclick={fetchHistory}
-		disabled={isFetching || isAnalyzing}
+		disabled={isFetching || isAnalyzing || isAmbientAnalysisRunning}
 		class="w-full py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
+		title={isAmbientAnalysisRunning ? "Cannot run manual analysis while ambient analysis is in progress" : ""}
 	>
 		{#if isFetching}
 			Fetching...
 		{:else if isAnalyzing}
 			Analyzing...
+		{:else if isAmbientAnalysisRunning}
+			Ambient Analysis Running...
 		{:else}
 			Analyze History
 		{/if}

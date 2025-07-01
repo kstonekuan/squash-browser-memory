@@ -1,4 +1,5 @@
 <script lang="ts">
+import { onMount } from "svelte";
 import AdvancedSettings from "./lib/AdvancedSettings.svelte";
 import AIProviderStatus from "./lib/AIProviderStatus.svelte";
 import AmbientAnalysisCard from "./lib/AmbientAnalysisCard.svelte";
@@ -30,6 +31,13 @@ let retryMessage = $state("");
 let subPhase: SubPhase | undefined = $state(undefined);
 let abortController: AbortController | null = null;
 let providerKey = $state(0); // Key to force AIProviderStatus re-render
+let isAmbientAnalysisRunning = $state(false);
+let ambientAnalysisStatus = $state<{
+	status: "idle" | "running" | "completed" | "skipped" | "error";
+	message?: string;
+	itemCount?: number;
+	reason?: string;
+}>({ status: "idle" });
 
 async function handleAnalysis(
 	event: CustomEvent<{ items: chrome.history.HistoryItem[] }>,
@@ -148,6 +156,180 @@ function handleDismissAnalysis() {
 	analysisResult = null;
 	memoryAutoExpand = false;
 }
+
+// Query ambient analysis status on mount and listen for updates
+onMount(() => {
+	// Query current status from background
+	chrome.runtime
+		.sendMessage({ type: "query-ambient-analysis-status" })
+		.then((response) => {
+			if (response?.isRunning) {
+				isAmbientAnalysisRunning = true;
+			}
+		})
+		.catch(() => {
+			// Ignore errors - background might not be ready
+		});
+
+	// Listen for ambient analysis status updates
+	const messageListener = async (message: {
+		type: string;
+		status?: string;
+		error?: string;
+		message?: string;
+		itemCount?: number;
+		reason?: string;
+		historyItems?: chrome.history.HistoryItem[];
+		timestamp?: number;
+	}) => {
+		if (message.type === "ambient-analysis-status") {
+			switch (message.status) {
+				case "started":
+					isAmbientAnalysisRunning = true;
+					ambientAnalysisStatus = {
+						status: "running",
+						message: message.message || "Starting analysis...",
+					};
+					break;
+				case "completed":
+					isAmbientAnalysisRunning = false;
+					ambientAnalysisStatus = {
+						status: "completed",
+						message: message.message || "Analysis completed",
+						itemCount: message.itemCount,
+					};
+					// Reset to idle after 10 seconds
+					setTimeout(() => {
+						if (ambientAnalysisStatus.status === "completed") {
+							ambientAnalysisStatus = { status: "idle" };
+						}
+					}, 10000);
+					break;
+				case "skipped":
+					isAmbientAnalysisRunning = false;
+					ambientAnalysisStatus = {
+						status: "skipped",
+						message: message.message || "Analysis skipped",
+						reason: message.reason,
+					};
+					// Reset to idle after 10 seconds
+					setTimeout(() => {
+						if (ambientAnalysisStatus.status === "skipped") {
+							ambientAnalysisStatus = { status: "idle" };
+						}
+					}, 10000);
+					break;
+				case "error":
+					isAmbientAnalysisRunning = false;
+					ambientAnalysisStatus = {
+						status: "error",
+						message: message.message || "Analysis failed",
+					};
+					break;
+			}
+		} else if (
+			message.type === "ambient-analysis-trigger" &&
+			message.historyItems
+		) {
+			// Handle ambient analysis trigger from background
+			console.log(
+				"[Ambient] Received analysis trigger for",
+				message.historyItems.length,
+				"items",
+			);
+
+			// Run the analysis
+			isAnalyzing = true;
+			analysisResult = null;
+			analysisPhase = "calculating";
+			rawHistoryData = message.historyItems;
+			isAmbientAnalysisRunning = true;
+
+			// Update status
+			ambientAnalysisStatus = {
+				status: "running",
+				message: "Analyzing new browsing history...",
+			};
+
+			// Create abort controller
+			abortController = new AbortController();
+
+			try {
+				const result = await analyzeHistoryItems(
+					message.historyItems,
+					customPrompts,
+					(info) => {
+						analysisPhase = info.phase;
+						subPhase = info.subPhase;
+						if (info.currentChunk && info.totalChunks) {
+							chunkProgress = {
+								current: info.currentChunk,
+								total: info.totalChunks,
+								description: info.chunkDescription || "",
+							};
+						} else if (info.chunkDescription) {
+							if (chunkProgress) {
+								chunkProgress.description = info.chunkDescription;
+							} else {
+								chunkProgress = {
+									current: 0,
+									total: 0,
+									description: info.chunkDescription,
+								};
+							}
+						}
+						if (info.retryMessage) {
+							retryMessage = info.retryMessage;
+						}
+					},
+					abortController.signal,
+				);
+
+				analysisResult = result;
+				analysisPhase = "complete";
+				chunkProgress = null;
+				memoryAutoExpand = true;
+
+				// Send completion message back to background
+				await chrome.runtime.sendMessage({
+					type: "ambient-analysis-complete",
+					success: true,
+					itemCount: message.historyItems.length,
+				});
+			} catch (error) {
+				console.error("[Ambient] Analysis error:", error);
+				analysisPhase = "error";
+
+				// Send error message back to background
+				await chrome.runtime.sendMessage({
+					type: "ambient-analysis-complete",
+					success: false,
+					error: error instanceof Error ? error.message : "Unknown error",
+					itemCount: message.historyItems.length,
+				});
+			} finally {
+				isAnalyzing = false;
+				isAmbientAnalysisRunning = false;
+				abortController = null;
+
+				if (analysisPhase === "complete") {
+					setTimeout(() => {
+						if (analysisPhase === "complete") {
+							analysisPhase = "idle";
+						}
+					}, 3000);
+				}
+			}
+		}
+	};
+
+	chrome.runtime.onMessage.addListener(messageListener);
+
+	// Cleanup
+	return () => {
+		chrome.runtime.onMessage.removeListener(messageListener);
+	};
+});
 </script>
 
 <main class="min-h-screen bg-gray-50">
@@ -169,13 +351,14 @@ function handleDismissAnalysis() {
 			<div class="mt-4 pt-4 border-t border-gray-200">
 				<HistoryFetcher 
 					bind:isAnalyzing 
+					isAmbientAnalysisRunning={isAmbientAnalysisRunning}
 					on:analysis-request={handleAnalysis}
 				/>
 			</div>
 		</div>
 
 		<!-- Ambient Analysis Card - Prominent position -->
-		<AmbientAnalysisCard />
+		<AmbientAnalysisCard analysisStatus={ambientAnalysisStatus} />
 
 		<AnalysisProgress 
 			phase={analysisPhase} 
@@ -183,6 +366,7 @@ function handleDismissAnalysis() {
 			retryMessage={retryMessage}
 			subPhase={subPhase}
 			onCancel={handleCancelAnalysis}
+			isAmbientAnalysis={isAmbientAnalysisRunning}
 		/>
 
 		{#if analysisResult}
