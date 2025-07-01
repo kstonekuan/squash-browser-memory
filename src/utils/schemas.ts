@@ -5,7 +5,7 @@ export const ANALYSIS_SCHEMA = {
 	properties: {
 		patterns: {
 			type: "array",
-			maxItems: 10,
+			maxItems: 15,
 			items: {
 				type: "object",
 				properties: {

@@ -14,94 +14,73 @@ Example: If session spans from [5] to [12], return startIndex: 5, endIndex: 12
 
 IMPORTANT: Return only valid JSON matching the schema. Do not include markdown formatting, code blocks, or any other text.`;
 
-export const ANALYSIS_SYSTEM_PROMPT = `You are a helpful assistant that analyzes browsing patterns to create detailed user profiles with specific, rich insights.
+export const ANALYSIS_SYSTEM_PROMPT = `Analyze browsing patterns to build detailed user profiles. Use evidence-based analysis with different thresholds.
 
-When analyzing browsing history data, create profiles with these specific fields:
+## STABLE TRAITS (High Evidence Required)
+Fill only when 2+ distinct browsing signals confirm the trait.
 
-**CORE IDENTITIES** (up to 5, roles and professional identity):
-Examples: "Senior UX Designer", "Frontend Engineer", "Digital Marketing Manager", "Freelance Consultant", "Remote Worker"
+**Core identities (max 5)** - Roles someone would claim:
+Senior UX Designer | Parent of two | Weekend volunteer firefighter | Dancer | Marathon runner
 
-**PERSONAL PREFERENCES** (up to 8, specific choices):
-Examples: {category: "Style", preference: "Minimalist capsule wardrobe"}, {category: "Travel", preference: "prefers night trains over flights"}, {category: "Diet", preference: "vegetarian"}, {category: "UI", preference: "always dark-theme"}, {category: "Music", preference: "loves techno at 124 BPM"}
+**Personal preferences (max 8)** - Enduring choices:
+Style: Minimalist capsule wardrobe | Travel: prefers night trains | Diet: vegetarian | UI: dark-theme | Music: techno at 124 BPM | Coffee: pour-over | Reading: sci-fi | Fitness: HIIT
 
-**CURRENT TASKS** (up to 10, actionable goals and projects):
-Examples: "Land a 6-month remote retainer", "redesign onboarding flow for mental-health app", "reach B2 level Portuguese", "cycle Camino de Santiago", "publish UX case-study on Medium", "build Notion template shop"
+## DYNAMIC CONTEXT (Frequent Updates)
 
-**CURRENT INTERESTS** (up to 8, current focus areas and obsessions):
-Examples: "Figma micro-interactions", "zero-waste travel", "EU Digital Services Act", "water-color journaling", "Figma variables beta", "Interrail Global Pass pricing", "dark patterns podcast", "Lisbon vs Porto coworking reviews"
+**Current tasks (max 10)** - Active goals:
+Land 6-month retainer | Redesign app onboarding | Reach B2 Portuguese | Cycle Camino de Santiago | Publish UX case-study | Build Notion templates
 
-**SUMMARY** (one engaging sentence):
-Example: "Remote UX designer living the nomad life—sketching SaaS dashboards by day, scouting Lisbon surf hostels by night, and hunting for the perfect dark-mode micro-interaction."
+**Current interests (max 8)** - Recent focus:
+Figma micro-interactions | Zero-waste travel | EU Digital Services Act | Watercolor journaling | Figma variables beta | Interrail pricing | AI ethics | Lisbon coworking
 
-Also identify workflow patterns:
-- Repetitive sequences of sites/actions
-- Time patterns (daily, weekly, etc.)
-- Automation opportunities
-- Include frequency and specific URLs as evidence
+**Summary** - 1 vivid sentence combining identities, preferences, and current focus.
 
-CRITICAL: Be specific, not generic. Use evidence from the browsing data to create vivid, detailed insights about this person's life, work, and interests.
+**Workflow patterns** - Quote URLs, frequencies, automation opportunities.
 
-IMPORTANT: Return only valid JSON matching the schema. Do not include markdown formatting, code blocks, or any other text.`;
+RULES:
+- Be specific, use actual evidence
+- Leave fields blank rather than guess
+- Return valid JSON only, no extra text`;
 
-export const MERGE_SYSTEM_PROMPT = `You are a helpful assistant that intelligently merges browsing analysis results to create richer, more accurate user profiles.
+export const MERGE_SYSTEM_PROMPT = `Merge browsing analysis results using evidence-based evolution. Apply different stability thresholds.
 
-INTELLIGENT MERGE RULES - Treat fields differently based on stability:
+## STABLE TRAITS (Resist Change)
+Require 2+ distinct signals to modify. Evolve slowly with strong evidence.
 
-**=== STABLE BACKGROUND - RESISTANT TO CHANGE ===**
-Require strong evidence to modify. Evolve slowly and carefully.
+**Core identities (max 5)** - High evidence threshold:
+Only update when substantial new evidence confirms role change. Keep distinct roles that define the person.
+UX Designer → Senior UX Designer | Parent of two → Homeschool educator | Weekend volunteer → Community organizer
 
-1. **CORE IDENTITIES** - High evidence threshold:
-   Examples: "UX Designer" → "Senior UX Designer" → "Freelance UX Designer"
-   Only update with substantial new evidence of role change
-   Keep identities separate and distinct
+**Personal preferences (max 8)** - Consolidate similar, strengthen core values:
+Merge related preferences into specific statements. Deep preferences rarely change.
+Minimalist + Capsule wardrobe → Minimalist capsule wardrobe | Dark mode + Always → always dark-theme
 
-2. **PERSONAL PREFERENCES** - Consolidate similar, preserve core values:
-   Examples:
-   - Style: "Minimalist" + "Capsule wardrobe" → "Minimalist capsule wardrobe"
-   - Travel: "Train travel" + "Environmental" → "prefers night trains over flights"
-   - UI: "Dark mode" + "Always" → "always dark-theme"
-   Deep preferences rarely change completely
+## DYNAMIC CONTEXT (Embrace Updates)
+Replace frequently. Prioritize recent evidence over older patterns.
 
-**=== CURRENT CONTEXT - EMBRACE CHANGE ===**
-Update frequently. Replace outdated with recent. Show progression.
+**Current tasks (max 10)** - Active goals evolve:
+Remove completed tasks. Update with more specific versions. Show progression.
+Find work → Land 6-month retainer | Learn language → Reach B2 Portuguese
 
-3. **CURRENT TASKS** - Replace completed, update in progress:
-   Examples:
-   - "Find freelance work" → "Land a 6-month remote retainer" (more specific)
-   - "Learn Portuguese" → "reach B2 level Portuguese" (progression)
-   - Remove completed tasks, keep active/evolving ones
+**Current interests (max 8)** - Recent focus replaces old:
+Keep specific recent obsessions over broad interests. Fresh signals override stale ones.
+Figma variables beta > General design tools | Zero-waste travel > General sustainability
 
-4. **CURRENT INTERESTS** - Fresh interests replace older ones:
-   Examples:
-   - Keep "Figma variables beta" over "General design tools"
-   - Prioritize specific current focus over broad interests
-   - Replace with most recent intense interests and obsessions
+**Summary** - Refresh to reflect current moment:
+Create vivid sentence combining most salient identities + preferences + current focus.
 
-5. **SUMMARY NARRATIVE** - Always refresh to reflect current state:
-    Combine: identities + current tasks + interests + preferences
-    Example: "Senior UX designer living the nomad life—sketching SaaS dashboards by day, scouting Lisbon surf hostels by night, and hunting for the perfect dark-mode micro-interaction."
-    Should capture current moment in person's life and work
+**Workflow patterns (max 15)** - Merge similar activities:
+Consolidate repetitive behaviors. Sum frequencies. Strengthen with new evidence.
+GitHub PR review + Checking PRs → Daily GitHub PR review (frequency: combined)
 
-6. **WORKFLOW PATTERNS** - CONSOLIDATE similar activities:
-    Examples:
-    - "Daily GitHub PR review" + "Checking GitHub pull requests" = "Daily GitHub PR review and triage" (frequency: sum both)
-    - "Google programming search" + "Stack Overflow research" = "Technical problem research workflow"
+MERGE RULES:
+- Evolve existing entries, don't just accumulate
+- Most specific and recent evidence wins
+- Remove completed/outdated items
+- Fill gaps only with strong supporting signals
+- Maintain narrative coherence
 
-**CRITICAL MERGE PRINCIPLES:**
-- EVOLVE entries with new evidence (don't just add)
-- Keep MOST SPECIFIC and RECENT information
-- REMOVE outdated/completed items
-- STRENGTHEN existing entries with new context
-- CREATE NARRATIVE COHERENCE across all fields
-
-**STRICT LIMITS** (must not exceed):
-- coreIdentities: MAX 5 | currentTasks: MAX 10 | currentInterests: MAX 8
-- personalPreferences: MAX 8
-- patterns: MAX 15
-
-Return the EVOLVED profile that tells a coherent, specific story about this person's current life and work.
-
-IMPORTANT: Return only valid JSON matching the schema. Do not include markdown formatting, code blocks, or any other text.`;
+Return evolved profile that tells coherent story. Valid JSON only.`;
 
 // Prompt builders
 export function buildChunkingPrompt(timestamps: number[]): string {
