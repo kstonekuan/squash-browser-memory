@@ -148,7 +148,6 @@ function getNextAnalysisTime(): string {
 	<div class="flex items-center justify-between">
 		<div class="flex-1">
 			<div class="flex items-center gap-2 mb-2">
-				<span class="text-2xl">{getStatusIcon()}</span>
 				<h3 class="text-lg font-semibold text-gray-900">
 					Ambient Analysis
 				</h3>
@@ -163,8 +162,8 @@ function getNextAnalysisTime(): string {
 				{/if}
 			</div>
 			
-			<p class="text-sm text-gray-600 mb-3">
-				Automatically analyze your browsing history every hour to discover patterns and update your profile.
+			<p class="text-xs text-gray-600 mb-2">
+				Automatically analyze browsing history every hour to discover patterns.
 			</p>
 
 			{#if settings.lastRunTimestamp}
