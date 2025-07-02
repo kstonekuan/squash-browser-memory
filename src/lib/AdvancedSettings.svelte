@@ -400,15 +400,18 @@ function formatLastRunTime(): string {
 							role="switch"
 							aria-checked={autoAnalysisSettings.enabled}
 							onclick={handleAutoAnalysisToggle}
-							class={`relative inline-flex h-8 w-14 items-center rounded-full transition-colors ${
-								autoAnalysisSettings.enabled ? 'bg-blue-600' : 'bg-gray-200'
-							}`}
+							class={`
+								relative inline-flex h-8 w-14 items-center rounded-full transition-colors
+								${autoAnalysisSettings.enabled ? "bg-blue-600" : "bg-gray-200"}
+								cursor-pointer
+							`}
 						>
 							<span class="sr-only">Enable auto-analysis</span>
 							<span
-								class={`inline-block h-6 w-6 transform rounded-full bg-white transition-transform shadow-sm ${
-									autoAnalysisSettings.enabled ? 'translate-x-7' : 'translate-x-1'
-								}`}
+								class={`
+									inline-block h-6 w-6 transform rounded-full bg-white transition-transform shadow-sm
+									${autoAnalysisSettings.enabled ? "translate-x-7" : "translate-x-1"}
+								`}
 							></span>
 						</button>
 					</div>
