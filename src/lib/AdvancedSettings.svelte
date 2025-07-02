@@ -387,7 +387,7 @@ function formatLastRunTime(): string {
 				<div class="space-y-4">
 					<!-- Enable/Disable Toggle -->
 					<div class="flex items-center justify-between">
-						<div>
+						<div class="flex-1">
 							<label for="auto-analysis-toggle" class="text-sm font-medium text-gray-700">
 								Enable Hourly Analysis
 							</label>
@@ -395,17 +395,18 @@ function formatLastRunTime(): string {
 								Automatically analyze new browsing history every hour ambiently
 							</p>
 						</div>
-						<button
-							id="auto-analysis-toggle"
-							role="switch"
-							aria-checked={autoAnalysisSettings.enabled}
-							onclick={handleAutoAnalysisToggle}
-							class={`
-								relative inline-flex h-8 w-14 items-center rounded-full transition-colors
-								${autoAnalysisSettings.enabled ? "bg-blue-600" : "bg-gray-200"}
-								cursor-pointer
-							`}
-						>
+						<div class="ml-4">
+							<button
+								id="auto-analysis-toggle"
+								role="switch"
+								aria-checked={autoAnalysisSettings.enabled}
+								onclick={handleAutoAnalysisToggle}
+								class={`
+									relative inline-flex h-8 w-14 items-center rounded-full transition-colors
+									${autoAnalysisSettings.enabled ? "bg-blue-600" : "bg-gray-200"}
+									cursor-pointer
+								`}
+							>
 							<span class="sr-only">Enable auto-analysis</span>
 							<span
 								class={`
@@ -414,6 +415,7 @@ function formatLastRunTime(): string {
 								`}
 							></span>
 						</button>
+						</div>
 					</div>
 					
 					<!-- Notification Settings -->

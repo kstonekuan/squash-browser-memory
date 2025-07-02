@@ -371,6 +371,10 @@ onMount(() => {
 			isAmbientAnalysis={isAmbientAnalysisRunning}
 		/>
 
+		{#if analysisResult}
+			<AnalysisResults result={analysisResult} onDismiss={handleDismissAnalysis} />
+		{/if}
+
 		<!-- Memory Viewer -->
 		<MemoryViewer autoExpand={memoryAutoExpand} />
 
@@ -395,10 +399,6 @@ onMount(() => {
 				onProviderChange={handleProviderChange}
 			/>
 		</div>
-
-		{#if analysisResult}
-			<AnalysisResults result={analysisResult} onDismiss={handleDismissAnalysis} />
-		{/if}
 	</div>
 </main>
 
