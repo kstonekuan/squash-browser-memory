@@ -41,7 +41,13 @@ export interface AnalysisResult {
 	patterns: WorkflowPattern[];
 	topDomains: { domain: string; count: number }[];
 	userProfile: UserProfile;
-	chunks?: ChunkInfo[];
-	chunkingRawResponse?: string;
-	chunkingError?: string;
+}
+
+export interface FullAnalysisResult {
+	analysis: AnalysisResult;
+	diagnostics: {
+		chunks: ChunkInfo[];
+		chunkingRawResponse?: string;
+		chunkingError?: string;
+	};
 }

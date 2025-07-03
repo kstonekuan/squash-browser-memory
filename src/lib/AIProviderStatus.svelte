@@ -102,7 +102,7 @@ function getStatusMessage(
 	{#if status === 'downloadable'}
 		<div class="mt-2 text-xs text-gray-600">
 			<p>The AI model will be downloaded automatically when you first use it.</p>
-			<p>This is a one-time download of approximately 20MB.</p>
+			<p>This is a one-time download of approximately 22GB.</p>
 		</div>
 	{/if}
 	

@@ -9,10 +9,10 @@ import AnalysisResults from "./lib/AnalysisResults.svelte";
 import CollapsibleSection from "./lib/CollapsibleSection.svelte";
 import HistoryFetcher from "./lib/HistoryFetcher.svelte";
 import MemoryViewer from "./lib/MemoryViewer.svelte";
-import type { AnalysisResult } from "./types";
+import type { FullAnalysisResult } from "./types";
 import { analyzeHistoryItems, clearMemory } from "./utils/analyzer";
 
-let analysisResult: AnalysisResult | null = $state(null);
+let analysisResult: FullAnalysisResult | null = $state(null);
 let memoryAutoExpand = $state(false);
 let isAnalyzing = $state(false);
 let analysisPhase: AnalysisPhase = $state("idle");
@@ -371,10 +371,6 @@ onMount(() => {
 			isAmbientAnalysis={isAmbientAnalysisRunning}
 		/>
 
-		{#if analysisResult}
-			<AnalysisResults result={analysisResult} onDismiss={handleDismissAnalysis} />
-		{/if}
-
 		<!-- Memory Viewer -->
 		<MemoryViewer autoExpand={memoryAutoExpand} />
 
@@ -399,6 +395,10 @@ onMount(() => {
 				onProviderChange={handleProviderChange}
 			/>
 		</div>
+
+		{#if analysisResult}
+			<AnalysisResults result={analysisResult} onDismiss={handleDismissAnalysis} />
+		{/if}
 	</div>
 </main>
 

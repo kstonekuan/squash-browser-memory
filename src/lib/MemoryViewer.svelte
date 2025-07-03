@@ -47,7 +47,7 @@ onMount(() => {
 		[key: string]: chrome.storage.StorageChange;
 	}) => {
 		// Check if the memory key changed
-		if (changes.history_analysis_memory && sectionIsOpen) {
+		if (changes.history_analysis_memory) {
 			console.log("Memory updated in storage, refreshing...");
 			refreshMemory();
 		}

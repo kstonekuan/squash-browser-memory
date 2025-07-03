@@ -1,11 +1,11 @@
 <script lang="ts">
-import type { AnalysisResult } from "../types";
+import type { FullAnalysisResult } from "../types";
 import ChunkDebugInfo from "./ChunkDebugInfo.svelte";
 import ChunkDisplay from "./ChunkDisplay.svelte";
 import CollapsibleSection from "./CollapsibleSection.svelte";
 
 const { result, onDismiss } = $props<{
-	result: AnalysisResult;
+	result: FullAnalysisResult;
 	onDismiss: () => void;
 }>();
 </script>
@@ -32,26 +32,26 @@ const { result, onDismiss } = $props<{
       {#if result.totalUrls > 0}
         <div class="flex items-center space-x-1">
           <span class="text-gray-600">URLs:</span>
-          <span class="font-medium text-gray-900">{result.totalUrls.toLocaleString()}</span>
+          <span class="font-medium text-gray-900">{result.analysis.totalUrls.toLocaleString()}</span>
         </div>
         
         <div class="flex items-center space-x-1">
           <span class="text-gray-600">Period:</span>
           <span class="font-medium text-gray-900">
-            {result.dateRange.start.toLocaleDateString()} - {result.dateRange.end.toLocaleDateString()}
+            {result.analysis.dateRange.start.toLocaleDateString()} - {result.analysis.dateRange.end.toLocaleDateString()}
           </span>
         </div>
       {/if}
       
       <div class="flex items-center space-x-1">
         <span class="text-gray-600">Patterns:</span>
-        <span class="font-medium text-gray-900">{result.patterns.length}</span>
+        <span class="font-medium text-gray-900">{result.analysis.patterns.length}</span>
       </div>
       
       {#if result.topDomains.length > 0}
         <div class="flex items-center space-x-1">
           <span class="text-gray-600">Top domain:</span>
-          <span class="font-medium text-gray-900">{result.topDomains[0].domain}</span>
+          <span class="font-medium text-gray-900">{result.analysis.topDomains[0].domain}</span>
         </div>
       {/if}
     </div>
@@ -62,15 +62,15 @@ const { result, onDismiss } = $props<{
   </div>
   
   <!-- Chunks Display Section -->
-  <ChunkDisplay chunks={result.chunks || []} />
+  <ChunkDisplay chunks={result.diagnostics.chunks || []} />
   
   <!-- Chunking Debug Info -->
-  <ChunkDebugInfo rawResponse={result.chunkingRawResponse} error={result.chunkingError} />
+  <ChunkDebugInfo rawResponse={result.diagnostics.chunkingRawResponse} error={result.diagnostics.chunkingError} />
   
   <!-- Raw Analysis Data Section -->
   <CollapsibleSection title="Raw Analysis Output" class="bg-white shadow-md">
         <div class="p-3 max-h-80 overflow-y-auto">
-          <pre class="text-xs font-mono whitespace-pre-wrap break-words bg-gray-50 p-3 rounded">{JSON.stringify(result, null, 2)}</pre>
+          <pre class="text-xs font-mono whitespace-pre-wrap break-words bg-gray-50 p-3 rounded">{JSON.stringify(result.analysis, null, 2)}</pre>
         </div>
         <div class="border-t border-gray-200 px-4 py-2 bg-gray-50">
           <p class="text-xs text-gray-600">

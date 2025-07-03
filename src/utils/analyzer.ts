@@ -1,8 +1,8 @@
 /// <reference types="@types/dom-chromium-ai" />
 
 import type {
-	AnalysisResult,
 	ChunkInfo,
+	FullAnalysisResult,
 	UserProfile,
 	WorkflowPattern,
 } from "../types";
@@ -111,7 +111,7 @@ export async function analyzeHistoryItems(
 	customPrompts?: CustomPrompts,
 	onProgress?: ProgressCallback,
 	abortSignal?: AbortSignal,
-): Promise<AnalysisResult> {
+): Promise<FullAnalysisResult> {
 	const analysisStartTime = performance.now();
 
 	// Check if already aborted
@@ -171,14 +171,18 @@ export async function analyzeHistoryItems(
 
 	if (chunks.length === 0) {
 		return {
-			patterns: memory.patterns,
-			totalUrls: stats.totalUrls,
-			dateRange: stats.dateRange,
-			topDomains: stats.topDomains,
-			userProfile: memory.userProfile,
-			chunks: [],
-			chunkingRawResponse: chunkingResult.rawResponse,
-			chunkingError: chunkingResult.error,
+			analysis: {
+				patterns: memory.patterns,
+				totalUrls: stats.totalUrls,
+				dateRange: stats.dateRange,
+				topDomains: stats.topDomains,
+				userProfile: memory.userProfile,
+			},
+			diagnostics: {
+				chunks: [],
+				chunkingRawResponse: chunkingResult.rawResponse,
+				chunkingError: chunkingResult.error,
+			},
 		};
 	}
 
@@ -298,14 +302,18 @@ export async function analyzeHistoryItems(
 	console.log(`========================\n`);
 
 	return {
-		patterns: memory.patterns,
-		totalUrls: stats.totalUrls,
-		dateRange: stats.dateRange,
-		topDomains: stats.topDomains,
-		userProfile: memory.userProfile,
-		chunks: chunkInfos,
-		chunkingRawResponse: chunkingResult.rawResponse,
-		chunkingError: chunkingResult.error,
+		analysis: {
+			patterns: memory.patterns,
+			totalUrls: stats.totalUrls,
+			dateRange: stats.dateRange,
+			topDomains: stats.topDomains,
+			userProfile: memory.userProfile,
+		},
+		diagnostics: {
+			chunks: chunkInfos,
+			chunkingRawResponse: chunkingResult.rawResponse,
+			chunkingError: chunkingResult.error,
+		},
 	};
 }
 
