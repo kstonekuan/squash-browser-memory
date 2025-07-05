@@ -5,6 +5,7 @@ An intelligent Chrome extension that analyzes your browsing history to identify 
 ## Features
 
 - **Dual AI Providers**: Choose between Chrome's built-in AI (Gemini Nano) for 100% local, private analysis or a remote provider (Anthropic's Claude) for more powerful insights.
+- **Context Injection on AI Chat Platforms**: Injects a "Context" button on supported platforms (ChatGPT, Claude) to provide relevant, personalized context from your browsing history directly in your conversations.
 - **Ambient Background Analysis**: Enable hourly, automatic analysis of your recent browsing history. The extension works quietly in the background to find patterns without interrupting you.
 - **Incremental Learning with Memory**: The extension remembers past analyses and builds a long-term understanding of your habits, leading to smarter, more refined suggestions over time.
 - **Advanced Settings**:
@@ -24,7 +25,20 @@ The extension uses a multi-stage pipeline to analyze your history:
 2.  **Intelligent Chunking**: Uses AI to group raw history items into logical browsing sessions or "chunks."
 3.  **Pattern Analysis**: Each chunk is analyzed by the AI to identify recurring sequences and user behavior.
 4.  **Memory Integration**: New findings are merged with the long-term memory, refining existing patterns and improving the user profile.
-5.  **Results Display**: Aggregated results, patterns, and suggestions are displayed in the side panel.
+5.  **Context Injection**: On supported AI chat sites, the extension provides a button to inject relevant context from your memory directly into your prompts.
+6.  **Results Display**: Aggregated results, patterns, and suggestions are displayed in the side panel.
+
+## Context Injection on AI Chat Platforms
+
+This extension enhances your experience on supported AI chat platforms (currently ChatGPT and Claude) by adding a "Context" button to the chat interface. This button allows you to seamlessly inject relevant information from your analyzed browsing history and user profile into your conversations.
+
+### How it Works
+
+1.  **Button Injection**: The extension's content script identifies the chat input area on supported sites and injects a "Context" button nearby.
+2.  **Contextual Suggestions**: As you type a prompt, the extension analyzes your input and suggests relevant pieces of context from your memory, such as your profession, interests, or previously identified workflow patterns.
+3.  **One-Click Insertion**: You can click a suggestion to insert it directly into the chat input. You can also shift-click the main button to insert a structured summary of your user profile.
+
+This feature helps you provide better, more personalized context to AI assistants without having to manually copy and paste information.
 
 ## Ambient Analysis
 
@@ -105,8 +119,9 @@ The extension requires the following permissions:
 - `sidePanel`: To show the extension UI in the browser side panel.
 - `alarms`: To schedule the hourly ambient analysis.
 - `notifications`: To show the status of background analysis.
+- `unlimitedStorage`: To store a larger amount of browsing history data and analysis results locally on your device.
+- `activeTab`: Used by the content script to interact with the chat interface on supported websites.
 
 ## TODO
 
 - Clean up Chrome Built-In AI usage instructions
-- Test AI on non-dev chrome

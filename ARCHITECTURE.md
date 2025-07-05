@@ -2,7 +2,7 @@
 
 ## Overview
 
-The **History Workflow Analyzer** is a Chrome browser extension that analyzes browsing history to identify repetitive workflows and behavioral patterns. It uses Chrome's built-in AI Language Model API to provide intelligent analysis without sending data to external servers.
+The **History Workflow Analyzer** is a Chrome browser extension that analyzes browsing history to identify repetitive workflows and behavioral patterns. It uses a dual AI provider model, supporting both Chrome's built-in AI for local processing and remote AI providers for more powerful analysis.
 
 ## Tech Stack
 
@@ -21,15 +21,18 @@ The extension follows Chrome's Manifest V3 specification:
 
 ```
 ├── manifest.json          # Extension configuration and permissions
-├── background.js           # Service worker for extension lifecycle
+├── background.ts           # Service worker for extension lifecycle
 ├── sidepanel.html         # HTML shell for the side panel UI
+├── content-scripts/       # Scripts for interacting with web pages
 └── src/                   # Application source code
 ```
 
 **Key Permissions:**
 - `history`: Access to Chrome browsing history
-- `storage`: Local data persistence
-- `sidePanel`: Side panel UI integration
+- `storage` & `unlimitedStorage`: Local data persistence for settings and memory.
+- `sidePanel`: Side panel UI integration.
+- `activeTab`: For context injection on supported sites.
+- `alarms` & `notifications`: For ambient background analysis.
 
 ### 2. Core Application (`src/`)
 
@@ -42,22 +45,24 @@ The extension follows Chrome's Manifest V3 specification:
 - **`HistoryFetcher.svelte`** - Handles Chrome history API interactions
 - **`AnalysisProgress.svelte`** - Real-time progress tracking UI
 - **`AnalysisResults.svelte`** - Display analysis results and insights
-- **`ChromeAIStatus.svelte`** - Shows Chrome AI availability status
-- **`AdvancedSettings.svelte`** - Custom prompt configuration
-- **`ChunkDisplay.svelte`** - Debug view for data chunking
-- **`ChunkDebugInfo.svelte`** - Detailed chunk analysis information
+- **`AIProviderStatus.svelte`** - Shows AI provider availability and status
+- **`AdvancedSettings.svelte`** - Configuration for AI providers, prompts, and ambient analysis.
+- **`ContextSelector.svelte`** - UI for the context injection feature.
 
 #### Utility Modules (`src/utils/`)
 
 **Core Analysis Engine:**
 - **`analyzer.ts`** - Main analysis orchestration with chunking and AI integration
-- **`chrome-ai.ts`** - Chrome AI Language Model API wrapper
-- **`chunking.ts`** - Intelligent time-based data segmentation
+- **`ai-provider-factory.ts`** - Factory for creating AI provider instances (local or remote).
+- **`chrome-ai.ts`** - Wrapper for Chrome's built-in AI Language Model API.
+- **`remote-ai.ts`** - Wrapper for remote AI APIs (e.g., Anthropic Claude).
+- **`chunking.ts`** - Intelligent time-based data segmentation.
 
 **Supporting Utilities:**
-- **`memory.ts`** - Persistent storage for analysis state and accumulated insights
-- **`constants.ts`** - AI prompts and configuration constants
-- **`schemas.ts`** - JSON Schema validation for AI responses
+- **`memory.ts`** - Persistent storage for analysis state and accumulated insights.
+- **`constants.ts`** - AI prompts and configuration constants.
+- **`schemas.ts`** - JSON Schema validation for AI responses.
+- **`simple-context-matcher.ts`** - Logic for matching user input to stored memory for context injection.
 
 ### 3. Data Flow Architecture
 
@@ -75,131 +80,64 @@ graph TD
     H --> I[UI Display]
 ```
 
-#### Key Data Structures
-
-**AnalysisResult Interface:**
-```typescript
-interface AnalysisResult {
-  totalUrls: number;
-  dateRange: { start: Date; end: Date };
-  patterns: WorkflowPattern[];
-  topDomains: { domain: string; count: number }[];
-  userProfile: UserProfile;
-  chunks?: ChunkInfo[];
-}
-```
-
-**WorkflowPattern Interface:**
-```typescript
-interface WorkflowPattern {
-  pattern: string;
-  description: string;
-  frequency: number;
-  urls: string[];
-  timePattern?: string;
-  suggestion: string;
-  automationPotential: "high" | "medium" | "low";
-}
-```
-
 ### 4. AI Integration Architecture
 
-#### Chrome AI Integration
-- **Local Processing**: Uses Chrome's built-in Language Model API (no external API calls)
-- **Privacy-First**: All data processing happens locally in the browser
-- **Token Management**: Automatic chunking to stay within Chrome AI's 1024 token limit
-- **Retry Logic**: Exponential backoff for quota-exceeded scenarios
+The extension supports two types of AI providers, configured via a factory pattern (`ai-provider-factory.ts`).
 
-#### AI Processing Flow
-1. **Chunking Phase**: AI identifies natural browsing sessions from timestamps
-2. **Analysis Phase**: Each chunk analyzed for patterns and user behavior
-3. **Memory Integration**: New patterns merged with existing knowledge
-4. **Result Synthesis**: Comprehensive user profile and workflow patterns
+#### 4.1. Chrome AI (Local)
+- **Local Processing**: Uses Chrome's built-in Language Model API (no external API calls).
+- **Privacy-First**: All data processing happens locally in the browser.
+- **Token Management**: Automatic chunking to stay within Chrome AI's token limits.
+- **Retry Logic**: Exponential backoff for quota-exceeded scenarios.
+
+#### 4.2. Remote AI (e.g., Anthropic Claude)
+- **Remote Processing**: Sends browsing history to a third-party API.
+- **User Consent**: Requires explicit user configuration and API key entry.
+- **Flexibility**: Allows for more powerful models at the cost of privacy.
 
 ### 5. Memory and Persistence
 
 #### Memory System (`memory.ts`)
-- **Incremental Learning**: Accumulates insights across analysis sessions
-- **Pattern Evolution**: Existing patterns refined with new data
-- **User Profile Building**: Continuous enhancement of user behavior understanding
-- **Chrome Storage API**: Persistent local storage using Chrome's storage API
+- **Incremental Learning**: Accumulates insights across analysis sessions.
+- **Pattern Evolution**: Existing patterns refined with new data.
+- **User Profile Building**: Continuous enhancement of user behavior understanding.
+- **Chrome Storage API**: Persistent local storage using `chrome.storage.local`.
 
-#### Memory Structure:
-```typescript
-interface AnalysisMemory {
-  userProfile: UserProfile;
-  patterns: WorkflowPattern[];
-  lastAnalyzedDate: Date;
-  totalItemsAnalyzed: number;
-  version: number;
-}
-```
+### 6. Context Injection on AI Chat Platforms
 
-### 6. Error Handling and Resilience
+A key feature of the extension is its ability to inject context into popular AI chat websites (like ChatGPT and Claude).
 
-#### Chunking Fallbacks
-- **AI Chunking**: Primary method using Chrome AI for intelligent session detection
-- **Half-Day Fallback**: Automatic fallback to time-based chunking (AM/PM periods)
-- **Batch Processing**: Large datasets processed in manageable batches
+#### 6.1. Content Script (`content-scripts/universal-context.ts`)
+- **Platform Detection**: Identifies the chat platform (e.g., ChatGPT, Claude) based on the hostname.
+- **DOM Injection**: Dynamically injects a "Context" button into the chat interface using platform-specific selectors.
+- **Input Monitoring**: Listens to the user's input in the chat box.
 
-#### Token Limit Management
-- **Binary Search**: Optimal chunk size determination through Chrome AI token measurement
-- **Subdivision**: Automatic chunk subdivision when token limits exceeded  
-- **Privacy Protection**: URL parameter filtering to reduce token usage
+#### 6.2. Context Matching (`utils/simple-context-matcher.ts`)
+- **Memory Access**: Retrieves the user's profile and workflow patterns from `chrome.storage.local`.
+- **String Similarity**: As the user types, it uses a simple string similarity algorithm (Dice's Coefficient) to find relevant context from memory.
+- **Suggestion UI**: Displays relevant suggestions in a dropdown panel, allowing the user to insert them into their prompt.
 
-#### Error Recovery
-- **Graceful Degradation**: Continues processing remaining chunks if individual chunks fail
-- **Retry Mechanisms**: Exponential backoff for quota and network errors
-- **Partial Results**: Returns available results even with processing failures
+#### 6.3. User Experience
+1.  **Button Appears**: A "Context" button is added to the chat UI.
+2.  **User Types**: The script analyzes the input text.
+3.  **Suggestions Offered**: If relevant context is found, the button becomes active. Clicking it reveals suggestions.
+4.  **User Inserts**: The user can click a suggestion to add it to their prompt, or shift-click the button to insert a structured summary of their profile.
 
-### 7. Security and Privacy
+### 7. Error Handling and Resilience
 
-#### Data Protection
-- **Local Processing**: All analysis happens within the browser
-- **Parameter Filtering**: Tracking parameters automatically hidden/removed
-- **No External Transmission**: History data never leaves the user's device
-- **Secure Storage**: Uses Chrome's secure storage APIs
+- **Chunking Fallbacks**: If AI-based chunking fails, it falls back to a simpler time-based method.
+- **Token Limit Management**: Intelligently subdivides data to fit within model context windows.
+- **Graceful Degradation**: The system can continue processing even if parts of the analysis fail.
 
-#### Content Security
-- **Manifest V3**: Modern security model with restricted permissions
-- **Service Worker**: Secure background processing
-- **Sandboxed Execution**: Extension runs in Chrome's security sandbox
+### 8. Security and Privacy
 
-### 8. Performance Considerations
-
-#### Optimization Strategies
-- **Chunked Processing**: Large datasets processed in manageable segments  
-- **Progress Tracking**: Real-time progress updates with cancellation support
-- **Memory Efficiency**: Streaming processing to minimize memory footprint
-- **Caching**: Analysis results cached to avoid reprocessing
-
-#### Scalability
-- **Token-Aware Processing**: Automatic adjustment to Chrome AI limitations
-- **Batch Processing**: Handles large history datasets efficiently
-- **Incremental Analysis**: Builds on previous analysis results
+- **Local by Default**: The primary analysis mode is fully local.
+- **Explicit Consent**: Remote AI usage requires explicit user action.
+- **Parameter Filtering**: Tracking parameters are filtered from URLs to reduce data leakage.
+- **Manifest V3**: Adheres to modern, stricter security standards.
 
 ## Development and Testing
 
-### Build System
-- **Development**: `pnpm dev` - Vite development server
-- **Production**: `pnpm build` - Optimized extension bundle
-- **Quality Assurance**: `pnpm check` - Comprehensive linting, type checking, and testing
-
-### Testing Strategy
-- **Unit Tests**: Core utility functions (`analyzer.test.ts`, `chunking.test.ts`)
-- **Component Tests**: Svelte component testing with Testing Library
-- **Integration Tests**: End-to-end analysis pipeline validation
-
-### Code Quality
-- **TypeScript**: Full type safety throughout the application
-- **Biome**: Consistent code formatting and linting
-- **Svelte Check**: Svelte-specific validation and type checking
-
-## Extension Installation and Distribution
-
-The extension is designed for Chrome browsers with Manifest V3 support and requires:
-- Chrome version 138+ (for Chrome AI Language Model API)
-- Side panel support
-- History access permissions
-
-This architecture provides a robust, privacy-focused solution for analyzing browsing patterns while leveraging Chrome's built-in AI capabilities for intelligent insights.
+- **Development**: `pnpm dev` - Vite development server with hot reload.
+- **Production**: `pnpm build` - Optimized extension bundle.
+- **Quality Assurance**: `pnpm check` - Comprehensive linting, type checking, and testing.
