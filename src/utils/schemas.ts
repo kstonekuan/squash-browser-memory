@@ -1,5 +1,7 @@
 // Structured output schemas for Chrome AI
 
+import { z } from "zod";
+
 export const ANALYSIS_SCHEMA = {
 	type: "object",
 	properties: {
@@ -109,3 +111,44 @@ export const CHUNK_SCHEMA = {
 	},
 	required: ["chunks"],
 };
+
+// Zod schemas for runtime validation
+const WorkflowPatternSchema = z.object({
+	pattern: z.string().max(100),
+	description: z.string().max(200),
+	frequency: z.number(),
+	urls: z.array(z.string().max(150)).max(5),
+	timePattern: z.string().max(50).optional(),
+	suggestion: z.string().max(200),
+	automationPotential: z.enum(["high", "medium", "low"]),
+});
+
+const UserProfileSchema = z.object({
+	coreIdentities: z.array(z.string().max(80)).max(5),
+	personalPreferences: z
+		.array(
+			z.object({
+				category: z.string().max(40),
+				preference: z.string().max(80),
+			}),
+		)
+		.max(8),
+	currentTasks: z.array(z.string().max(80)).max(10),
+	currentInterests: z.array(z.string().max(60)).max(8),
+	summary: z.string().max(500),
+});
+
+export const AnalysisResultSchema = z.object({
+	patterns: z.array(WorkflowPatternSchema).max(15),
+	userProfile: UserProfileSchema,
+});
+
+export const ChunkSchema = z.object({
+	chunks: z.array(
+		z.object({
+			startIndex: z.number(),
+			endIndex: z.number(),
+			description: z.string(),
+		}),
+	),
+});

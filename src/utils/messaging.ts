@@ -4,7 +4,6 @@
  */
 
 import { defineExtensionMessaging } from "@webext-core/messaging";
-import type { AutoAnalysisSettings } from "./ambient";
 import type { CustomPrompts } from "./analyzer";
 
 // Progress information for analysis
@@ -14,7 +13,6 @@ export interface AnalysisProgress {
 		| "calculating"
 		| "chunking"
 		| "analyzing"
-		| "retrying"
 		| "complete"
 		| "error"
 		| "idle";
@@ -24,7 +22,6 @@ export interface AnalysisProgress {
 		total: number;
 		description: string;
 	};
-	retryMessage?: string;
 }
 
 // Analysis status for broadcasting
@@ -50,22 +47,6 @@ interface ProtocolMap {
 		error?: string;
 	};
 
-	// Run analysis in offscreen document
-	"analysis:run-in-offscreen": (data: {
-		historyItems: chrome.history.HistoryItem[];
-		customPrompts?: CustomPrompts;
-		analysisId: string;
-	}) => void;
-
-	// Analysis result from offscreen
-	"analysis:offscreen-result": (data: {
-		success: boolean;
-		itemCount?: number;
-		analysisId: string;
-		error?: string;
-		cancelled?: boolean;
-	}) => void;
-
 	// Progress updates
 	"analysis:progress": (data: AnalysisProgress) => void;
 
@@ -80,7 +61,6 @@ interface ProtocolMap {
 		analysisId?: string;
 		phase?: string;
 		chunkProgress?: AnalysisProgress["chunkProgress"];
-		retryMessage?: string;
 	};
 
 	// Ambient analysis settings

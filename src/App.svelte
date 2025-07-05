@@ -28,7 +28,6 @@ let chunkProgress = $state<{
 	total: number;
 	description: string;
 } | null>(null);
-let retryMessage = $state("");
 let subPhase: SubPhase | undefined = $state(undefined);
 let abortController: AbortController | null = null;
 let providerKey = $state(0); // Key to force AIProviderStatus re-render
@@ -53,7 +52,6 @@ async function handleAnalysis(
 	analysisResult = null;
 	analysisPhase = "calculating";
 	rawHistoryData = items;
-	retryMessage = "";
 
 	// Mark as manual analysis to track properly
 	isManualAnalysisRunning = true;
@@ -68,10 +66,7 @@ async function handleAnalysis(
 
 		if (!response.success) {
 			// Check if it's blocked by ambient analysis
-			if (
-				response.error &&
-				response.error.includes("Ambient analysis is currently running")
-			) {
+			if (response.error?.includes("Ambient analysis is currently running")) {
 				alert(
 					"Cannot start manual analysis while ambient analysis is running. Please wait for it to complete.",
 				);
@@ -189,9 +184,6 @@ onMount(() => {
 				if (response.chunkProgress) {
 					chunkProgress = response.chunkProgress;
 				}
-				if (response.retryMessage) {
-					retryMessage = response.retryMessage;
-				}
 			}
 		})
 		.catch(() => {
@@ -278,21 +270,14 @@ onMount(() => {
 		// Check if it's our analysis (manual or ambient)
 		const isOurAnalysis =
 			(data.analysisId && data.analysisId === currentAnalysisId) ||
-			(data.analysisId &&
-				data.analysisId.startsWith("manual-") &&
-				isManualAnalysisRunning) ||
-			(data.analysisId &&
-				data.analysisId.startsWith("ambient-") &&
-				isAmbientAnalysisRunning);
+			(data.analysisId?.startsWith("manual-") && isManualAnalysisRunning) ||
+			(data.analysisId?.startsWith("ambient-") && isAmbientAnalysisRunning);
 
 		if (isOurAnalysis) {
 			analysisPhase = data.phase;
 			subPhase = data.subPhase;
 			if (data.chunkProgress) {
 				chunkProgress = data.chunkProgress;
-			}
-			if (data.retryMessage) {
-				retryMessage = data.retryMessage;
 			}
 		}
 	});
@@ -344,9 +329,6 @@ onMount(() => {
 									description: info.chunkDescription,
 								};
 							}
-						}
-						if (info.retryMessage) {
-							retryMessage = info.retryMessage;
 						}
 					},
 					abortController.signal,
@@ -415,8 +397,7 @@ onMount(() => {
 		<AnalysisProgress 
 			phase={analysisPhase} 
 			chunkProgress={chunkProgress} 
-			retryMessage={retryMessage}
-			subPhase={subPhase}
+				subPhase={subPhase}
 			onCancel={handleCancelAnalysis}
 			isAmbientAnalysis={isAmbientAnalysisRunning}
 		/>

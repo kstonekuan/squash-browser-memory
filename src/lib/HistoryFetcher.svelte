@@ -1,4 +1,5 @@
 <script lang="ts">
+import { format, subDays, subHours, subWeeks } from "date-fns";
 import { createEventDispatcher, onMount } from "svelte";
 import { loadAIConfig } from "../utils/ai-config";
 import type { AIProviderType } from "../utils/ai-interface";
@@ -93,16 +94,16 @@ function getStartTime(): number {
 		return lastHistoryTimestamp + 1;
 	}
 
-	const now = Date.now();
+	const now = new Date();
 	switch (dateRange) {
 		case "1hour":
-			return now - 1 * 60 * 60 * 1000;
+			return subHours(now, 1).getTime();
 		case "3hours":
-			return now - 3 * 60 * 60 * 1000;
+			return subHours(now, 3).getTime();
 		case "day":
-			return now - 24 * 60 * 60 * 1000;
+			return subDays(now, 1).getTime();
 		case "week":
-			return now - 7 * 24 * 60 * 60 * 1000;
+			return subWeeks(now, 1).getTime();
 		case "all":
 		default:
 			return 0;
@@ -235,7 +236,7 @@ async function fetchHistory() {
 				disabled={isFetching || isAnalyzing}
 			/>
 			<label for="only-new-history" class="text-sm text-gray-700">
-				Only analyze new history since {new Date(lastHistoryTimestamp).toLocaleString()}
+				Only analyze new history since {format(new Date(lastHistoryTimestamp), 'PPpp')}
 			</label>
 		</div>
 	{/if}

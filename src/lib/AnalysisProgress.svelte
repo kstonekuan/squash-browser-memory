@@ -4,7 +4,6 @@ export type AnalysisPhase =
 	| "calculating"
 	| "chunking"
 	| "analyzing"
-	| "retrying"
 	| "complete"
 	| "error";
 
@@ -13,7 +12,6 @@ export type SubPhase = "sending-analysis" | "sending-merge" | "processing";
 let {
 	phase = "idle",
 	chunkProgress = null,
-	retryMessage = "",
 	onCancel,
 	subPhase = undefined,
 	isAmbientAnalysis = false,
@@ -24,7 +22,6 @@ let {
 		total: number;
 		description: string;
 	} | null;
-	retryMessage?: string;
 	onCancel?: () => void;
 	subPhase?: SubPhase;
 	isAmbientAnalysis?: boolean;
@@ -163,11 +160,6 @@ function getSubPhaseIcon(subPhase: SubPhase | undefined): string {
 		</div>
 		{/if}
 		
-		{#if phase === 'retrying' && retryMessage}
-			<div class="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-				<p class="text-sm text-yellow-800">{retryMessage}</p>
-			</div>
-		{/if}
 		
 		{#if phase === 'error'}
 			<div class="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg">

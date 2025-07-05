@@ -1,5 +1,8 @@
 // Background service worker for the History Workflow Analyzer extension
+/// <reference types="@types/dom-chromium-ai" />
 
+import { format } from "date-fns";
+import { analyzeHistoryItems } from "./utils/analyzer";
 import type { AnalysisProgress } from "./utils/messaging";
 import { onMessage, sendMessage } from "./utils/messaging";
 
@@ -102,33 +105,10 @@ async function broadcastAnalysisStatus(
 	}
 }
 
-// Create or get offscreen document
-async function setupOffscreenDocument(): Promise<void> {
-	if (!chrome.offscreen) {
-		console.error("[Ambient Analysis] Offscreen API not available");
-		throw new Error("Offscreen API not available");
-	}
+// Track active analyses
+const activeAnalyses = new Map<string, AbortController>();
 
-	try {
-		await chrome.offscreen.createDocument({
-			url: "offscreen.html",
-			reasons: ["LOCAL_STORAGE"] as chrome.offscreen.Reason[],
-			justification: "Running background analysis of browsing history",
-		});
-	} catch (error) {
-		if (error instanceof Error && error.message.includes("already exists")) {
-			// Offscreen document already exists, that's fine
-		} else {
-			console.error(
-				"[Ambient Analysis] Failed to create offscreen document:",
-				error,
-			);
-			throw error;
-		}
-	}
-}
-
-// Run manual analysis using offscreen document
+// Run manual analysis directly in service worker
 async function runManualAnalysis(
 	historyItems: chrome.history.HistoryItem[],
 	analysisId: string,
@@ -149,39 +129,93 @@ async function runManualAnalysis(
 		message: `Analyzing ${historyItems.length} history items...`,
 	});
 
-	try {
-		await setupOffscreenDocument();
+	const abortController = new AbortController();
+	activeAnalyses.set(analysisId, abortController);
 
-		// Send analysis request to offscreen document
-		await sendMessage("analysis:run-in-offscreen", {
+	try {
+		// Run analysis directly in service worker
+		const result = await analyzeHistoryItems(
 			historyItems,
 			customPrompts,
-			analysisId,
+			// Progress callback
+			async (info) => {
+				console.log(`[Background] Analysis progress: ${info.phase}`, info);
+
+				// Send progress update
+				try {
+					await sendMessage("analysis:progress", {
+						analysisId,
+						phase: info.phase,
+						subPhase: info.subPhase,
+						chunkProgress:
+							info.currentChunk !== undefined && info.totalChunks !== undefined
+								? {
+										current: info.currentChunk,
+										total: info.totalChunks,
+										description: info.chunkDescription || "",
+									}
+								: info.chunkDescription && !info.currentChunk
+									? {
+											current: 0,
+											total: 0,
+											description: info.chunkDescription,
+										}
+									: undefined,
+					});
+				} catch (err) {
+					console.error("[Background] Failed to send progress update:", err);
+				}
+			},
+			abortController.signal,
+		);
+
+		console.log("[Manual Analysis] Analysis completed:", result);
+
+		// Send success notification
+		await broadcastAnalysisStatus("completed", {
+			message: `Analysis completed successfully for ${historyItems.length} items`,
+			itemCount: historyItems.length,
 		});
 
-		// Wait for result
-		// Note: The actual result will come via a separate message
+		const settings = await loadAutoAnalysisSettings();
+		if (settings.notifyOnSuccess) {
+			await createNotification(
+				"Manual Analysis Complete",
+				`Successfully analyzed ${historyItems.length} items`,
+				"success",
+			);
+		}
 	} catch (error) {
 		console.error("[Manual Analysis] Error:", error);
 
 		const errorMessage =
 			error instanceof Error ? error.message : "Unknown error";
 
-		await broadcastAnalysisStatus("error", {
-			error: errorMessage,
-			message: `Analysis failed: ${errorMessage}`,
-		});
+		// Check if it was cancelled
+		if (error instanceof Error && error.name === "AbortError") {
+			await broadcastAnalysisStatus("error", {
+				error: "Analysis cancelled",
+				message: "Analysis was cancelled by user",
+			});
+		} else {
+			await broadcastAnalysisStatus("error", {
+				error: errorMessage,
+				message: `Analysis failed: ${errorMessage}`,
+			});
 
-		await createNotification(
-			"Manual Analysis Failed",
-			`Analysis encountered an error: ${errorMessage}`,
-			"error",
-		);
+			await createNotification(
+				"Manual Analysis Failed",
+				`Analysis encountered an error: ${errorMessage}`,
+				"error",
+			);
+		}
 
 		throw error;
 	} finally {
+		activeAnalyses.delete(analysisId);
 		if (currentManualAnalysisId === analysisId) {
 			currentManualAnalysisId = null;
+			isManualAnalysisRunning = false;
 		}
 	}
 }
@@ -220,7 +254,9 @@ async function runAmbientAnalysis(): Promise<void> {
 
 		console.log(
 			`[Ambient Analysis] Last analyzed timestamp: ${
-				lastTimestamp > 0 ? new Date(lastTimestamp).toISOString() : "never"
+				lastTimestamp > 0
+					? format(new Date(lastTimestamp), "yyyy-MM-dd'T'HH:mm:ss'Z'")
+					: "never"
 			}`,
 		);
 
@@ -256,8 +292,7 @@ async function runAmbientAnalysis(): Promise<void> {
 			return;
 		}
 
-		// Try to send to side panel first, then fall back to offscreen
-		let analysisHandled = false;
+		// Try to send to side panel first, then run in service worker
 
 		// Check if side panel is open by trying to send a message
 		try {
@@ -277,31 +312,61 @@ async function runAmbientAnalysis(): Promise<void> {
 				type: "ambient-analysis-trigger",
 				historyItems: historyItems,
 			});
-
-			analysisHandled = true;
 		} catch {
-			// Side panel not available, use offscreen document
+			// Side panel not available, run in service worker
 			console.log(
-				"[Ambient Analysis] Side panel not available, using offscreen document",
+				"[Ambient Analysis] Side panel not available, running in service worker",
 			);
-
-			await setupOffscreenDocument();
 
 			const promptsResult = await chrome.storage.local.get("custom_prompts");
 			const customPrompts = promptsResult.custom_prompts;
 
-			// Send to offscreen document
-			await sendMessage("analysis:run-in-offscreen", {
-				historyItems,
-				customPrompts,
-				analysisId: `ambient-${Date.now()}`,
-			});
+			const analysisId = `ambient-${Date.now()}`;
+			const abortController = new AbortController();
+			activeAnalyses.set(analysisId, abortController);
 
-			analysisHandled = true;
-		}
+			try {
+				// Run analysis directly in service worker
+				const result = await analyzeHistoryItems(
+					historyItems,
+					customPrompts,
+					// Progress callback
+					async (info) => {
+						console.log(`[Ambient] Analysis progress: ${info.phase}`, info);
 
-		if (!analysisHandled) {
-			throw new Error("Unable to process analysis");
+						// Send progress update
+						try {
+							await sendMessage("analysis:progress", {
+								analysisId,
+								phase: info.phase,
+								subPhase: info.subPhase,
+								chunkProgress:
+									info.currentChunk !== undefined &&
+									info.totalChunks !== undefined
+										? {
+												current: info.currentChunk,
+												total: info.totalChunks,
+												description: info.chunkDescription || "",
+											}
+										: info.chunkDescription && !info.currentChunk
+											? {
+													current: 0,
+													total: 0,
+													description: info.chunkDescription,
+												}
+											: undefined,
+							});
+						} catch (err) {
+							console.error("[Ambient] Failed to send progress update:", err);
+						}
+					},
+					abortController.signal,
+				);
+
+				console.log("[Ambient Analysis] Analysis completed:", result);
+			} finally {
+				activeAnalyses.delete(analysisId);
+			}
 		}
 	} catch (error) {
 		console.error("[Ambient Analysis] Error:", error);
@@ -390,7 +455,7 @@ async function handleAutoAnalysisToggle(enabled: boolean) {
 		const alarm = await chrome.alarms.get(ALARM_NAME);
 		if (alarm) {
 			console.log(
-				`Auto-analysis enabled. Next run: ${new Date(alarm.scheduledTime).toLocaleString()}`,
+				`Auto-analysis enabled. Next run: ${format(new Date(alarm.scheduledTime), "PPpp")}`,
 			);
 		} else {
 			console.error("Failed to create ambient analysis alarm");
@@ -408,7 +473,7 @@ chrome.runtime.onStartup.addListener(async () => {
 	if (alarm) {
 		console.log(
 			"Hourly analysis alarm is active, next run:",
-			new Date(alarm.scheduledTime).toLocaleString(),
+			format(new Date(alarm.scheduledTime), "PPpp"),
 		);
 	} else {
 		console.log("Hourly analysis alarm is not active");
@@ -484,15 +549,15 @@ onMessage("analysis:cancel", async (message) => {
 		return { success: false, error: "No matching analysis in progress" };
 	}
 
-	try {
-		// Forward cancellation to offscreen document
-		await sendMessage("analysis:cancel", { analysisId: data.analysisId });
+	// Cancel the analysis
+	const abortController = activeAnalyses.get(data.analysisId);
+	if (abortController) {
+		console.log("[Background] Cancelling analysis:", data.analysisId);
+		abortController.abort();
+		activeAnalyses.delete(data.analysisId);
 		return { success: true };
-	} catch (error) {
-		return {
-			success: false,
-			error: error instanceof Error ? error.message : "Failed to cancel",
-		};
+	} else {
+		return { success: false, error: "Analysis not found" };
 	}
 });
 
@@ -521,7 +586,6 @@ onMessage("analysis:get-state", async () => {
 		analysisId: currentManualAnalysisId || undefined,
 		phase: currentProgress?.phase,
 		chunkProgress: currentProgress?.chunkProgress,
-		retryMessage: currentProgress?.retryMessage,
 	};
 });
 
@@ -536,7 +600,6 @@ onMessage("analysis:progress", async (message) => {
 			phase: data.phase,
 			subPhase: data.subPhase,
 			chunkProgress: data.chunkProgress,
-			retryMessage: data.retryMessage,
 		} as AnalysisProgress);
 	}
 
@@ -546,69 +609,6 @@ onMessage("analysis:progress", async (message) => {
 	} catch {
 		// No listeners active
 	}
-});
-
-// Handle results from offscreen document
-onMessage("analysis:offscreen-result", async (message) => {
-	const data = message.data;
-
-	const isManual = data.analysisId.startsWith("manual-");
-
-	if (data.cancelled) {
-		await broadcastAnalysisStatus("error", {
-			message: "Analysis cancelled by user",
-		});
-		isManualAnalysisRunning = false;
-		return;
-	}
-
-	if (data.success) {
-		const settings = await loadAutoAnalysisSettings();
-
-		// Update settings for ambient analysis
-		if (!isManual) {
-			await saveAutoAnalysisSettings({
-				...settings,
-				lastRunTimestamp: Date.now(),
-				lastRunStatus: "success",
-				lastRunError: undefined,
-			});
-		}
-
-		await broadcastAnalysisStatus("completed", {
-			itemCount: data.itemCount,
-			message: `Successfully analyzed ${data.itemCount || 0} items`,
-		});
-
-		if (
-			(isManual && settings.notifyOnSuccess) ||
-			(!isManual && settings.notifyOnSuccess)
-		) {
-			await createNotification(
-				isManual ? "Manual Analysis Complete" : "History Analysis Complete",
-				`Successfully analyzed ${data.itemCount || 0} new items`,
-				"success",
-			);
-		}
-	} else {
-		await broadcastAnalysisStatus("error", {
-			error: data.error,
-			message: `Analysis failed: ${data.error}`,
-		});
-	}
-
-	// Clean up
-	if (isManual) {
-		isManualAnalysisRunning = false;
-		if (currentManualAnalysisId === data.analysisId) {
-			currentManualAnalysisId = null;
-		}
-	} else {
-		isAmbientAnalysisRunning = false;
-	}
-
-	// Clean up progress map
-	analysisProgressMap.delete(data.analysisId);
 });
 
 // Handle ambient analysis completion from side panel

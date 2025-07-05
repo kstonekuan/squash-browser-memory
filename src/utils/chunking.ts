@@ -1,8 +1,9 @@
+import type { z } from "zod";
 import { createAISession, promptAI } from "./ai-session-factory";
 import { buildChunkingPrompt, CHUNK_SYSTEM_PROMPT } from "./constants";
 import type { ChunkTimeRange, HistoryChunk } from "./memory";
-import { CHUNK_SCHEMA } from "./schemas";
-import { extractJSONFromResponse, retryWithBackoff } from "./shared-utils";
+import { CHUNK_SCHEMA, ChunkSchema } from "./schemas";
+import { extractJSONFromResponse } from "./shared-utils";
 
 export interface ChunkingResult {
 	timeRanges: ChunkTimeRange[];
@@ -47,7 +48,7 @@ export async function identifyChunks(
 	// Log the exact chunking prompt being sent to AI
 	console.log("\n=== CHUNKING PROMPT ===");
 	console.log("System Prompt:", customChunkPrompt || CHUNK_SYSTEM_PROMPT);
-	console.log("User Prompt:", prompt);
+	console.log("\n=== Starting Chunking ===");
 	console.log("Prompt Length:", prompt.length, "characters");
 	console.log("Timestamp count:", timestamps.length);
 	console.log("======================\n");
@@ -67,35 +68,25 @@ export async function identifyChunks(
 
 	try {
 		const startTime = performance.now();
-		const response = await retryWithBackoff(async () => {
-			return await promptAI(session, prompt, {
-				responseConstraint: CHUNK_SCHEMA,
-			});
+		const response = await promptAI(session, prompt, {
+			responseConstraint: CHUNK_SCHEMA,
 		});
 		const endTime = performance.now();
 		const duration = ((endTime - startTime) / 1000).toFixed(2);
 		console.log(
 			`Chunking LLM call completed in ${duration}s for ${items.length} items`,
 		);
-		console.log("\n=== CHUNKING RESPONSE ===");
 		console.log("Response Length:", response.length, "characters");
-		console.log(
-			"Response Preview (first 500 chars):",
-			response.substring(0, 500),
-		);
-		console.log("=========================\n");
+		console.log("=== Chunking Complete ===");
 
-		let parsed: {
-			chunks?: Array<{
-				startIndex: number;
-				endIndex: number;
-				description: string;
-			}>;
-		};
+		let parsed: z.infer<typeof ChunkSchema>;
 		try {
 			// Clean the response to extract JSON from markdown if needed
 			const cleanedResponse = extractJSONFromResponse(response);
-			parsed = JSON.parse(cleanedResponse);
+			const rawParsed = JSON.parse(cleanedResponse);
+
+			// Validate with zod schema
+			parsed = ChunkSchema.parse(rawParsed);
 		} catch (parseError) {
 			return {
 				timeRanges: createHalfDayChunks(timestamps),
@@ -105,25 +96,13 @@ export async function identifyChunks(
 			};
 		}
 
-		if (!parsed.chunks || !Array.isArray(parsed.chunks)) {
-			return {
-				timeRanges: createHalfDayChunks(timestamps),
-				rawResponse: response,
-				error: "Response missing 'chunks' array",
-				isFallback: true,
-			};
-		}
-
 		// Convert indices to timestamps and validate
 		const validChunks: ChunkTimeRange[] = parsed.chunks
 			.filter(
 				(chunk) =>
-					typeof chunk.startIndex === "number" &&
-					typeof chunk.endIndex === "number" &&
 					chunk.startIndex >= 0 &&
 					chunk.endIndex < timestamps.length &&
-					chunk.startIndex <= chunk.endIndex &&
-					typeof chunk.description === "string",
+					chunk.startIndex <= chunk.endIndex,
 			)
 			.map((chunk) => ({
 				startTime: timestamps[chunk.startIndex],
@@ -248,7 +227,7 @@ async function identifyChunksForBatch(
 	// Log the exact batch chunking prompt being sent to AI
 	console.log("\n=== BATCH CHUNKING PROMPT ===");
 	console.log("System Prompt:", customChunkPrompt || CHUNK_SYSTEM_PROMPT);
-	console.log("User Prompt:", prompt);
+	console.log("\n=== Starting Chunking ===");
 	console.log("Prompt Length:", prompt.length, "characters");
 	console.log("Batch timestamp count:", timestamps.length);
 	console.log("=============================\n");
@@ -268,35 +247,25 @@ async function identifyChunksForBatch(
 
 	try {
 		const startTime = performance.now();
-		const response = await retryWithBackoff(async () => {
-			return await promptAI(session, prompt, {
-				responseConstraint: CHUNK_SCHEMA,
-			});
+		const response = await promptAI(session, prompt, {
+			responseConstraint: CHUNK_SCHEMA,
 		});
 		const endTime = performance.now();
 		const duration = ((endTime - startTime) / 1000).toFixed(2);
 		console.log(
 			`Chunking LLM call completed in ${duration}s for ${items.length} items`,
 		);
-		console.log("\n=== CHUNKING RESPONSE ===");
 		console.log("Response Length:", response.length, "characters");
-		console.log(
-			"Response Preview (first 500 chars):",
-			response.substring(0, 500),
-		);
-		console.log("=========================\n");
+		console.log("=== Chunking Complete ===");
 
-		let parsed: {
-			chunks?: Array<{
-				startIndex: number;
-				endIndex: number;
-				description: string;
-			}>;
-		};
+		let parsed: z.infer<typeof ChunkSchema>;
 		try {
 			// Clean the response to extract JSON from markdown if needed
 			const cleanedResponse = extractJSONFromResponse(response);
-			parsed = JSON.parse(cleanedResponse);
+			const rawParsed = JSON.parse(cleanedResponse);
+
+			// Validate with zod schema
+			parsed = ChunkSchema.parse(rawParsed);
 		} catch (parseError) {
 			return {
 				timeRanges: createHalfDayChunks(timestamps),
@@ -306,25 +275,13 @@ async function identifyChunksForBatch(
 			};
 		}
 
-		if (!parsed.chunks || !Array.isArray(parsed.chunks)) {
-			return {
-				timeRanges: createHalfDayChunks(timestamps),
-				rawResponse: response,
-				error: "Response missing 'chunks' array",
-				isFallback: true,
-			};
-		}
-
 		// Convert indices to timestamps and validate
 		const validChunks: ChunkTimeRange[] = parsed.chunks
 			.filter(
 				(chunk) =>
-					typeof chunk.startIndex === "number" &&
-					typeof chunk.endIndex === "number" &&
 					chunk.startIndex >= 0 &&
 					chunk.endIndex < timestamps.length &&
-					chunk.startIndex <= chunk.endIndex &&
-					typeof chunk.description === "string",
+					chunk.startIndex <= chunk.endIndex,
 			)
 			.map((chunk) => ({
 				startTime: timestamps[chunk.startIndex],

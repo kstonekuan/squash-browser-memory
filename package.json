@@ -5,19 +5,22 @@
 	"type": "module",
 	"scripts": {
 		"dev": "vite",
-		"build": "pnpm check && vite build && vite build --config vite.offscreen.config.ts",
+		"build": "pnpm check && vite build",
 		"check": "biome check --write . && tsc --noEmit && svelte-check --tsconfig ./tsconfig.app.json && tsc -p tsconfig.node.json && vitest run --passWithNoTests && knip",
 		"test": "vitest",
 		"test:ui": "vitest --ui"
 	},
 	"dependencies": {
 		"@anthropic-ai/sdk": "0.56.0",
-		"@webext-core/messaging": "^2.3.0",
-		"ts-pattern": "5.7.1"
+		"@webext-core/messaging": "2.3.0",
+		"date-fns": "4.1.0",
+		"jsonrepair": "^3.12.0",
+		"ts-pattern": "5.7.1",
+		"zod": "3.25.74"
 	},
 	"devDependencies": {
 		"@biomejs/biome": "2.0.6",
-		"@crxjs/vite-plugin": "^2.0.2",
+		"@crxjs/vite-plugin": "2.0.2",
 		"@sveltejs/vite-plugin-svelte": "5.1.0",
 		"@tailwindcss/forms": "0.5.10",
 		"@tailwindcss/postcss": "4.1.11",
@@ -34,7 +37,7 @@
 		"svelte-check": "4.2.2",
 		"tailwindcss": "4.1.11",
 		"typescript": "5.8.3",
-		"vite": "6.3.5",
+		"vite": "7.0.2",
 		"vitest": "3.2.4"
 	}
 }

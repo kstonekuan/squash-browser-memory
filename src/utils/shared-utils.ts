@@ -2,95 +2,30 @@
  * Shared utilities used across multiple modules
  */
 
+import { jsonrepair } from "jsonrepair";
+
 /**
  * Extract JSON from markdown-wrapped or mixed content responses
  */
 export function extractJSONFromResponse(response: string): string {
-	// Remove markdown code fences if present
-	const codeBlockRegex = /```(?:json)?\s*([\s\S]*?)\s*```/;
-	const match = response.match(codeBlockRegex);
+	const responseTrimmed = response.trim();
+	try {
+		// jsonrepair can handle many cases, but not markdown code blocks
+		// Check for markdown first since it's common in LLM responses
+		const codeBlockRegex = /```(?:json)?\s*([\s\S]*?)\s*```/;
+		const match = responseTrimmed.match(codeBlockRegex);
 
-	if (match) {
-		return match[1].trim();
-	}
-
-	// If no code blocks, try to find JSON object boundaries
-	const jsonStartIndex = response.indexOf("{");
-	const jsonEndIndex = response.lastIndexOf("}");
-
-	if (
-		jsonStartIndex !== -1 &&
-		jsonEndIndex !== -1 &&
-		jsonEndIndex > jsonStartIndex
-	) {
-		const extractedJson = response.substring(jsonStartIndex, jsonEndIndex + 1);
-		return extractedJson;
-	}
-
-	// Return as-is if no extraction needed
-	return response.trim();
-}
-
-/**
- * Retry a function with exponential backoff on quota errors
- */
-export async function retryWithBackoff<T>(
-	fn: () => Promise<T>,
-	maxRetries = 3,
-	baseDelay = 2000,
-	onProgress?: (retryMessage: string) => void,
-	abortSignal?: AbortSignal,
-): Promise<T> {
-	for (let i = 0; i < maxRetries; i++) {
-		try {
-			return await fn();
-		} catch (error) {
-			const isLastAttempt = i === maxRetries - 1;
-
-			// Only retry on quota errors, not on other errors
-			if (
-				!(
-					error instanceof DOMException && error.name === "QuotaExceededError"
-				) ||
-				isLastAttempt
-			) {
-				throw error;
-			}
-
-			// Exponential backoff: 2s, 4s, 8s
-			const delay = baseDelay * 2 ** i;
-			const retryMessage = `Quota exceeded. Retrying in ${delay / 1000} seconds...`;
-			console.log(retryMessage);
-
-			if (onProgress) {
-				onProgress(retryMessage);
-			}
-
-			// Check if already aborted before waiting
-			if (abortSignal?.aborted) {
-				throw new Error("Operation cancelled");
-			}
-
-			// Wait with abort support
-			await new Promise<void>((resolve, reject) => {
-				const timeout = setTimeout(resolve, delay);
-
-				if (abortSignal) {
-					const abortHandler = () => {
-						clearTimeout(timeout);
-						reject(new Error("Operation cancelled during retry"));
-					};
-
-					if (abortSignal.aborted) {
-						abortHandler();
-					} else {
-						abortSignal.addEventListener("abort", abortHandler, { once: true });
-					}
-				}
-			});
+		if (match) {
+			// Extract from markdown and repair
+			return jsonrepair(match[1].trim());
 		}
+
+		// Let jsonrepair handle everything else
+		return jsonrepair(responseTrimmed);
+	} catch (error) {
+		console.error("Failed to repair JSON:", error);
+		return responseTrimmed;
 	}
-	throw new Error("Max retries exceeded");
 }
 
 /**

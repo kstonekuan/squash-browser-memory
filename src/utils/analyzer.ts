@@ -1,5 +1,6 @@
 /// <reference types="@types/dom-chromium-ai" />
 
+import { format } from "date-fns";
 import type {
 	ChunkInfo,
 	FullAnalysisResult,
@@ -22,12 +23,11 @@ import {
 	loadMemory,
 	saveMemory,
 } from "./memory";
-import { ANALYSIS_SCHEMA } from "./schemas";
+import { ANALYSIS_SCHEMA, AnalysisResultSchema } from "./schemas";
 import {
 	calculateOptimalChunkSize,
 	extractJSONFromResponse,
 	getMostRecentTimestamp,
-	retryWithBackoff,
 } from "./shared-utils";
 
 // Re-export clearMemory for use in UI
@@ -90,11 +90,10 @@ export function calculateStats(items: chrome.history.HistoryItem[]): {
 
 // Progress callback type with more detailed information
 export type ProgressCallback = (info: {
-	phase: "calculating" | "chunking" | "analyzing" | "retrying";
+	phase: "calculating" | "chunking" | "analyzing";
 	currentChunk?: number;
 	totalChunks?: number;
 	chunkDescription?: string;
-	retryMessage?: string;
 	subPhase?: "sending-analysis" | "sending-merge" | "processing";
 }) => void;
 
@@ -202,7 +201,7 @@ export async function analyzeHistoryItems(
 			endTime: chunk.endTime,
 			itemCount: chunk.items.length,
 			description: chunk.isFallback
-				? `${chunk.startTime.toLocaleDateString()} ${chunk.startTime.getHours() < 12 ? "Morning" : "Afternoon/Evening"} (Fallback)`
+				? `${format(chunk.startTime, "PP")} ${chunk.startTime.getHours() < 12 ? "Morning" : "Afternoon/Evening"} (Fallback)`
 				: timeRange?.description || `Session ${index + 1}`,
 			isFallback: chunk.isFallback,
 		};
@@ -233,7 +232,7 @@ export async function analyzeHistoryItems(
 				phase: "analyzing",
 				currentChunk: processedChunks,
 				totalChunks,
-				chunkDescription: `${chunk.items.length} items from ${chunk.startTime.toLocaleDateString()} - ${chunk.endTime.toLocaleDateString()}`,
+				chunkDescription: `${chunk.items.length} items from ${format(chunk.startTime, "PP")} - ${format(chunk.endTime, "PP")}`,
 			});
 		}
 
@@ -318,7 +317,9 @@ export async function analyzeHistoryItems(
 	console.log(`Items analyzed: ${stats.totalUrls}`);
 	console.log(`Chunks processed: ${processedChunks}`);
 	console.log(`Patterns found: ${memory.patterns.length}`);
-	console.log(`Last analyzed: ${memory.lastAnalyzedDate.toISOString()}`);
+	console.log(
+		`Last analyzed: ${format(memory.lastAnalyzedDate, "yyyy-MM-dd'T'HH:mm:ss'Z'")}`,
+	);
 	console.log(`========================\n`);
 
 	return {
@@ -441,14 +442,13 @@ async function mergeAnalysisResults(
 		newResults,
 	);
 
-	// Log the exact merge prompt being sent to AI
-	console.log("\n=== MERGE PROMPT ===");
-	console.log("System Prompt:", customSystemPrompt || MERGE_SYSTEM_PROMPT);
-	console.log("User Prompt:", mergePrompt);
-	console.log("Prompt Length:", mergePrompt.length, "characters");
-	console.log("Existing patterns:", memory.patterns.length);
-	console.log("New patterns:", newResults.patterns.length);
-	console.log("===================\n");
+	// Log merge info without full prompt
+	console.log("\n=== Starting Merge ===");
+	console.log("Merging analysis results:", {
+		promptLength: mergePrompt.length,
+		existingPatterns: memory.patterns.length,
+		newPatterns: newResults.patterns.length,
+	});
 
 	const session = await createAISession(
 		customSystemPrompt || MERGE_SYSTEM_PROMPT,
@@ -479,14 +479,11 @@ async function mergeAnalysisResults(
 		const duration = ((endTime - startTime) / 1000).toFixed(2);
 
 		console.log(`Merge LLM call completed in ${duration}s`);
-		console.log("Merge response received");
-		console.log("\n=== MERGE RESPONSE ===");
-		console.log("Response Length:", response.length, "characters");
-		console.log(
-			"Response Preview (first 500 chars):",
-			response.substring(0, 500),
-		);
-		console.log("======================\n");
+		console.log(`Merge LLM call completed in ${duration}s`);
+		console.log("Merge response received:", {
+			responseLength: response.length,
+		});
+		console.log("=== Merge Complete ===");
 
 		// Notify that merge is complete
 		if (onProgress) {
@@ -497,50 +494,39 @@ async function mergeAnalysisResults(
 			});
 		}
 
-		let parsed: { userProfile: UserProfile; patterns: WorkflowPattern[] };
 		try {
 			// Clean the response to extract JSON from markdown if needed
 			const cleanedResponse = extractJSONFromResponse(response);
-			parsed = JSON.parse(cleanedResponse);
+			const parsed = JSON.parse(cleanedResponse);
+
+			// Validate with zod schema
+			const validated = AnalysisResultSchema.parse(parsed);
+
+			// Log merge results for debugging
+			console.log("Merge operation:", {
+				beforePatterns: memory.patterns.length,
+				newPatterns: newResults.patterns.length,
+				afterPatterns: validated.patterns.length,
+				sampleBefore: memory.patterns.slice(0, 3).map((p) => p.description),
+				sampleNew: newResults.patterns.slice(0, 3).map((p) => p.description),
+				sampleAfter: validated.patterns.slice(0, 3).map((p) => p.description),
+			});
+
+			return {
+				patterns: validated.patterns,
+				userProfile: validated.userProfile,
+			};
 		} catch (parseError) {
 			console.error("Failed to parse merge response:", parseError);
 			console.error("Response length:", response.length);
-			console.error("Response preview:", `${response.substring(0, 200)}...`);
+			if (parseError instanceof Error) {
+				console.error("Parse error details:", parseError.message);
+			}
 
 			// For merge failures, return the new results as-is
 			console.log("Falling back to new results without merging");
 			return newResults;
 		}
-
-		// Log merge results for debugging
-		console.log("Merge operation:", {
-			beforePatterns: memory.patterns.length,
-			newPatterns: newResults.patterns.length,
-			afterPatterns: parsed.patterns?.length || 0,
-			sampleBefore: memory.patterns.slice(0, 3).map((p) => p.description),
-			sampleNew: newResults.patterns.slice(0, 3).map((p) => p.description),
-			sampleAfter:
-				parsed.patterns
-					?.slice(0, 3)
-					.map((p: WorkflowPattern) => p.description) || [],
-		});
-
-		// Validate and enforce limits
-		const validatedProfile = {
-			...parsed.userProfile,
-			coreIdentities: parsed.userProfile.coreIdentities?.slice(0, 5) || [],
-			personalPreferences:
-				parsed.userProfile.personalPreferences?.slice(0, 8) || [],
-			currentTasks: parsed.userProfile.currentTasks?.slice(0, 10) || [],
-			currentInterests: parsed.userProfile.currentInterests?.slice(0, 8) || [],
-		};
-
-		const validatedPatterns = parsed.patterns?.slice(0, 15) || [];
-
-		return {
-			patterns: validatedPatterns,
-			userProfile: validatedProfile,
-		};
 	} catch (error) {
 		console.error("Failed to merge with memory, returning new results:", error);
 		return newResults;
@@ -834,12 +820,12 @@ async function analyzeChunk(
 	// Build the analysis prompt
 	const prompt = buildAnalysisPrompt(items, historyData);
 
-	// Log the exact prompt being sent to AI
-	console.log("\n=== ANALYSIS PROMPT ===");
-	console.log("System Prompt:", customSystemPrompt || ANALYSIS_SYSTEM_PROMPT);
-	console.log("User Prompt:", prompt);
-	console.log("Prompt Length:", prompt.length, "characters");
-	console.log("======================\n");
+	// Log analysis info without full prompt
+	console.log("\n=== Starting Analysis ===");
+	console.log("Analysis details:", {
+		promptLength: prompt.length,
+		itemCount: items.length,
+	});
 
 	const session = await createAISession(
 		customSystemPrompt || ANALYSIS_SYSTEM_PROMPT,
@@ -851,119 +837,87 @@ async function analyzeChunk(
 
 	try {
 		console.log(`Analyzing chunk with ${items.length} items`);
-		const response = await retryWithBackoff(
-			async () => {
-				// Check abort before making request
-				if (abortSignal?.aborted) {
-					throw new Error("Analysis cancelled");
-				}
-				console.log("Sending analysis prompt to AI...");
-				console.log("Prompt:", `${prompt}`);
-				console.log(
-					"Using response schema:",
-					`${JSON.stringify(ANALYSIS_SCHEMA)}...`,
-				);
 
-				// Notify progress that we're sending analysis prompt
-				if (onProgress) {
-					onProgress({
-						phase: "analyzing",
-						subPhase: "sending-analysis",
-						chunkDescription: `Sending analysis prompt for ${items.length} items`,
-					});
-				}
+		// Check abort before making request
+		if (abortSignal?.aborted) {
+			throw new Error("Analysis cancelled");
+		}
+		console.log("Sending analysis prompt to AI...");
 
-				const startTime = performance.now();
-				const result = await promptAI(session, prompt, {
-					responseConstraint: ANALYSIS_SCHEMA,
-					signal: abortSignal,
-				});
-				const endTime = performance.now();
-				const duration = ((endTime - startTime) / 1000).toFixed(2);
+		// Notify progress that we're sending analysis prompt
+		if (onProgress) {
+			onProgress({
+				phase: "analyzing",
+				subPhase: "sending-analysis",
+				chunkDescription: `Sending analysis prompt for ${items.length} items`,
+			});
+		}
 
-				console.log(
-					`Analysis LLM call completed in ${duration}s for ${items.length} items`,
-				);
+		const startTime = performance.now();
+		const response = await promptAI(session, prompt, {
+			responseConstraint: ANALYSIS_SCHEMA,
+			signal: abortSignal,
+		});
+		const endTime = performance.now();
+		const duration = ((endTime - startTime) / 1000).toFixed(2);
 
-				// Notify that we received response
-				if (onProgress) {
-					onProgress({
-						phase: "analyzing",
-						subPhase: "processing",
-						chunkDescription: `Processing AI response (${duration}s)`,
-					});
-				}
-
-				return result;
-			},
-			3,
-			2000,
-			onProgress
-				? (retryMessage) => onProgress({ phase: "retrying", retryMessage })
-				: undefined,
-			abortSignal,
-		);
-		console.log("Analysis response received");
-		console.log("\n=== ANALYSIS RESPONSE ===");
-		console.log("Response Length:", response.length, "characters");
 		console.log(
-			"Response Preview (first 500 chars):",
-			response.substring(0, 500),
+			`Analysis LLM call completed in ${duration}s for ${items.length} items`,
 		);
-		console.log("=========================\n");
+
+		// Notify that we received response
+		if (onProgress) {
+			onProgress({
+				phase: "analyzing",
+				subPhase: "processing",
+				chunkDescription: `Processing AI response (${duration}s)`,
+			});
+		}
+		console.log(
+			`Analysis LLM call completed in ${duration}s for ${items.length} items`,
+		);
+		console.log("Response received:", {
+			responseLength: response.length,
+		});
+		console.log("=== Analysis Complete ===");
 
 		try {
 			// Clean the response to extract JSON from markdown if needed
 			const cleanedResponse = extractJSONFromResponse(response);
 			const parsed = JSON.parse(cleanedResponse);
 
-			// Ensure patterns is an array and userProfile exists
-			if (!parsed || !Array.isArray(parsed.patterns) || !parsed.userProfile) {
-				// Chrome AI analysis response missing required fields
-				throw new Error("AI response missing required fields");
-			}
-
-			// Validate and enforce limits
-			const validatedProfile = {
-				...parsed.userProfile,
-				coreIdentities: parsed.userProfile.coreIdentities?.slice(0, 5) || [],
-				personalPreferences:
-					parsed.userProfile.personalPreferences?.slice(0, 8) || [],
-				currentTasks: parsed.userProfile.currentTasks?.slice(0, 10) || [],
-				currentInterests:
-					parsed.userProfile.currentInterests?.slice(0, 8) || [],
-			};
-
-			const validatedPatterns = parsed.patterns?.slice(0, 15) || [];
+			// Validate with zod schema
+			const validated = AnalysisResultSchema.parse(parsed);
 
 			return {
-				patterns: validatedPatterns,
-				userProfile: validatedProfile,
+				patterns: validated.patterns,
+				userProfile: validated.userProfile,
 			};
 		} catch (error) {
 			// Failed to parse AI analysis response
 			console.error("Failed to parse AI response:", error);
 			console.error("Raw response length:", response.length);
-			console.error("Response preview:", `${response.substring(0, 200)}...`);
-			console.error(
-				"Response end:",
-				`...${response.substring(Math.max(0, response.length - 200))}`,
-			);
-
-			// Try to show what the cleaning function extracted
-			try {
-				const cleaned = extractJSONFromResponse(response);
-				console.error(
-					"Cleaned response preview:",
-					`${cleaned.substring(0, 200)}...`,
-				);
-			} catch (cleanError) {
-				console.error("Failed to clean response:", cleanError);
+			if (error instanceof Error) {
+				console.error("Parse error details:", error.message);
+				// Show a snippet of the cleaned response for debugging
+				try {
+					const cleaned = extractJSONFromResponse(response);
+					console.error("Cleaned response length:", cleaned.length);
+					// Log the area around the error if we can parse the position
+					const posMatch = error.message.match(/position (\d+)/);
+					if (posMatch) {
+						const pos = parseInt(posMatch[1], 10);
+						const start = Math.max(0, pos - 100);
+						const end = Math.min(cleaned.length, pos + 100);
+						console.error(
+							`JSON around error position ${pos}:`,
+							cleaned.substring(start, end),
+						);
+					}
+				} catch (cleanError) {
+					console.error("Failed to debug cleaned response:", cleanError);
+				}
 			}
-			console.error(
-				"Response end:",
-				`...${response.substring(response.length - 200)}`,
-			);
 
 			// Let the error propagate - no complex recovery
 			throw error;

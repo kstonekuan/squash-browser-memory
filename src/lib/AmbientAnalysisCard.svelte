@@ -1,4 +1,5 @@
 <script lang="ts">
+import { addMinutes, format, formatDistanceToNow, isAfter } from "date-fns";
 import {
 	ambientSettings,
 	toggleAmbientAnalysis as toggleAmbient,
@@ -73,18 +74,19 @@ function formatLastRunTime(): string {
 	const date = new Date(settings.lastRunTimestamp);
 	const now = new Date();
 	const diffMs = now.getTime() - date.getTime();
-	const diffMins = Math.floor(diffMs / 60000);
 
-	if (diffMins < 1) {
+	// For very recent times (less than a minute), show "Just now"
+	if (diffMs < 60000) {
 		return "Just now";
-	} else if (diffMins < 60) {
-		return `${diffMins} minute${diffMins !== 1 ? "s" : ""} ago`;
-	} else if (diffMins < 1440) {
-		const hours = Math.floor(diffMins / 60);
-		return `${hours} hour${hours !== 1 ? "s" : ""} ago`;
-	} else {
-		return date.toLocaleDateString();
 	}
+
+	// For times within the last 24 hours, use formatDistanceToNow
+	if (diffMs < 24 * 60 * 60 * 1000) {
+		return formatDistanceToNow(date, { addSuffix: true });
+	}
+
+	// For older times, show the date
+	return format(date, "PP");
 }
 
 function getStatusIcon() {
@@ -114,20 +116,14 @@ function getStatusColor() {
 function getNextAnalysisTime(): string {
 	// If we have the actual alarm time, use it
 	if (settings.nextAlarmTime) {
-		return new Date(settings.nextAlarmTime).toLocaleTimeString([], {
-			hour: "2-digit",
-			minute: "2-digit",
-		});
+		return format(new Date(settings.nextAlarmTime), "p");
 	}
 
 	// Otherwise, estimate based on last run
 	if (!settings.lastRunTimestamp) {
 		// First run will be in 1 minute
 		const nextTime = new Date(Date.now() + 60000);
-		return nextTime.toLocaleTimeString([], {
-			hour: "2-digit",
-			minute: "2-digit",
-		});
+		return format(nextTime, "p");
 	} else {
 		// Calculate next hourly run
 		const lastRun = new Date(settings.lastRunTimestamp);
@@ -139,10 +135,7 @@ function getNextAnalysisTime(): string {
 			nextTime = new Date(nextTime.getTime() + 3600000);
 		}
 
-		return nextTime.toLocaleTimeString([], {
-			hour: "2-digit",
-			minute: "2-digit",
-		});
+		return format(nextTime, "p");
 	}
 }
 </script>
