@@ -13,20 +13,17 @@ An intelligent Chrome extension that analyzes your browsing history to identify 
     - Customize the AI prompts used for analysis, data chunking, and memory integration.
     - Configure API keys for remote providers.
     - Manage ambient analysis settings and notifications.
-- **Robust & Resilient**: Designed with intelligent error handling, including automatic retries and fallbacks, to ensure smooth analysis even with large history datasets.
+- **Robust & Resilient**: Designed with intelligent error handling, including automatic retries, fallbacks, and a keepalive mechanism to ensure the analysis process is not interrupted.
 - **Privacy-First Design**: Your data stays on your device by default. The extension provides clear warnings and requires explicit consent before using any remote service.
 - **Side Panel UI**: A clean and intuitive interface that works alongside your browsing without needing a full tab.
 
 ## How It Works
 
-The extension uses a multi-stage pipeline to analyze your history:
+The extension analyzes your history in the background using a multi-stage pipeline that runs in a dedicated offscreen document for stability.
 
-1.  **History Fetching**: Gathers your browsing history within a selected date range.
-2.  **Intelligent Chunking**: Uses AI to group raw history items into logical browsing sessions or "chunks."
-3.  **Pattern Analysis**: Each chunk is analyzed by the AI to identify recurring sequences and user behavior.
-4.  **Memory Integration**: New findings are merged with the long-term memory, refining existing patterns and improving the user profile.
-5.  **Context Injection**: On supported AI chat sites, the extension provides a button to inject relevant context from your memory directly into your prompts.
-6.  **Results Display**: Aggregated results, patterns, and suggestions are displayed in the side panel.
+1.  **Fetch & Chunk**: Browsing history is collected and intelligently grouped into browsing sessions using AI.
+2.  **Analyze & Learn**: Each session is analyzed to identify patterns. These findings are integrated with a long-term memory to build a profile of your habits over time.
+3.  **Inject & Display**: The discovered patterns and profile are used to provide contextual suggestions on AI chat platforms and are displayed in the extension's side panel.
 
 ## Context Injection on AI Chat Platforms
 
@@ -102,6 +99,7 @@ For a detailed technical overview, please see [ARCHITECTURE.md](./ARCHITECTURE.m
 - `pnpm build`: Run checks and build the extension.
 - `pnpm check`: Run all quality checks (Biome, TypeScript, Svelte, tests).
 - `pnpm test`: Run tests in watch mode.
+- `pnpm test:ui`: Run tests with the Vitest UI.
 
 ## Privacy Notice
 
@@ -121,7 +119,5 @@ The extension requires the following permissions:
 - `notifications`: To show the status of background analysis.
 - `unlimitedStorage`: To store a larger amount of browsing history data and analysis results locally on your device.
 - `activeTab`: Used by the content script to interact with the chat interface on supported websites.
+- `offscreen`: To run the AI analysis in a separate, non-visible document.
 
-## TODO
-
-- Clean up Chrome Built-In AI usage instructions

@@ -1,3 +1,4 @@
+import { format, isValid, parseISO } from "date-fns";
 import type { UserProfile, WorkflowPattern } from "../types";
 
 // Memory structure for accumulated analysis
@@ -82,48 +83,34 @@ export async function loadMemory(): Promise<AnalysisMemory | null> {
 			typeof dateValue,
 		);
 
-		// Handle different possible date formats
+		// Handle different possible date formats using date-fns
 		let parsedDate: Date;
 		if (dateValue instanceof Date) {
 			// Already a Date object
 			parsedDate = dateValue;
 		} else if (typeof dateValue === "string") {
 			// ISO string from JSON serialization
-			parsedDate = new Date(dateValue);
+			parsedDate = parseISO(dateValue);
 		} else if (typeof dateValue === "number") {
 			// Unix timestamp
 			parsedDate = new Date(dateValue);
-		} else if (typeof dateValue === "object" && dateValue !== null) {
-			// Date object that lost its prototype during JSON serialization/deserialization
-			console.warn(
-				"Date stored as plain object, attempting to recover:",
-				dateValue,
-			);
-			try {
-				// Try to convert the object to a string and parse it
-				const dateString = String(dateValue);
-				parsedDate = new Date(dateString);
-
-				// If that didn't work, it might be a Date object that lost its prototype
-				if (Number.isNaN(parsedDate.getTime())) {
-					// Force create a new Date from current time as fallback
-					console.warn(
-						"Could not recover date from object, using current time",
-					);
-					parsedDate = new Date();
-				}
-			} catch (error) {
-				console.warn("Error parsing date object:", error);
-				parsedDate = new Date();
-			}
 		} else {
-			// Invalid format
+			// Fallback for any other format
 			console.warn(
 				"Unexpected date format in storage:",
 				dateValue,
 				typeof dateValue,
 			);
 			parsedDate = new Date();
+		}
+
+		// Validate the parsed date
+		if (!isValid(parsedDate)) {
+			console.warn(
+				"Invalid lastAnalyzedDate in stored memory, using epoch:",
+				dateValue,
+			);
+			parsedDate = new Date(0);
 		}
 
 		stored.lastAnalyzedDate = parsedDate;
@@ -151,15 +138,6 @@ export async function loadMemory(): Promise<AnalysisMemory | null> {
 		delete stored.userProfile.personalPreferences;
 		delete stored.userProfile.currentTasks;
 		delete stored.userProfile.currentInterests;
-
-		// Validate the date conversion
-		if (Number.isNaN(stored.lastAnalyzedDate.getTime())) {
-			console.warn(
-				"Invalid lastAnalyzedDate in stored memory, using epoch. Original value:",
-				dateValue,
-			);
-			stored.lastAnalyzedDate = new Date(0);
-		}
 
 		// Check version compatibility
 		if (stored.version !== MEMORY_VERSION) {
@@ -198,10 +176,31 @@ export async function saveMemory(memory: AnalysisMemory): Promise<void> {
 			return;
 		}
 
+		// Ensure lastAnalyzedDate is properly formatted
+		// This handles Date objects, ISO strings, timestamps, or any valid date format
+		let lastAnalyzedDate =
+			memory.lastAnalyzedDate instanceof Date
+				? memory.lastAnalyzedDate
+				: typeof memory.lastAnalyzedDate === "string"
+					? parseISO(memory.lastAnalyzedDate)
+					: new Date(memory.lastAnalyzedDate);
+
+		// Validate the date
+		if (!isValid(lastAnalyzedDate)) {
+			console.warn(
+				"[Memory] Invalid lastAnalyzedDate, using current date:",
+				memory.lastAnalyzedDate,
+			);
+			lastAnalyzedDate = new Date();
+		}
+
 		// Normalize the date to an ISO string before saving to prevent serialization issues
 		const memoryToSave = {
 			...memory,
-			lastAnalyzedDate: memory.lastAnalyzedDate.toISOString(),
+			lastAnalyzedDate: format(
+				lastAnalyzedDate,
+				"yyyy-MM-dd'T'HH:mm:ss.SSS'Z'",
+			),
 			lastHistoryTimestamp: memory.lastHistoryTimestamp,
 		};
 
@@ -209,7 +208,7 @@ export async function saveMemory(memory: AnalysisMemory): Promise<void> {
 		console.log("[Memory] Saved to chrome.storage.local:", {
 			key: MEMORY_KEY,
 			patterns: memory.patterns.length,
-			lastAnalyzedDate: memory.lastAnalyzedDate,
+			lastAnalyzedDate: lastAnalyzedDate,
 			lastAnalyzedDateISO: memoryToSave.lastAnalyzedDate,
 			lastHistoryTimestamp: memory.lastHistoryTimestamp,
 			userProfile: {

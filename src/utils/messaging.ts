@@ -4,7 +4,9 @@
  */
 
 import { defineExtensionMessaging } from "@webext-core/messaging";
+import type { FullAnalysisResult } from "../types";
 import type { CustomPrompts } from "./analyzer";
+import type { AnalysisMemory } from "./memory";
 
 // Progress information for analysis
 export interface AnalysisProgress {
@@ -75,6 +77,43 @@ interface ProtocolMap {
 	"ambient:query-next-alarm": () => {
 		nextRunTime?: number;
 		alarmExists: boolean;
+	};
+
+	// Offscreen document messages
+	"offscreen:start-analysis": (data: {
+		historyItems: chrome.history.HistoryItem[];
+		customPrompts?: CustomPrompts;
+		analysisId: string;
+		trigger: "manual" | "alarm";
+	}) => void;
+
+	"offscreen:cancel": (data: { analysisId: string }) => {
+		success: boolean;
+		error?: string;
+	};
+
+	"offscreen:progress": (data: AnalysisProgress) => void;
+
+	"offscreen:analysis-complete": (data: {
+		analysisId: string;
+		result: FullAnalysisResult;
+	}) => void;
+
+	"offscreen:analysis-error": (data: {
+		analysisId: string;
+		error: string;
+	}) => void;
+
+	"offscreen:read-memory": () => {
+		memory: AnalysisMemory | null;
+	};
+
+	"offscreen:write-memory": (data: { memory: AnalysisMemory }) => {
+		success: boolean;
+	};
+
+	"offscreen:keepalive": () => {
+		success: boolean;
 	};
 }
 

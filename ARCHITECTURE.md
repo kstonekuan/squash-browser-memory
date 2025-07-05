@@ -4,6 +4,49 @@
 
 The **History Workflow Analyzer** is a Chrome browser extension that analyzes browsing history to identify repetitive workflows and behavioral patterns. It uses a dual AI provider model, supporting both Chrome's built-in AI for local processing and remote AI providers for more powerful analysis.
 
+### High-Level Diagram
+
+```text
++---------------------------------------------------------------------------------+
+|                                  User Interface                                 |
+|---------------------------------------------------------------------------------|
+|      Side Panel UI (Svelte)      |      Content Script (on AI Chat sites)       |
+| (Initiates analysis, displays    | (Injects context button, reads user input)   |
+|  results, manages settings)      |                                              |
++-----------------|--------------------------------------|------------------------+
+                  | (User Actions)                       | (Context Request)
+                  v                                      v
++---------------------------------------------------------------------------------+
+|                             Service Worker (background.ts)                      |
+|---------------------------------------------------------------------------------|
+| - Manages extension lifecycle & UI events.                                      |
+| - Handles alarms for ambient analysis.                                          |
+| - Launches and communicates with the Offscreen Document.                        |
+| - Relays progress and results to the UI.                                        |
+| - Acts as a proxy for Chrome Storage access.                                    |
++-----------------|--------------------------^-----------|------------------------+
+                  | (Start Analysis)         | (R/W Memory) | (Read Memory)
+                  v                          |           v
++----------------------------------+         |  +---------------------------------------+
+|    Offscreen Document            |         |  |      Chrome Storage API               |
+|    (offscreen.ts)                |---------+  |---------------------------------------|
+|----------------------------------|            | - Stores analysis memory (patterns,   |
+| - Performs heavy lifting:        |            |   user profile).                      |
+|   - Fetches history              |            | - Persists user settings.             |
+|   - Chunks data                  |            +---------------------------------------+
+|   - Manages AI sessions          |
+|   - Merges results into memory   |
++----------------|-----------------+
+                 | (AI API Calls)
+                 v
++----------------------------------+
+|    AI Providers                  |
+|----------------------------------|
+| - Chrome AI (Local, on-device)   |
+| - Claude API (Remote)            |
++----------------------------------+
+```
+
 ## Tech Stack
 
 - **Frontend Framework**: Svelte 5 with TypeScript
@@ -23,6 +66,8 @@ The extension follows Chrome's Manifest V3 specification:
 ├── manifest.json          # Extension configuration and permissions
 ├── background.ts           # Service worker for extension lifecycle
 ├── sidepanel.html         # HTML shell for the side panel UI
+├── offscreen.html         # HTML for the offscreen document
+├── offscreen.ts           # Logic for the offscreen document
 ├── content-scripts/       # Scripts for interacting with web pages
 └── src/                   # Application source code
 ```
@@ -33,6 +78,7 @@ The extension follows Chrome's Manifest V3 specification:
 - `sidePanel`: Side panel UI integration.
 - `activeTab`: For context injection on supported sites.
 - `alarms` & `notifications`: For ambient background analysis.
+- `offscreen`: To run analysis in a separate, non-visible document.
 
 ### 2. Core Application (`src/`)
 
@@ -41,57 +87,48 @@ The extension follows Chrome's Manifest V3 specification:
 - **`sidepanel.ts`** - Entry point that mounts the Svelte application
 - **`types.ts`** - TypeScript interfaces for data structures
 
-#### Component Library (`src/lib/`)
-- **`HistoryFetcher.svelte`** - Handles Chrome history API interactions
-- **`AnalysisProgress.svelte`** - Real-time progress tracking UI
-- **`AnalysisResults.svelte`** - Display analysis results and insights
-- **`AIProviderStatus.svelte`** - Shows AI provider availability and status
-- **`AdvancedSettings.svelte`** - Configuration for AI providers, prompts, and ambient analysis.
-- **`ContextSelector.svelte`** - UI for the context injection feature.
 
-#### Utility Modules (`src/utils/`)
-
-**Core Analysis Engine:**
-- **`analyzer.ts`** - Main analysis orchestration with chunking and AI integration
-- **`ai-provider-factory.ts`** - Factory for creating AI provider instances (local or remote).
-- **`chrome-ai.ts`** - Wrapper for Chrome's built-in AI Language Model API.
-- **`remote-ai.ts`** - Wrapper for remote AI APIs (e.g., Anthropic Claude).
-- **`chunking.ts`** - Intelligent time-based data segmentation.
-
-**Supporting Utilities:**
-- **`memory.ts`** - Persistent storage for analysis state and accumulated insights.
-- **`constants.ts`** - AI prompts and configuration constants.
-- **`schemas.ts`** - JSON Schema validation for AI responses.
-- **`simple-context-matcher.ts`** - Logic for matching user input to stored memory for context injection.
 
 ### 3. Data Flow Architecture
 
-#### Analysis Pipeline
+The analysis pipeline is designed to be robust and resilient, running entirely within a dedicated offscreen document to prevent the main service worker from being terminated during long-running tasks.
 
 ```mermaid
 graph TD
-    A[Chrome History API] --> B[History Items Collection]
-    B --> C[Statistical Calculation]
-    C --> D[AI-Powered Chunking]
-    D --> E[Chunk Processing]
-    E --> F[Pattern Analysis per Chunk]
-    F --> G[Memory Integration]
-    G --> H[Results Aggregation]
-    H --> I[UI Display]
+    subgraph User Interface
+        A[Side Panel]
+        B[Content Script]
+    end
+
+    subgraph Background
+        C[Service Worker]
+        D[Offscreen Document]
+    end
+
+    subgraph Data & AI
+        E[Chrome Storage]
+        F[AI Providers]
+    end
+
+    A --> C
+    B --> C
+    C <--> D
+    C <--> E
+    D --> F
 ```
 
 ### 4. AI Integration Architecture
 
-The extension supports two types of AI providers, configured via a factory pattern (`ai-provider-factory.ts`).
+The extension supports two types of AI providers, configured via a factory pattern (`ai-provider-factory.ts`). The AI analysis is performed within the offscreen document, which communicates with the selected AI provider.
 
 #### 4.1. Chrome AI (Local)
-- **Local Processing**: Uses Chrome's built-in Language Model API (no external API calls).
+- **Local Processing**: Uses Chrome's built-in Language Model API (no external API calls). The offscreen document creates a session with the local model.
 - **Privacy-First**: All data processing happens locally in the browser.
 - **Token Management**: Automatic chunking to stay within Chrome AI's token limits.
 - **Retry Logic**: Exponential backoff for quota-exceeded scenarios.
 
 #### 4.2. Remote AI (e.g., Anthropic Claude)
-- **Remote Processing**: Sends browsing history to a third-party API.
+- **Remote Processing**: The offscreen document sends browsing history to a third-party API.
 - **User Consent**: Requires explicit user configuration and API key entry.
 - **Flexibility**: Allows for more powerful models at the cost of privacy.
 
@@ -117,11 +154,7 @@ A key feature of the extension is its ability to inject context into popular AI 
 - **String Similarity**: As the user types, it uses a simple string similarity algorithm (Dice's Coefficient) to find relevant context from memory.
 - **Suggestion UI**: Displays relevant suggestions in a dropdown panel, allowing the user to insert them into their prompt.
 
-#### 6.3. User Experience
-1.  **Button Appears**: A "Context" button is added to the chat UI.
-2.  **User Types**: The script analyzes the input text.
-3.  **Suggestions Offered**: If relevant context is found, the button becomes active. Clicking it reveals suggestions.
-4.  **User Inserts**: The user can click a suggestion to add it to their prompt, or shift-click the button to insert a structured summary of their profile.
+
 
 ### 7. Error Handling and Resilience
 

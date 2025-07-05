@@ -3,7 +3,7 @@
 
 import { format } from "date-fns";
 import { match } from "ts-pattern";
-import { analyzeHistoryItems } from "./utils/analyzer";
+import { loadMemory, saveMemory } from "./utils/memory";
 import type { AnalysisProgress } from "./utils/messaging";
 import { onMessage, sendMessage } from "./utils/messaging";
 
@@ -35,6 +35,56 @@ let currentAnalysisId: string | null = null;
 // Using the AnalysisProgress type from messaging.ts
 
 const analysisProgressMap = new Map<string, AnalysisProgress>();
+
+// Offscreen document management
+let creatingOffscreenDocument: Promise<void> | null = null;
+
+async function ensureOffscreenDocument(): Promise<void> {
+	// Check if we're already creating the document
+	if (creatingOffscreenDocument) {
+		await creatingOffscreenDocument;
+		return;
+	}
+
+	// Check if document already exists
+	const contexts = await chrome.runtime.getContexts({
+		contextTypes: ["OFFSCREEN_DOCUMENT" as chrome.runtime.ContextType],
+	});
+
+	if (contexts.length > 0) {
+		console.log("[Background] Offscreen document already exists");
+		return;
+	}
+
+	// Create the document
+	console.log("[Background] Creating offscreen document");
+	creatingOffscreenDocument = chrome.offscreen.createDocument({
+		url: "offscreen.html",
+		reasons: ["DOM_PARSER" as chrome.offscreen.Reason],
+		justification:
+			"AI analysis of browsing history requires DOM parsing capabilities",
+	});
+
+	try {
+		await creatingOffscreenDocument;
+		console.log("[Background] Offscreen document created successfully");
+	} catch (error) {
+		console.error("[Background] Failed to create offscreen document:", error);
+		throw error;
+	} finally {
+		creatingOffscreenDocument = null;
+	}
+}
+
+async function _closeOffscreenDocument(): Promise<void> {
+	try {
+		await chrome.offscreen.closeDocument();
+		console.log("[Background] Offscreen document closed");
+	} catch (error) {
+		// Document might not exist, ignore error
+		console.debug("[Background] Error closing offscreen document:", error);
+	}
+}
 
 // Load auto-analysis settings
 async function loadAutoAnalysisSettings(): Promise<AutoAnalysisSettings> {
@@ -113,9 +163,9 @@ async function broadcastAnalysisStatus(
 }
 
 // Track active analyses
-const activeAnalyses = new Map<string, AbortController>();
+const activeAnalyses = new Map<string, boolean>();
 
-// Common analysis runner
+// Common analysis runner - delegates to offscreen document
 async function runAnalysis(
 	historyItems: chrome.history.HistoryItem[],
 	analysisId: string,
@@ -127,82 +177,54 @@ async function runAnalysis(
 	trigger: "manual" | "alarm" = "manual",
 ): Promise<void> {
 	console.log(
-		`[Analysis] Starting analysis for ${historyItems.length} items with ID: ${analysisId} (triggered by: ${trigger})`,
+		`[Background] Starting analysis for ${historyItems.length} items with ID: ${analysisId} (triggered by: ${trigger})`,
 	);
 
-	const abortController = new AbortController();
-	activeAnalyses.set(analysisId, abortController);
+	activeAnalyses.set(analysisId, true);
 
 	try {
-		// Run analysis directly in service worker
-		const result = await analyzeHistoryItems(
-			historyItems,
-			customPrompts,
-			// Progress callback
-			async (info) => {
-				console.log(`[Analysis] Progress: ${info.phase}`, info);
+		// Ensure offscreen document exists
+		await ensureOffscreenDocument();
 
-				// Send progress update
-				try {
-					await sendMessage("analysis:progress", {
-						analysisId,
-						phase: info.phase,
-						subPhase: info.subPhase,
-						chunkProgress:
-							info.currentChunk !== undefined && info.totalChunks !== undefined
-								? {
-										current: info.currentChunk,
-										total: info.totalChunks,
-										description: info.chunkDescription || "",
-									}
-								: info.chunkDescription && !info.currentChunk
-									? {
-											current: 0,
-											total: 0,
-											description: info.chunkDescription,
-										}
-									: undefined,
-					});
-				} catch (err) {
-					// This is expected if the side panel is closed
-					if (
-						err instanceof Error &&
-						err.message.includes("Could not establish connection")
-					) {
-						console.debug(
-							"[Analysis] Side panel closed, skipping progress update",
-						);
-					} else {
-						console.error(`[Analysis] Failed to send progress update:`, err);
+		// Send analysis request to offscreen document and wait for completion
+		await new Promise<void>((resolve, reject) => {
+			// Set up one-time listeners for completion/error
+			const completeHandler = onMessage(
+				"offscreen:analysis-complete",
+				async (msg) => {
+					if (msg.data.analysisId === analysisId) {
+						completeHandler();
+						errorHandler();
+						resolve();
 					}
-				}
-			},
-			abortController.signal,
-		);
+				},
+			);
 
-		console.log(`[Analysis] Completed:`, result);
+			const errorHandler = onMessage(
+				"offscreen:analysis-error",
+				async (msg) => {
+					if (msg.data.analysisId === analysisId) {
+						completeHandler();
+						errorHandler();
+						reject(new Error(msg.data.error));
+					}
+				},
+			);
 
-		// Send final progress update
-		try {
-			await sendMessage("analysis:progress", {
+			// Send the start message
+			sendMessage("offscreen:start-analysis", {
+				historyItems,
+				customPrompts,
 				analysisId,
-				phase: "complete",
-				subPhase: undefined,
-				chunkProgress: undefined,
+				trigger,
+			}).catch((error) => {
+				completeHandler();
+				errorHandler();
+				reject(error);
 			});
-		} catch (err) {
-			// This is expected if the side panel is closed
-			if (
-				err instanceof Error &&
-				err.message.includes("Could not establish connection")
-			) {
-				console.debug(
-					"[Analysis] Side panel closed, skipping completion progress",
-				);
-			} else {
-				console.error(`[Analysis] Failed to send completion progress:`, err);
-			}
-		}
+		});
+
+		console.log(`[Background] Analysis completed`);
 
 		// Send success notification
 		await broadcastAnalysisStatus("completed", {
@@ -226,14 +248,14 @@ async function runAnalysis(
 			);
 		}
 	} catch (error) {
-		console.error(`[Analysis] Error:`, error);
+		console.error(`[Background] Analysis error:`, error);
 
 		const errorMessage =
 			error instanceof Error ? error.message : "Unknown error";
 
 		// Handle different error types
 		await match(error)
-			.with({ name: "AbortError" }, async () => {
+			.with({ message: "Analysis cancelled" }, async () => {
 				await broadcastAnalysisStatus("error", {
 					error: "Analysis cancelled",
 					message: "Analysis was cancelled by user",
@@ -278,7 +300,7 @@ async function runAnalysis(
 			await chrome.alarms.create(ALARM_NAME, {
 				delayInMinutes: 60,
 			});
-			console.log("[Analysis] Next analysis scheduled in 1 hour");
+			console.log("[Background] Next analysis scheduled in 1 hour");
 		}
 	}
 }
@@ -497,16 +519,41 @@ onMessage("settings:toggle-auto-analysis", async (message) => {
 	}
 });
 
-onMessage("analysis:start-manual", async () => {
-	// Let triggerAnalysis handle all the checks
+onMessage("analysis:start-manual", async (message) => {
+	const { historyItems, customPrompts } = message.data;
+
+	// Check if analysis is already running
+	if (isAnalysisRunning) {
+		console.log("[Background] Analysis already in progress, skipping.");
+		return {
+			success: false,
+			error: "Analysis is already in progress",
+		};
+	}
+
+	isAnalysisRunning = true;
+	const analysisId = `manual-${Date.now()}`;
+	currentAnalysisId = analysisId;
+
+	await broadcastAnalysisStatus("started", {
+		message: `Starting manual analysis of ${historyItems.length} items...`,
+	});
+
 	try {
-		await triggerAnalysis("manual");
+		console.log(
+			`[Background] Starting manual analysis with ${historyItems.length} items`,
+		);
+		await runAnalysis(historyItems, analysisId, customPrompts, "manual");
+
 		return {
 			success: true,
-			analysisId: currentAnalysisId || undefined,
+			analysisId: analysisId,
 		};
 	} catch (error) {
-		console.error("[Background] Manual analysis trigger failed:", error);
+		console.error("[Background] Manual analysis failed:", error);
+		isAnalysisRunning = false;
+		currentAnalysisId = null;
+
 		return {
 			success: false,
 			error: error instanceof Error ? error.message : "Unknown error",
@@ -516,19 +563,34 @@ onMessage("analysis:start-manual", async () => {
 
 onMessage("analysis:cancel", async (message) => {
 	const data = message.data;
-	console.log("[Analysis] Received cancellation request");
+	console.log("[Background] Received cancellation request");
 
 	if (!currentAnalysisId || currentAnalysisId !== data.analysisId) {
 		return { success: false, error: "No matching analysis in progress" };
 	}
 
-	// Cancel the analysis
-	const abortController = activeAnalyses.get(data.analysisId);
-	if (abortController) {
-		console.log("[Analysis] Cancelling analysis:", data.analysisId);
-		abortController.abort();
-		activeAnalyses.delete(data.analysisId);
-		return { success: true };
+	// Send cancel message to offscreen document
+	if (activeAnalyses.has(data.analysisId)) {
+		console.log("[Background] Cancelling analysis:", data.analysisId);
+
+		try {
+			// Ensure offscreen document exists
+			const contexts = await chrome.runtime.getContexts({
+				contextTypes: ["OFFSCREEN_DOCUMENT" as chrome.runtime.ContextType],
+			});
+
+			if (contexts.length > 0) {
+				await sendMessage("offscreen:cancel", {
+					analysisId: data.analysisId,
+				});
+			}
+
+			activeAnalyses.delete(data.analysisId);
+			return { success: true };
+		} catch (error) {
+			console.error("[Background] Failed to cancel analysis:", error);
+			return { success: false, error: "Failed to send cancel message" };
+		}
 	} else {
 		return { success: false, error: "Analysis not found" };
 	}
@@ -562,26 +624,44 @@ onMessage("analysis:get-state", async () => {
 	};
 });
 
-// Handle progress updates from offscreen document
-onMessage("analysis:progress", async (message) => {
-	const data = message.data;
+// Handle offscreen document messages
+onMessage("offscreen:progress", async (message) => {
+	const progress = message.data;
+
+	console.log("[Background] Received progress from offscreen:", {
+		phase: progress.phase,
+		analysisId: progress.analysisId,
+		chunkProgress: progress.chunkProgress,
+	});
 
 	// Store progress for state queries
-	if (data.analysisId) {
-		analysisProgressMap.set(data.analysisId, {
-			analysisId: data.analysisId,
-			phase: data.phase,
-			subPhase: data.subPhase,
-			chunkProgress: data.chunkProgress,
-		} as AnalysisProgress);
+	if (progress.analysisId) {
+		analysisProgressMap.set(progress.analysisId, progress);
 	}
 
-	// Forward to popup/side panel and all contexts
+	// Forward to side panel
 	try {
-		await sendMessage("analysis:progress", data);
-	} catch {
-		// No listeners active
+		await sendMessage("analysis:progress", progress);
+		console.log("[Background] Forwarded progress to side panel");
+	} catch (err) {
+		// Side panel might be closed
+		console.debug("[Background] Failed to forward progress:", err);
 	}
+});
+
+onMessage("offscreen:read-memory", async () => {
+	const memory = await loadMemory();
+	return { memory };
+});
+
+onMessage("offscreen:write-memory", async (message) => {
+	await saveMemory(message.data.memory);
+	return { success: true };
+});
+
+onMessage("offscreen:keepalive", async () => {
+	// Just acknowledge keepalive
+	return { success: true };
 });
 
 // Handle errors

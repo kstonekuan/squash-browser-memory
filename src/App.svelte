@@ -267,19 +267,34 @@ onMount(() => {
 	onMessage("analysis:progress", async (message) => {
 		const data = message.data;
 
+		console.log("[App] Received progress:", {
+			phase: data.phase,
+			analysisId: data.analysisId,
+			currentAnalysisId,
+			isManualAnalysisRunning,
+			chunkProgress: data.chunkProgress,
+		});
+
 		// Update UI with progress information
-		// Check if it's our analysis (manual or ambient)
+		// Check if it's our analysis
 		const isOurAnalysis =
-			(data.analysisId && data.analysisId === currentAnalysisId) ||
-			(data.analysisId?.startsWith("manual-") && isManualAnalysisRunning) ||
-			(data.analysisId?.startsWith("ambient-") && isAmbientAnalysisRunning);
+			data.analysisId && data.analysisId === currentAnalysisId;
+
+		console.log("[App] Analysis ID match:", {
+			isOurAnalysis,
+			dataId: data.analysisId,
+			currentId: currentAnalysisId,
+		});
 
 		if (isOurAnalysis) {
+			console.log("[App] Updating UI with progress");
 			analysisPhase = data.phase;
 			subPhase = data.subPhase;
 			if (data.chunkProgress) {
 				chunkProgress = data.chunkProgress;
 			}
+		} else {
+			console.log("[App] Ignoring progress - not our analysis");
 		}
 	});
 });

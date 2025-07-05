@@ -11,7 +11,8 @@
 		"alarms",
 		"notifications",
 		"unlimitedStorage",
-		"activeTab"
+		"activeTab",
+		"offscreen"
 	],
 	"host_permissions": ["https://api.anthropic.com/*"],
 	"background": {
