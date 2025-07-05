@@ -1,4 +1,5 @@
 <script lang="ts">
+import { format, formatDistanceToNow } from "date-fns";
 import {
 	ambientSettings,
 	toggleAmbientAnalysis,
@@ -165,18 +166,7 @@ function formatLastRunTime(): string {
 	}
 
 	const date = new Date(autoAnalysisSettings.lastRunTimestamp);
-	const now = new Date();
-	const diffMs = now.getTime() - date.getTime();
-	const diffMins = Math.floor(diffMs / 60000);
-
-	if (diffMins < 60) {
-		return `${diffMins} minute${diffMins !== 1 ? "s" : ""} ago`;
-	} else if (diffMins < 1440) {
-		const hours = Math.floor(diffMins / 60);
-		return `${hours} hour${hours !== 1 ? "s" : ""} ago`;
-	} else {
-		return date.toLocaleString();
-	}
+	return formatDistanceToNow(date, { addSuffix: true });
 }
 </script>
 

@@ -1,3 +1,11 @@
+import {
+	endOfDay,
+	format,
+	setHours,
+	setMinutes,
+	setSeconds,
+	startOfDay,
+} from "date-fns";
 import type { z } from "zod";
 import { createAISession, promptAI } from "./ai-session-factory";
 import { buildChunkingPrompt, CHUNK_SYSTEM_PROMPT } from "./constants";
@@ -45,9 +53,6 @@ export async function identifyChunks(
 
 	const prompt = buildChunkingPrompt(timestamps);
 
-	// Log the exact chunking prompt being sent to AI
-	console.log("\n=== CHUNKING PROMPT ===");
-	console.log("System Prompt:", customChunkPrompt || CHUNK_SYSTEM_PROMPT);
 	console.log("\n=== Starting Chunking ===");
 	console.log("Prompt Length:", prompt.length, "characters");
 	console.log("Timestamp count:", timestamps.length);
@@ -224,10 +229,7 @@ async function identifyChunksForBatch(
 
 	const prompt = buildChunkingPrompt(timestamps);
 
-	// Log the exact batch chunking prompt being sent to AI
-	console.log("\n=== BATCH CHUNKING PROMPT ===");
-	console.log("System Prompt:", customChunkPrompt || CHUNK_SYSTEM_PROMPT);
-	console.log("\n=== Starting Chunking ===");
+	console.log("\n=== Starting Batch Chunking ===");
 	console.log("Prompt Length:", prompt.length, "characters");
 	console.log("Batch timestamp count:", timestamps.length);
 	console.log("=============================\n");
@@ -357,31 +359,18 @@ export function createHalfDayChunks(timestamps: number[]): ChunkTimeRange[] {
 
 	for (const ts of sortedTimestamps) {
 		const date = new Date(ts);
-		const year = date.getFullYear();
-		const month = date.getMonth();
-		const day = date.getDate();
 		const period = date.getHours() < 12 ? "AM" : "PM";
-		const key = `${year}-${month}-${day}-${period}`;
+		const key = `${format(date, "yyyy-MM-dd")}-${period}`;
 
 		if (!chunks.has(key)) {
-			const startTime = new Date(
-				year,
-				month,
-				day,
-				period === "AM" ? 0 : 12,
-				0,
-				0,
-				0,
-			).getTime();
-			const endTime = new Date(
-				year,
-				month,
-				day,
-				period === "AM" ? 11 : 23,
-				59,
-				59,
-				999,
-			).getTime();
+			const baseDate = startOfDay(date);
+			const startTime =
+				period === "AM" ? baseDate.getTime() : setHours(baseDate, 12).getTime();
+			const endTime =
+				period === "AM"
+					? setSeconds(setMinutes(setHours(baseDate, 11), 59), 59).getTime() +
+						999
+					: endOfDay(baseDate).getTime();
 			chunks.set(key, { startTime, endTime });
 		}
 	}
@@ -395,7 +384,7 @@ export function createHalfDayChunks(timestamps: number[]): ChunkTimeRange[] {
 		return {
 			startTime,
 			endTime,
-			description: `${startDate.toLocaleDateString()} ${period}`,
+			description: `${format(startDate, "PP")} ${period}`,
 		};
 	});
 }

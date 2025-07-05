@@ -1,6 +1,7 @@
 <script lang="ts">
 import { format, subDays, subHours, subWeeks } from "date-fns";
 import { createEventDispatcher, onMount } from "svelte";
+import { match } from "ts-pattern";
 import { loadAIConfig } from "../utils/ai-config";
 import type { AIProviderType } from "../utils/ai-interface";
 import { loadMemory } from "../utils/memory";
@@ -14,7 +15,8 @@ let { isAnalyzing = $bindable(false), isAmbientAnalysisRunning = false } =
 const dispatch = createEventDispatcher();
 
 let error = $state("");
-let dateRange = $state("1hour"); // 1hour, 3hours, day, week, all
+type DateRange = "1hour" | "3hours" | "day" | "week" | "all";
+let dateRange = $state<DateRange>("1hour");
 let fetchProgress = $state(0);
 let isFetching = $state(false);
 let rawHistoryData = $state<chrome.history.HistoryItem[] | null>(null);
@@ -95,19 +97,13 @@ function getStartTime(): number {
 	}
 
 	const now = new Date();
-	switch (dateRange) {
-		case "1hour":
-			return subHours(now, 1).getTime();
-		case "3hours":
-			return subHours(now, 3).getTime();
-		case "day":
-			return subDays(now, 1).getTime();
-		case "week":
-			return subWeeks(now, 1).getTime();
-		case "all":
-		default:
-			return 0;
-	}
+	return match(dateRange)
+		.with("1hour", () => subHours(now, 1).getTime())
+		.with("3hours", () => subHours(now, 3).getTime())
+		.with("day", () => subDays(now, 1).getTime())
+		.with("week", () => subWeeks(now, 1).getTime())
+		.with("all", () => 0)
+		.exhaustive();
 }
 
 function getEndTime(): number {

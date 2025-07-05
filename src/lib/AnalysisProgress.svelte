@@ -1,5 +1,6 @@
 <script lang="ts">
 // Import from the centralized type definition
+import { match } from "ts-pattern";
 import type { AnalysisProgress } from "../utils/messaging";
 
 export type AnalysisPhase = AnalysisProgress["phase"];
@@ -65,16 +66,12 @@ function getPhaseStatus(phaseId: string): "pending" | "active" | "complete" {
 }
 
 function getSubPhaseIcon(subPhase: SubPhase | undefined): string {
-	switch (subPhase) {
-		case "sending-analysis":
-			return "📤";
-		case "sending-merge":
-			return "🔄";
-		case "processing":
-			return "⚙️";
-		default:
-			return "";
-	}
+	return match(subPhase)
+		.with("sending-analysis", () => "📤")
+		.with("sending-merge", () => "🔄")
+		.with("processing", () => "⚙️")
+		.with(undefined, () => "")
+		.exhaustive();
 }
 </script>
 

@@ -1,5 +1,6 @@
 <script lang="ts">
 import { onMount } from "svelte";
+import { match } from "ts-pattern";
 import AdvancedSettings from "./lib/AdvancedSettings.svelte";
 import AIProviderStatus from "./lib/AIProviderStatus.svelte";
 import AmbientAnalysisCard from "./lib/AmbientAnalysisCard.svelte";
@@ -191,15 +192,16 @@ onMount(() => {
 	// Listen for analysis status updates
 	onMessage("analysis:status", async (message) => {
 		const data = message.data;
-		switch (data.status) {
-			case "started":
+
+		match(data.status)
+			.with("started", () => {
 				isAmbientAnalysisRunning = true;
 				ambientAnalysisStatus = {
 					status: "running",
 					message: data.message || "Starting analysis...",
 				};
-				break;
-			case "completed":
+			})
+			.with("completed", () => {
 				isAmbientAnalysisRunning = false;
 				ambientAnalysisStatus = {
 					status: "completed",
@@ -213,8 +215,6 @@ onMount(() => {
 					isAnalyzing = false;
 					analysisPhase = "complete";
 					currentAnalysisId = null;
-					// Note: We don't have the full analysis result here since it ran in the background
-					// The user will need to check the Memory Viewer to see the updated results
 					memoryAutoExpand = true;
 				}
 
@@ -227,8 +227,8 @@ onMount(() => {
 						analysisPhase = "idle";
 					}
 				}, 10000);
-				break;
-			case "skipped":
+			})
+			.with("skipped", () => {
 				isAmbientAnalysisRunning = false;
 				ambientAnalysisStatus = {
 					status: "skipped",
@@ -241,8 +241,8 @@ onMount(() => {
 						ambientAnalysisStatus = { status: "idle" };
 					}
 				}, 10000);
-				break;
-			case "error":
+			})
+			.with("error", () => {
 				isAmbientAnalysisRunning = false;
 				ambientAnalysisStatus = {
 					status: "error",
@@ -256,8 +256,8 @@ onMount(() => {
 					analysisPhase = "error";
 					currentAnalysisId = null;
 				}
-				break;
-		}
+			})
+			.exhaustive();
 	});
 
 	// Listen for analysis progress updates
@@ -337,6 +337,13 @@ onMount(() => {
 				chunkProgress = null;
 				memoryAutoExpand = true;
 
+				// Update ambient analysis status
+				ambientAnalysisStatus = {
+					status: "completed",
+					message: `Successfully analyzed ${message.historyItems.length} items`,
+					itemCount: message.historyItems.length,
+				};
+
 				// Send completion message back to background
 				await sendMessage("ambient:analysis-complete", {
 					success: true,
@@ -345,6 +352,12 @@ onMount(() => {
 			} catch (error) {
 				console.error("[Ambient] Analysis error:", error);
 				analysisPhase = "error";
+
+				// Update ambient analysis status
+				ambientAnalysisStatus = {
+					status: "error",
+					message: error instanceof Error ? error.message : "Analysis failed",
+				};
 
 				// Send error message back to background
 				await sendMessage("ambient:analysis-complete", {
@@ -362,7 +375,10 @@ onMount(() => {
 						if (analysisPhase === "complete") {
 							analysisPhase = "idle";
 						}
-					}, 3000);
+						if (ambientAnalysisStatus.status === "completed") {
+							ambientAnalysisStatus = { status: "idle" };
+						}
+					}, 10000);
 				}
 			}
 		}

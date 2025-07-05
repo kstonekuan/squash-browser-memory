@@ -2,6 +2,7 @@
 /// <reference types="@types/dom-chromium-ai" />
 
 import { format } from "date-fns";
+import { match } from "ts-pattern";
 import { analyzeHistoryItems } from "./utils/analyzer";
 import type { AnalysisProgress } from "./utils/messaging";
 import { onMessage, sendMessage } from "./utils/messaging";
@@ -186,68 +187,78 @@ async function runAnalysis(
 
 		// Handle success notification
 		const settings = await loadAutoAnalysisSettings();
-		if (type === "manual" && settings.notifyOnSuccess) {
-			await createNotification(
-				"Manual Analysis Complete",
-				`Successfully analyzed ${historyItems.length} items`,
-				"success",
-			);
-		} else if (type === "ambient") {
-			await saveAutoAnalysisSettings({
-				...settings,
-				lastRunTimestamp: Date.now(),
-				lastRunStatus: "success",
-			});
-			if (settings.notifyOnSuccess) {
-				await createNotification(
-					"History Analysis Complete",
-					`Successfully analyzed ${historyItems.length} new items`,
-					"success",
-				);
-			}
-		}
+		await match(type)
+			.with("manual", async () => {
+				if (settings.notifyOnSuccess) {
+					await createNotification(
+						"Manual Analysis Complete",
+						`Successfully analyzed ${historyItems.length} items`,
+						"success",
+					);
+				}
+			})
+			.with("ambient", async () => {
+				await saveAutoAnalysisSettings({
+					...settings,
+					lastRunTimestamp: Date.now(),
+					lastRunStatus: "success",
+				});
+				if (settings.notifyOnSuccess) {
+					await createNotification(
+						"History Analysis Complete",
+						`Successfully analyzed ${historyItems.length} new items`,
+						"success",
+					);
+				}
+			})
+			.exhaustive();
 	} catch (error) {
 		console.error(`${logPrefix} Error:`, error);
 
 		const errorMessage =
 			error instanceof Error ? error.message : "Unknown error";
 
-		// Check if it was cancelled
-		if (error instanceof Error && error.name === "AbortError") {
-			await broadcastAnalysisStatus("error", {
-				error: "Analysis cancelled",
-				message: "Analysis was cancelled by user",
-			});
-		} else {
-			await broadcastAnalysisStatus("error", {
-				error: errorMessage,
-				message: `Analysis failed: ${errorMessage}`,
-			});
-
-			// Handle error notification
-			const settings = await loadAutoAnalysisSettings();
-			if (type === "manual") {
-				await createNotification(
-					"Manual Analysis Failed",
-					`Analysis encountered an error: ${errorMessage}`,
-					"error",
-				);
-			} else if (type === "ambient") {
-				await saveAutoAnalysisSettings({
-					...settings,
-					lastRunTimestamp: Date.now(),
-					lastRunStatus: "error",
-					lastRunError: errorMessage,
+		// Handle different error types
+		await match(error)
+			.with({ name: "AbortError" }, async () => {
+				await broadcastAnalysisStatus("error", {
+					error: "Analysis cancelled",
+					message: "Analysis was cancelled by user",
 				});
-				if (settings.notifyOnError) {
-					await createNotification(
-						"History Analysis Failed",
-						`Ambient analysis encountered an error: ${errorMessage}`,
-						"error",
-					);
-				}
-			}
-		}
+			})
+			.otherwise(async () => {
+				await broadcastAnalysisStatus("error", {
+					error: errorMessage,
+					message: `Analysis failed: ${errorMessage}`,
+				});
+
+				// Handle error notification
+				const settings = await loadAutoAnalysisSettings();
+				await match(type)
+					.with("manual", async () => {
+						await createNotification(
+							"Manual Analysis Failed",
+							`Analysis encountered an error: ${errorMessage}`,
+							"error",
+						);
+					})
+					.with("ambient", async () => {
+						await saveAutoAnalysisSettings({
+							...settings,
+							lastRunTimestamp: Date.now(),
+							lastRunStatus: "error",
+							lastRunError: errorMessage,
+						});
+						if (settings.notifyOnError) {
+							await createNotification(
+								"History Analysis Failed",
+								`Ambient analysis encountered an error: ${errorMessage}`,
+								"error",
+							);
+						}
+					})
+					.exhaustive();
+			});
 
 		throw error;
 	} finally {
@@ -287,6 +298,10 @@ async function runAmbientAnalysis(): Promise<void> {
 		console.log(
 			"[Ambient Analysis] Manual analysis is in progress, skipping ambient analysis.",
 		);
+		await broadcastAnalysisStatus("skipped", {
+			reason: "manual-analysis-running",
+			message: "Skipped: Manual analysis is currently running",
+		});
 		return;
 	}
 
@@ -294,6 +309,7 @@ async function runAmbientAnalysis(): Promise<void> {
 
 	if (!settings.enabled) {
 		console.log("[Ambient Analysis] Auto-analysis is disabled, skipping.");
+		// Don't broadcast when disabled - this is expected behavior
 		return;
 	}
 

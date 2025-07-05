@@ -1,3 +1,4 @@
+import { format } from "date-fns";
 import { describe, expect, it } from "vitest";
 import { createHalfDayChunks, createHistoryChunks } from "../utils/chunking";
 import type { ChunkTimeRange, HistoryChunk } from "../utils/memory";
@@ -450,9 +451,9 @@ describe("createHalfDayChunks", () => {
 
 			expect(result).toHaveLength(4);
 			// Check dates and periods
-			const date1 = new Date(2024, 0, 15).toLocaleDateString();
-			const date2 = new Date(2024, 0, 16).toLocaleDateString();
-			const date3 = new Date(2024, 0, 17).toLocaleDateString();
+			const date1 = format(new Date(2024, 0, 15), "PP");
+			const date2 = format(new Date(2024, 0, 16), "PP");
+			const date3 = format(new Date(2024, 0, 17), "PP");
 
 			expect(result[0].description).toContain(date1);
 			expect(result[0].description).toContain("Morning");
@@ -473,8 +474,8 @@ describe("createHalfDayChunks", () => {
 			const result = createHalfDayChunks(timestamps);
 
 			expect(result).toHaveLength(2);
-			const date1 = new Date(2024, 0, 15).toLocaleDateString();
-			const date2 = new Date(2024, 0, 17).toLocaleDateString();
+			const date1 = format(new Date(2024, 0, 15), "PP");
+			const date2 = format(new Date(2024, 0, 17), "PP");
 			expect(result[0].description).toContain(date1);
 			expect(result[1].description).toContain(date2);
 		});
@@ -492,8 +493,8 @@ describe("createHalfDayChunks", () => {
 
 			expect(result).toHaveLength(3);
 			// Should be sorted: Day 1 morning, Day 1 afternoon, Day 2 morning
-			const date1 = new Date(2024, 0, 15).toLocaleDateString();
-			const date2 = new Date(2024, 0, 16).toLocaleDateString();
+			const date1 = format(new Date(2024, 0, 15), "PP");
+			const date2 = format(new Date(2024, 0, 16), "PP");
 
 			expect(result[0].description).toContain(date1);
 			expect(result[0].description).toContain("Morning");
@@ -531,8 +532,8 @@ describe("createHalfDayChunks", () => {
 			const result = createHalfDayChunks(timestamps);
 
 			expect(result).toHaveLength(2);
-			const date1 = new Date(2024, 0, 15).toLocaleDateString();
-			const date2 = new Date(2024, 0, 16).toLocaleDateString();
+			const date1 = format(new Date(2024, 0, 15), "PP");
+			const date2 = format(new Date(2024, 0, 16), "PP");
 
 			expect(result[0].description).toContain(date1);
 			expect(result[0].description).toContain("Afternoon/Evening");
@@ -548,8 +549,8 @@ describe("createHalfDayChunks", () => {
 			const result = createHalfDayChunks(timestamps);
 
 			expect(result).toHaveLength(2);
-			const date1 = new Date(2023, 11, 31).toLocaleDateString();
-			const date2 = new Date(2024, 0, 1).toLocaleDateString();
+			const date1 = format(new Date(2023, 11, 31), "PP");
+			const date2 = format(new Date(2024, 0, 1), "PP");
 
 			expect(result[0].description).toContain(date1);
 			expect(result[0].description).toContain("Afternoon/Evening");
@@ -565,8 +566,8 @@ describe("createHalfDayChunks", () => {
 			const result = createHalfDayChunks(timestamps);
 
 			expect(result).toHaveLength(2);
-			const date1 = new Date(2024, 0, 31).toLocaleDateString();
-			const date2 = new Date(2024, 1, 1).toLocaleDateString();
+			const date1 = format(new Date(2024, 0, 31), "PP");
+			const date2 = format(new Date(2024, 1, 1), "PP");
 
 			expect(result[0].description).toContain(date1);
 			expect(result[1].description).toContain(date2);
@@ -589,8 +590,8 @@ describe("createHalfDayChunks", () => {
 			const result = createHalfDayChunks(timestamps);
 
 			expect(result).toHaveLength(2);
-			const date1 = new Date(2024, 0, 1).toLocaleDateString();
-			const date2 = new Date(2024, 11, 31).toLocaleDateString();
+			const date1 = format(new Date(2024, 0, 1), "PP");
+			const date2 = format(new Date(2024, 11, 31), "PP");
 
 			expect(result[0].description).toContain(date1);
 			expect(result[1].description).toContain(date2);

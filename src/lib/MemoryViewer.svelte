@@ -1,4 +1,5 @@
 <script lang="ts">
+import { format } from "date-fns";
 import { onMount } from "svelte";
 import type { AnalysisMemory } from "../utils/memory";
 import { loadMemory } from "../utils/memory";
@@ -109,7 +110,7 @@ function formatDate(date: Date): string {
 		return "Never";
 	}
 
-	return `${date.toLocaleDateString()} ${date.toLocaleTimeString()}`;
+	return format(date, "PPpp");
 }
 
 function getAutomationPotentialColor(

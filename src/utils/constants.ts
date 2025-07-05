@@ -10,9 +10,7 @@ Rules:
 - Use descriptive labels
 
 IMPORTANT: Return startIndex and endIndex (not startTime/endTime) using the indices shown in brackets in the data.
-Example: If session spans from [5] to [12], return startIndex: 5, endIndex: 12
-
-IMPORTANT: Return only valid JSON matching the schema. Do not include markdown formatting, code blocks, or any other text.`;
+Example: If session spans from [5] to [12], return startIndex: 5, endIndex: 12`;
 
 export const ANALYSIS_SYSTEM_PROMPT = `Analyze browsing patterns to build detailed user profiles. Use evidence-based analysis with different thresholds.
 
@@ -39,8 +37,7 @@ Figma micro-interactions | Zero-waste travel | EU Digital Services Act | Waterco
 
 RULES:
 - Be specific, use actual evidence
-- Leave fields blank rather than guess
-- Return valid JSON only, no extra text`;
+- Return empty strings rather than guess`;
 
 export const MERGE_SYSTEM_PROMPT = `Merge browsing analysis results using evidence-based evolution. Apply different stability thresholds.
 
@@ -80,7 +77,10 @@ MERGE RULES:
 - Fill gaps only with strong supporting signals
 - Maintain narrative coherence
 
-Return evolved profile that tells coherent story. Valid JSON only.`;
+Return evolved profile that tells coherent story.`;
+
+import { format } from "date-fns";
+import type { UserProfile, WorkflowPattern } from "../types";
 
 // Prompt builders
 export function buildChunkingPrompt(timestamps: number[]): string {
@@ -89,13 +89,10 @@ export function buildChunkingPrompt(timestamps: number[]): string {
 Indexed timestamps:
 ${timestamps
 	.map((ts, index) => {
-		const d = new Date(ts);
-		return `[${index}] ${d.toLocaleDateString()} ${d.getHours()}:${String(d.getMinutes()).padStart(2, "0")}`;
+		return `[${index}] ${format(new Date(ts), "PP HH:mm")}`;
 	})
 	.join("\n")}`;
 }
-
-import type { UserProfile, WorkflowPattern } from "../types";
 
 export function buildAnalysisPrompt(
 	items: chrome.history.HistoryItem[],
@@ -108,15 +105,22 @@ export function buildAnalysisPrompt(
 		v: number;
 	}>,
 ): string {
-	return `Analyze this browsing history data and create a detailed user profile:
+	const firstItem = items[0];
+	const lastItem = items[items.length - 1];
 
-DATA CHUNK (${items.length} items):
-Time: ${items[0]?.lastVisitTime ? new Date(items[0].lastVisitTime).toLocaleDateString() : "unknown"} to ${items[items.length - 1]?.lastVisitTime ? new Date(items[items.length - 1]?.lastVisitTime || 0).toLocaleDateString() : "unknown"}
+	const startTime = firstItem?.lastVisitTime
+		? format(new Date(firstItem.lastVisitTime), "PP")
+		: "unknown";
+	const endTime = lastItem?.lastVisitTime
+		? format(new Date(lastItem.lastVisitTime), "PP")
+		: "unknown";
+
+	return `
+HISTORY (${items.length} items):
+Time: ${startTime} to ${endTime}
 
 Data (d=domain, p=path, q=query params, t=title, ts=timestamp, v=visits):
-${JSON.stringify(historyData)}
-
-Analyze this data to create a comprehensive user profile and identify workflow patterns. Be specific and use evidence from the browsing data.`;
+${JSON.stringify(historyData)}`;
 }
 
 export function buildMergePrompt(
@@ -129,13 +133,9 @@ export function buildMergePrompt(
 		patterns: WorkflowPattern[];
 	},
 ): string {
-	return `Merge the new analysis results with existing memory:
-
-EXISTING MEMORY:
+	return `EXISTING MEMORY:
 ${JSON.stringify(existingMemory)}
 
-NEW ANALYSIS RESULTS:
-${JSON.stringify(newResults)}
-
-Intelligently merge these results following the merge rules to create an evolved, coherent profile.`;
+NEW MEMORY:
+${JSON.stringify(newResults)}`;
 }

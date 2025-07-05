@@ -17,13 +17,35 @@ export function extractJSONFromResponse(response: string): string {
 
 		if (match) {
 			// Extract from markdown and repair
-			return jsonrepair(match[1].trim());
+			const extracted = match[1].trim();
+			console.log(
+				"[extractJSON] Found markdown code block, extracted length:",
+				extracted.length,
+			);
+			const repaired = jsonrepair(extracted);
+			console.log("[extractJSON] After repair, length:", repaired.length);
+			return repaired;
 		}
 
 		// Let jsonrepair handle everything else
-		return jsonrepair(responseTrimmed);
+		console.log(
+			"[extractJSON] No markdown block found, attempting direct repair on",
+			responseTrimmed.length,
+			"chars",
+		);
+		const repaired = jsonrepair(responseTrimmed);
+		console.log("[extractJSON] After repair, length:", repaired.length);
+		return repaired;
 	} catch (error) {
 		console.error("Failed to repair JSON:", error);
+		console.error(
+			"[extractJSON] First 500 chars of response:",
+			responseTrimmed.substring(0, 500),
+		);
+		console.error(
+			"[extractJSON] Last 500 chars of response:",
+			responseTrimmed.substring(responseTrimmed.length - 500),
+		);
 		return responseTrimmed;
 	}
 }

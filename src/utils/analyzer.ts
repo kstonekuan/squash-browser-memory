@@ -201,7 +201,7 @@ export async function analyzeHistoryItems(
 			endTime: chunk.endTime,
 			itemCount: chunk.items.length,
 			description: chunk.isFallback
-				? `${format(chunk.startTime, "PP")} ${chunk.startTime.getHours() < 12 ? "Morning" : "Afternoon/Evening"} (Fallback)`
+				? `${format(chunk.startTime, "PP")} ${format(chunk.startTime, "a")} (Fallback)`
 				: timeRange?.description || `Session ${index + 1}`,
 			isFallback: chunk.isFallback,
 		};
@@ -497,7 +497,9 @@ async function mergeAnalysisResults(
 		try {
 			// Clean the response to extract JSON from markdown if needed
 			const cleanedResponse = extractJSONFromResponse(response);
+			console.log("[Merge] Attempting to parse cleaned response");
 			const parsed = JSON.parse(cleanedResponse);
+			console.log("[Merge] Parsed object keys:", Object.keys(parsed));
 
 			// Validate with zod schema
 			const validated = AnalysisResultSchema.parse(parsed);
@@ -519,8 +521,25 @@ async function mergeAnalysisResults(
 		} catch (parseError) {
 			console.error("Failed to parse merge response:", parseError);
 			console.error("Response length:", response.length);
+			console.error(
+				"[Merge] First 1000 chars of raw response:",
+				response.substring(0, 1000),
+			);
 			if (parseError instanceof Error) {
 				console.error("Parse error details:", parseError.message);
+				try {
+					const cleaned = extractJSONFromResponse(response);
+					console.error("[Merge] Cleaned response length:", cleaned.length);
+					console.error(
+						"[Merge] First 500 chars of cleaned:",
+						cleaned.substring(0, 500),
+					);
+				} catch (cleanError) {
+					console.error(
+						"[Merge] Failed to debug cleaned response:",
+						cleanError,
+					);
+				}
 			}
 
 			// For merge failures, return the new results as-is
@@ -820,7 +839,6 @@ async function analyzeChunk(
 	// Build the analysis prompt
 	const prompt = buildAnalysisPrompt(items, historyData);
 
-	// Log analysis info without full prompt
 	console.log("\n=== Starting Analysis ===");
 	console.log("Analysis details:", {
 		promptLength: prompt.length,
@@ -884,7 +902,9 @@ async function analyzeChunk(
 		try {
 			// Clean the response to extract JSON from markdown if needed
 			const cleanedResponse = extractJSONFromResponse(response);
+			console.log("[Analyzer] Attempting to parse cleaned response");
 			const parsed = JSON.parse(cleanedResponse);
+			console.log("[Analyzer] Parsed object keys:", Object.keys(parsed));
 
 			// Validate with zod schema
 			const validated = AnalysisResultSchema.parse(parsed);
@@ -897,12 +917,24 @@ async function analyzeChunk(
 			// Failed to parse AI analysis response
 			console.error("Failed to parse AI response:", error);
 			console.error("Raw response length:", response.length);
+			console.error(
+				"[Analyzer] First 1000 chars of raw response:",
+				response.substring(0, 1000),
+			);
 			if (error instanceof Error) {
 				console.error("Parse error details:", error.message);
 				// Show a snippet of the cleaned response for debugging
 				try {
 					const cleaned = extractJSONFromResponse(response);
 					console.error("Cleaned response length:", cleaned.length);
+					console.error(
+						"[Analyzer] First 500 chars of cleaned:",
+						cleaned.substring(0, 500),
+					);
+					console.error(
+						"[Analyzer] Last 500 chars of cleaned:",
+						cleaned.substring(cleaned.length - 500),
+					);
 					// Log the area around the error if we can parse the position
 					const posMatch = error.message.match(/position (\d+)/);
 					if (posMatch) {

@@ -1,26 +1,19 @@
 <script lang="ts">
+import { format, formatDistance, isSameDay } from "date-fns";
 import type { ChunkInfo } from "../types";
 import CollapsibleSection from "./CollapsibleSection.svelte";
 
 let { chunks = [] } = $props<{ chunks: ChunkInfo[] }>();
 
 function formatDateRange(start: Date, end: Date): string {
-	const sameDay = start.toDateString() === end.toDateString();
-	if (sameDay) {
-		return `${start.toLocaleDateString()} (${start.toLocaleTimeString()} - ${end.toLocaleTimeString()})`;
+	if (isSameDay(start, end)) {
+		return `${format(start, "PP")} (${format(start, "p")} - ${format(end, "p")})`;
 	}
-	return `${start.toLocaleDateString()} ${start.toLocaleTimeString()} - ${end.toLocaleDateString()} ${end.toLocaleTimeString()}`;
+	return `${format(start, "PP p")} - ${format(end, "PP p")}`;
 }
 
 function getDuration(start: Date, end: Date): string {
-	const diff = end.getTime() - start.getTime();
-	const hours = Math.floor(diff / (1000 * 60 * 60));
-	const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-
-	if (hours > 0) {
-		return `${hours}h ${minutes}m`;
-	}
-	return `${minutes}m`;
+	return formatDistance(start, end);
 }
 </script>
 

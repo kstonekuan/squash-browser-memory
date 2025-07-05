@@ -1,4 +1,5 @@
 <script lang="ts">
+import { format } from "date-fns";
 import type { FullAnalysisResult } from "../types";
 import ChunkDebugInfo from "./ChunkDebugInfo.svelte";
 import ChunkDisplay from "./ChunkDisplay.svelte";
@@ -38,7 +39,7 @@ const { result, onDismiss } = $props<{
         <div class="flex items-center space-x-1">
           <span class="text-gray-600">Period:</span>
           <span class="font-medium text-gray-900">
-            {result.analysis.dateRange.start.toLocaleDateString()} - {result.analysis.dateRange.end.toLocaleDateString()}
+            {format(result.analysis.dateRange.start, "PP")} - {format(result.analysis.dateRange.end, "PP")}
           </span>
         </div>
       {/if}
