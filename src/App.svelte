@@ -34,6 +34,9 @@ let abortController: AbortController | null = null;
 let providerKey = $state(0); // Key to force AIProviderStatus re-render
 let isAmbientAnalysisRunning = $state(false);
 let isManualAnalysisRunning = $state(false);
+let isAnyAnalysisRunning = $derived(
+	isAmbientAnalysisRunning || isManualAnalysisRunning,
+);
 let currentAnalysisId: string | null = $state(null);
 let ambientAnalysisStatus = $state<{
 	status: "idle" | "running" | "completed" | "skipped" | "error";
@@ -66,10 +69,10 @@ async function handleAnalysis(
 		});
 
 		if (!response.success) {
-			// Check if it's blocked by ambient analysis
-			if (response.error?.includes("Ambient analysis is currently running")) {
+			// Check if it's blocked by another analysis
+			if (response.error?.includes("already in progress")) {
 				alert(
-					"Cannot start manual analysis while ambient analysis is running. Please wait for it to complete.",
+					"An analysis is already in progress. Please wait for it to complete.",
 				);
 				analysisPhase = "idle";
 				isAnalyzing = false;
@@ -279,110 +282,6 @@ onMount(() => {
 			}
 		}
 	});
-
-	// Handle ambient analysis triggers (when side panel is open during ambient analysis)
-	// This maintains compatibility with the existing flow
-	chrome.runtime.onMessage.addListener(async (message) => {
-		if (message.type === "ambient-analysis-trigger" && message.historyItems) {
-			console.log(
-				"[Ambient] Received analysis trigger for",
-				message.historyItems.length,
-				"items",
-			);
-
-			// Run the analysis locally in the side panel
-			isAnalyzing = true;
-			analysisResult = null;
-			analysisPhase = "calculating";
-			rawHistoryData = message.historyItems;
-			isAmbientAnalysisRunning = true;
-
-			ambientAnalysisStatus = {
-				status: "running",
-				message: "Analyzing new browsing history...",
-			};
-
-			abortController = new AbortController();
-
-			try {
-				const result = await analyzeHistoryItems(
-					message.historyItems,
-					customPrompts,
-					(info) => {
-						analysisPhase = info.phase;
-						subPhase = info.subPhase;
-						if (info.currentChunk && info.totalChunks) {
-							chunkProgress = {
-								current: info.currentChunk,
-								total: info.totalChunks,
-								description: info.chunkDescription || "",
-							};
-						} else if (info.chunkDescription) {
-							if (chunkProgress) {
-								chunkProgress.description = info.chunkDescription;
-							} else {
-								chunkProgress = {
-									current: 0,
-									total: 0,
-									description: info.chunkDescription,
-								};
-							}
-						}
-					},
-					abortController.signal,
-				);
-
-				analysisResult = result;
-				analysisPhase = "complete";
-				chunkProgress = null;
-				memoryAutoExpand = true;
-
-				// Update ambient analysis status
-				ambientAnalysisStatus = {
-					status: "completed",
-					message: `Successfully analyzed ${message.historyItems.length} items`,
-					itemCount: message.historyItems.length,
-				};
-
-				// Send completion message back to background
-				await sendMessage("ambient:analysis-complete", {
-					success: true,
-					itemCount: message.historyItems.length,
-				});
-			} catch (error) {
-				console.error("[Ambient] Analysis error:", error);
-				analysisPhase = "error";
-
-				// Update ambient analysis status
-				ambientAnalysisStatus = {
-					status: "error",
-					message: error instanceof Error ? error.message : "Analysis failed",
-				};
-
-				// Send error message back to background
-				await sendMessage("ambient:analysis-complete", {
-					success: false,
-					error: error instanceof Error ? error.message : "Unknown error",
-					itemCount: message.historyItems.length,
-				});
-			} finally {
-				isAnalyzing = false;
-				isAmbientAnalysisRunning = false;
-				abortController = null;
-
-				if (analysisPhase === "complete") {
-					setTimeout(() => {
-						if (analysisPhase === "complete") {
-							analysisPhase = "idle";
-						}
-						if (ambientAnalysisStatus.status === "completed") {
-							ambientAnalysisStatus = { status: "idle" };
-						}
-					}, 10000);
-				}
-			}
-		}
-	});
 });
 </script>
 
@@ -400,7 +299,7 @@ onMount(() => {
 				<HistoryFetcher 
 					on:analysis-request={handleAnalysis} 
 					{isAnalyzing}
-					isAmbientAnalysisRunning={isAmbientAnalysisRunning}
+					isAmbientAnalysisRunning={isAnyAnalysisRunning}
 				/>
 			</div>
 		</div>

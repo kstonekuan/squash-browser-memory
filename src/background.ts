@@ -27,10 +27,9 @@ const defaultAutoAnalysisSettings: AutoAnalysisSettings = {
 	notifyOnError: true,
 };
 
-// Track analysis states
-let isAmbientAnalysisRunning = false;
-let isManualAnalysisRunning = false;
-let currentManualAnalysisId: string | null = null;
+// Track analysis state
+let isAnalysisRunning = false;
+let currentAnalysisId: string | null = null;
 
 // Store analysis progress for when side panel reopens
 // Using the AnalysisProgress type from messaging.ts
@@ -102,14 +101,21 @@ async function broadcastAnalysisStatus(
 		});
 	} catch (err) {
 		// This is expected if no listeners are active
-		console.debug("No listeners for analysis status:", err);
+		if (
+			err instanceof Error &&
+			err.message.includes("Could not establish connection")
+		) {
+			console.debug("No listeners for analysis status (side panel closed)");
+		} else {
+			console.debug("No listeners for analysis status:", err);
+		}
 	}
 }
 
 // Track active analyses
 const activeAnalyses = new Map<string, AbortController>();
 
-// Common analysis runner for both manual and ambient
+// Common analysis runner
 async function runAnalysis(
 	historyItems: chrome.history.HistoryItem[],
 	analysisId: string,
@@ -118,11 +124,10 @@ async function runAnalysis(
 		chunkPrompt?: string;
 		mergePrompt?: string;
 	},
-	type: "manual" | "ambient" = "manual",
+	trigger: "manual" | "alarm" = "manual",
 ): Promise<void> {
-	const logPrefix = type === "manual" ? "[Manual Analysis]" : "[Ambient]";
 	console.log(
-		`${logPrefix} Starting analysis for ${historyItems.length} items with ID: ${analysisId}`,
+		`[Analysis] Starting analysis for ${historyItems.length} items with ID: ${analysisId} (triggered by: ${trigger})`,
 	);
 
 	const abortController = new AbortController();
@@ -135,7 +140,7 @@ async function runAnalysis(
 			customPrompts,
 			// Progress callback
 			async (info) => {
-				console.log(`${logPrefix} Analysis progress: ${info.phase}`, info);
+				console.log(`[Analysis] Progress: ${info.phase}`, info);
 
 				// Send progress update
 				try {
@@ -159,13 +164,23 @@ async function runAnalysis(
 									: undefined,
 					});
 				} catch (err) {
-					console.error(`${logPrefix} Failed to send progress update:`, err);
+					// This is expected if the side panel is closed
+					if (
+						err instanceof Error &&
+						err.message.includes("Could not establish connection")
+					) {
+						console.debug(
+							"[Analysis] Side panel closed, skipping progress update",
+						);
+					} else {
+						console.error(`[Analysis] Failed to send progress update:`, err);
+					}
 				}
 			},
 			abortController.signal,
 		);
 
-		console.log(`${logPrefix} Analysis completed:`, result);
+		console.log(`[Analysis] Completed:`, result);
 
 		// Send final progress update
 		try {
@@ -176,7 +191,17 @@ async function runAnalysis(
 				chunkProgress: undefined,
 			});
 		} catch (err) {
-			console.error(`${logPrefix} Failed to send completion progress:`, err);
+			// This is expected if the side panel is closed
+			if (
+				err instanceof Error &&
+				err.message.includes("Could not establish connection")
+			) {
+				console.debug(
+					"[Analysis] Side panel closed, skipping completion progress",
+				);
+			} else {
+				console.error(`[Analysis] Failed to send completion progress:`, err);
+			}
 		}
 
 		// Send success notification
@@ -185,35 +210,23 @@ async function runAnalysis(
 			itemCount: historyItems.length,
 		});
 
-		// Handle success notification
+		// Update settings and send notification
 		const settings = await loadAutoAnalysisSettings();
-		await match(type)
-			.with("manual", async () => {
-				if (settings.notifyOnSuccess) {
-					await createNotification(
-						"Manual Analysis Complete",
-						`Successfully analyzed ${historyItems.length} items`,
-						"success",
-					);
-				}
-			})
-			.with("ambient", async () => {
-				await saveAutoAnalysisSettings({
-					...settings,
-					lastRunTimestamp: Date.now(),
-					lastRunStatus: "success",
-				});
-				if (settings.notifyOnSuccess) {
-					await createNotification(
-						"History Analysis Complete",
-						`Successfully analyzed ${historyItems.length} new items`,
-						"success",
-					);
-				}
-			})
-			.exhaustive();
+		await saveAutoAnalysisSettings({
+			...settings,
+			lastRunTimestamp: Date.now(),
+			lastRunStatus: "success",
+		});
+
+		if (settings.notifyOnSuccess) {
+			await createNotification(
+				"History Analysis Complete",
+				`Successfully analyzed ${historyItems.length} items`,
+				"success",
+			);
+		}
 	} catch (error) {
-		console.error(`${logPrefix} Error:`, error);
+		console.error(`[Analysis] Error:`, error);
 
 		const errorMessage =
 			error instanceof Error ? error.message : "Unknown error";
@@ -232,125 +245,122 @@ async function runAnalysis(
 					message: `Analysis failed: ${errorMessage}`,
 				});
 
-				// Handle error notification
+				// Update settings and send notification
 				const settings = await loadAutoAnalysisSettings();
-				await match(type)
-					.with("manual", async () => {
-						await createNotification(
-							"Manual Analysis Failed",
-							`Analysis encountered an error: ${errorMessage}`,
-							"error",
-						);
-					})
-					.with("ambient", async () => {
-						await saveAutoAnalysisSettings({
-							...settings,
-							lastRunTimestamp: Date.now(),
-							lastRunStatus: "error",
-							lastRunError: errorMessage,
-						});
-						if (settings.notifyOnError) {
-							await createNotification(
-								"History Analysis Failed",
-								`Ambient analysis encountered an error: ${errorMessage}`,
-								"error",
-							);
-						}
-					})
-					.exhaustive();
+				await saveAutoAnalysisSettings({
+					...settings,
+					lastRunTimestamp: Date.now(),
+					lastRunStatus: "error",
+					lastRunError: errorMessage,
+				});
+
+				if (settings.notifyOnError) {
+					await createNotification(
+						"History Analysis Failed",
+						`Analysis encountered an error: ${errorMessage}`,
+						"error",
+					);
+				}
 			});
 
 		throw error;
 	} finally {
 		activeAnalyses.delete(analysisId);
-		if (type === "manual" && currentManualAnalysisId === analysisId) {
-			currentManualAnalysisId = null;
-			isManualAnalysisRunning = false;
-		} else if (type === "ambient") {
-			isAmbientAnalysisRunning = false;
+		if (currentAnalysisId === analysisId) {
+			currentAnalysisId = null;
+			isAnalysisRunning = false;
+		}
+
+		// Schedule next analysis in 1 hour if auto-analysis is enabled
+		const settings = await loadAutoAnalysisSettings();
+		if (settings.enabled) {
+			await chrome.alarms.clear(ALARM_NAME);
+			await chrome.alarms.create(ALARM_NAME, {
+				delayInMinutes: 60,
+			});
+			console.log("[Analysis] Next analysis scheduled in 1 hour");
 		}
 	}
 }
 
-// Run manual analysis directly in service worker
-async function runManualAnalysis(
-	historyItems: chrome.history.HistoryItem[],
-	analysisId: string,
-	customPrompts?: {
-		systemPrompt?: string;
-		chunkPrompt?: string;
-		mergePrompt?: string;
-	},
-): Promise<void> {
-	await broadcastAnalysisStatus("started", {
-		message: `Analyzing ${historyItems.length} history items...`,
-	});
+// Main analysis function that can be triggered by button or alarm
+async function triggerAnalysis(trigger: "manual" | "alarm"): Promise<void> {
+	console.log(`[Analysis] Triggered by: ${trigger}`);
 
-	return runAnalysis(historyItems, analysisId, customPrompts, "manual");
-}
-
-// Main ambient analysis function
-async function runAmbientAnalysis(): Promise<void> {
-	console.log("[Ambient Analysis] Starting hourly analysis...");
-
-	// Check if manual analysis is already running
-	if (isManualAnalysisRunning) {
-		console.log(
-			"[Ambient Analysis] Manual analysis is in progress, skipping ambient analysis.",
-		);
-		await broadcastAnalysisStatus("skipped", {
-			reason: "manual-analysis-running",
-			message: "Skipped: Manual analysis is currently running",
-		});
+	// Check if analysis is already running
+	if (isAnalysisRunning) {
+		console.log("[Analysis] Analysis already in progress, skipping.");
+		if (trigger === "manual") {
+			// For manual triggers, notify the user
+			await broadcastAnalysisStatus("skipped", {
+				reason: "analysis-already-running",
+				message: "Analysis is already in progress",
+			});
+		}
 		return;
 	}
 
 	const settings = await loadAutoAnalysisSettings();
 
-	if (!settings.enabled) {
-		console.log("[Ambient Analysis] Auto-analysis is disabled, skipping.");
-		// Don't broadcast when disabled - this is expected behavior
+	// For alarm triggers, check if auto-analysis is enabled
+	if (trigger === "alarm" && !settings.enabled) {
+		console.log(
+			"[Analysis] Auto-analysis is disabled, skipping alarm trigger.",
+		);
 		return;
 	}
 
-	isAmbientAnalysisRunning = true;
+	isAnalysisRunning = true;
 	await broadcastAnalysisStatus("started", {
 		message: "Checking for new browsing history...",
 	});
 
 	try {
-		// Load memory to get the last analyzed timestamp
-		const memoryResult = await chrome.storage.local.get(
-			"history_analysis_memory",
-		);
-		const memory = memoryResult.history_analysis_memory;
-		const lastTimestamp = memory?.lastHistoryTimestamp || 0;
+		// Determine time range based on trigger
+		let historyItems: chrome.history.HistoryItem[];
+
+		if (trigger === "manual") {
+			// For manual trigger, get last hour of history
+			const searchStartTime = Date.now() - 60 * 60 * 1000; // 1 hour ago
+			historyItems = await chrome.history.search({
+				text: "",
+				startTime: searchStartTime,
+				endTime: Date.now(),
+				maxResults: 5000,
+			});
+		} else {
+			// For alarm trigger, get history since last analysis
+			const memoryResult = await chrome.storage.local.get(
+				"history_analysis_memory",
+			);
+			const memory = memoryResult.history_analysis_memory;
+			const lastTimestamp = memory?.lastHistoryTimestamp || 0;
+
+			console.log(
+				`[Analysis] Last analyzed timestamp: ${
+					lastTimestamp > 0
+						? format(new Date(lastTimestamp), "yyyy-MM-dd'T'HH:mm:ss'Z'")
+						: "never"
+				}`,
+			);
+
+			const searchStartTime =
+				lastTimestamp > 0 ? lastTimestamp + 1 : Date.now() - 60 * 60 * 1000;
+
+			historyItems = await chrome.history.search({
+				text: "",
+				startTime: searchStartTime,
+				endTime: Date.now(),
+				maxResults: 5000,
+			});
+		}
 
 		console.log(
-			`[Ambient Analysis] Last analyzed timestamp: ${
-				lastTimestamp > 0
-					? format(new Date(lastTimestamp), "yyyy-MM-dd'T'HH:mm:ss'Z'")
-					: "never"
-			}`,
-		);
-
-		// Fetch history since last analysis
-		const searchStartTime =
-			lastTimestamp > 0 ? lastTimestamp + 1 : Date.now() - 60 * 60 * 1000;
-
-		const historyItems = await chrome.history.search({
-			text: "",
-			startTime: searchStartTime,
-			endTime: Date.now(),
-			maxResults: 5000,
-		});
-
-		console.log(
-			`[Ambient Analysis] Found ${historyItems.length} new history items since last analysis`,
+			`[Analysis] Found ${historyItems.length} history items to analyze`,
 		);
 
 		if (historyItems.length === 0) {
-			console.log("[Ambient Analysis] No new history to analyze");
+			console.log("[Analysis] No history to analyze");
 
 			await saveAutoAnalysisSettings({
 				...settings,
@@ -358,52 +368,27 @@ async function runAmbientAnalysis(): Promise<void> {
 				lastRunStatus: "success",
 			});
 
-			isAmbientAnalysisRunning = false;
+			isAnalysisRunning = false;
 			await broadcastAnalysisStatus("skipped", {
 				reason: "no-new-history",
-				message: "No new browsing history since last analysis",
+				message: "No browsing history to analyze",
 			});
 			return;
 		}
 
-		// Try to send to side panel first, then run in service worker
+		// Run analysis in service worker
+		console.log("[Analysis] Running analysis in service worker");
 
-		// Check if side panel is open by trying to send a message
-		try {
-			await sendMessage("analysis:status", {
-				status: "started",
-				message: "Side panel analysis starting...",
-			});
+		const promptsResult = await chrome.storage.local.get("custom_prompts");
+		const customPrompts = promptsResult.custom_prompts;
 
-			// Side panel is available, send the ambient analysis trigger
-			console.log(
-				"[Ambient Analysis] Side panel available, delegating analysis",
-			);
-
-			// Send the history items to the side panel for analysis
-			// Note: Using chrome.runtime for ambient trigger as it's not in our protocol map
-			await chrome.runtime.sendMessage({
-				type: "ambient-analysis-trigger",
-				historyItems: historyItems,
-			});
-		} catch {
-			// Side panel not available, run in service worker
-			console.log(
-				"[Ambient Analysis] Side panel not available, running in service worker",
-			);
-
-			const promptsResult = await chrome.storage.local.get("custom_prompts");
-			const customPrompts = promptsResult.custom_prompts;
-
-			const analysisId = `ambient-${Date.now()}`;
-			await runAnalysis(historyItems, analysisId, customPrompts, "ambient");
-		}
-	} catch {
+		const analysisId = `analysis-${Date.now()}`;
+		currentAnalysisId = analysisId;
+		await runAnalysis(historyItems, analysisId, customPrompts, trigger);
+	} catch (error) {
 		// Error already handled and logged by runAnalysis
-		// Just ensure the flag is reset (though it should already be reset in runAnalysis)
-		if (isAmbientAnalysisRunning) {
-			isAmbientAnalysisRunning = false;
-		}
+		console.error("[Analysis] Error in triggerAnalysis:", error);
+		isAnalysisRunning = false;
 	}
 }
 
@@ -429,8 +414,7 @@ chrome.runtime.onInstalled.addListener(async () => {
 		try {
 			await chrome.alarms.clear(ALARM_NAME);
 			await chrome.alarms.create(ALARM_NAME, {
-				delayInMinutes: 1,
-				periodInMinutes: 60,
+				delayInMinutes: 1, // First run after 1 minute
 			});
 			console.log("Hourly analysis alarm created");
 		} catch (error) {
@@ -442,11 +426,11 @@ chrome.runtime.onInstalled.addListener(async () => {
 // Handle alarm events
 chrome.alarms.onAlarm.addListener(async (alarm) => {
 	if (alarm.name === ALARM_NAME) {
-		console.log("Hourly analysis alarm triggered");
+		console.log("[Analysis] Alarm triggered");
 		try {
-			await runAmbientAnalysis();
+			await triggerAnalysis("alarm");
 		} catch (error) {
-			console.error("Failed to run ambient analysis:", error);
+			console.error("Failed to run analysis from alarm:", error);
 		}
 	}
 });
@@ -456,8 +440,7 @@ async function handleAutoAnalysisToggle(enabled: boolean) {
 	if (enabled) {
 		await chrome.alarms.clear(ALARM_NAME);
 		await chrome.alarms.create(ALARM_NAME, {
-			delayInMinutes: 1,
-			periodInMinutes: 60,
+			delayInMinutes: 1, // First run after 1 minute
 		});
 
 		const alarm = await chrome.alarms.get(ALARM_NAME);
@@ -466,7 +449,7 @@ async function handleAutoAnalysisToggle(enabled: boolean) {
 				`Auto-analysis enabled. Next run: ${format(new Date(alarm.scheduledTime), "PPpp")}`,
 			);
 		} else {
-			console.error("Failed to create ambient analysis alarm");
+			console.error("Failed to create analysis alarm");
 			throw new Error("Failed to create alarm");
 		}
 	} else {
@@ -480,19 +463,18 @@ chrome.runtime.onStartup.addListener(async () => {
 	const alarm = await chrome.alarms.get(ALARM_NAME);
 	if (alarm) {
 		console.log(
-			"Hourly analysis alarm is active, next run:",
+			"Analysis alarm is active, next run:",
 			format(new Date(alarm.scheduledTime), "PPpp"),
 		);
 	} else {
-		console.log("Hourly analysis alarm is not active");
+		console.log("Analysis alarm is not active");
 
 		const settings = await loadAutoAnalysisSettings();
 		if (settings.enabled) {
 			await chrome.alarms.create(ALARM_NAME, {
-				delayInMinutes: 1,
-				periodInMinutes: 60,
+				delayInMinutes: 60, // Schedule next run in 1 hour
 			});
-			console.log("Re-created hourly analysis alarm");
+			console.log("Re-created analysis alarm");
 		}
 	}
 });
@@ -515,33 +497,16 @@ onMessage("settings:toggle-auto-analysis", async (message) => {
 	}
 });
 
-onMessage("analysis:start-manual", async (message) => {
-	const data = message.data;
-
-	if (isManualAnalysisRunning) {
-		console.log("[Background] Analysis already in progress");
-		return { success: false, error: "Analysis already in progress" };
-	}
-
-	if (isAmbientAnalysisRunning) {
-		console.log("[Background] Ambient analysis is running, blocking manual");
-		return {
-			success: false,
-			error:
-				"Ambient analysis is currently running. Please wait for it to complete.",
-		};
-	}
-
-	const analysisId = `manual-${Date.now()}`;
-	currentManualAnalysisId = analysisId;
-	isManualAnalysisRunning = true;
-
+onMessage("analysis:start-manual", async () => {
+	// Let triggerAnalysis handle all the checks
 	try {
-		await runManualAnalysis(data.historyItems, analysisId, data.customPrompts);
-		return { success: true, analysisId };
+		await triggerAnalysis("manual");
+		return {
+			success: true,
+			analysisId: currentAnalysisId || undefined,
+		};
 	} catch (error) {
-		console.error("[Background] Manual analysis failed:", error);
-		isManualAnalysisRunning = false;
+		console.error("[Background] Manual analysis trigger failed:", error);
 		return {
 			success: false,
 			error: error instanceof Error ? error.message : "Unknown error",
@@ -551,16 +516,16 @@ onMessage("analysis:start-manual", async (message) => {
 
 onMessage("analysis:cancel", async (message) => {
 	const data = message.data;
-	console.log("[Manual Analysis] Received cancellation request");
+	console.log("[Analysis] Received cancellation request");
 
-	if (!currentManualAnalysisId || currentManualAnalysisId !== data.analysisId) {
+	if (!currentAnalysisId || currentAnalysisId !== data.analysisId) {
 		return { success: false, error: "No matching analysis in progress" };
 	}
 
 	// Cancel the analysis
 	const abortController = activeAnalyses.get(data.analysisId);
 	if (abortController) {
-		console.log("[Background] Cancelling analysis:", data.analysisId);
+		console.log("[Analysis] Cancelling analysis:", data.analysisId);
 		abortController.abort();
 		activeAnalyses.delete(data.analysisId);
 		return { success: true };
@@ -570,7 +535,7 @@ onMessage("analysis:cancel", async (message) => {
 });
 
 onMessage("ambient:query-status", async () => {
-	return { isRunning: isAmbientAnalysisRunning };
+	return { isRunning: isAnalysisRunning };
 });
 
 onMessage("ambient:query-next-alarm", async () => {
@@ -583,15 +548,15 @@ onMessage("ambient:query-next-alarm", async () => {
 
 onMessage("analysis:get-state", async () => {
 	// Return the current analysis state
-	const currentProgress = currentManualAnalysisId
-		? analysisProgressMap.get(currentManualAnalysisId)
+	const currentProgress = currentAnalysisId
+		? analysisProgressMap.get(currentAnalysisId)
 		: undefined;
 
 	return {
-		isRunning: isManualAnalysisRunning || isAmbientAnalysisRunning,
-		isManualAnalysisRunning,
-		isAmbientAnalysisRunning,
-		analysisId: currentManualAnalysisId || undefined,
+		isRunning: isAnalysisRunning,
+		isManualAnalysisRunning: isAnalysisRunning, // For compatibility - both are the same now
+		isAmbientAnalysisRunning: isAnalysisRunning,
+		analysisId: currentAnalysisId || undefined,
 		phase: currentProgress?.phase,
 		chunkProgress: currentProgress?.chunkProgress,
 	};
@@ -617,43 +582,6 @@ onMessage("analysis:progress", async (message) => {
 	} catch {
 		// No listeners active
 	}
-});
-
-// Handle ambient analysis completion from side panel
-onMessage("ambient:analysis-complete", async (message) => {
-	const data = message.data;
-	const settings = await loadAutoAnalysisSettings();
-	await saveAutoAnalysisSettings({
-		...settings,
-		lastRunTimestamp: Date.now(),
-		lastRunStatus: data.success ? "success" : "error",
-		lastRunError: data.error,
-	});
-
-	if (data.success && settings.notifyOnSuccess) {
-		await createNotification(
-			"History Analysis Complete",
-			`Successfully analyzed ${data.itemCount || 0} new items`,
-			"success",
-		);
-	}
-
-	const alarm = await chrome.alarms.get(ALARM_NAME);
-	if (alarm) {
-		await saveAutoAnalysisSettings({
-			...settings,
-			lastRunTimestamp: Date.now(),
-			lastRunStatus: data.success ? "success" : "error",
-			lastRunError: data.error,
-			nextAlarmTime: alarm.scheduledTime,
-		});
-	}
-
-	isAmbientAnalysisRunning = false;
-	await broadcastAnalysisStatus("completed", {
-		itemCount: data.itemCount,
-		message: `Analyzed ${data.itemCount || 0} new items`,
-	});
 });
 
 // Handle errors

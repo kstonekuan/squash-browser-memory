@@ -231,7 +231,7 @@ function getMemoryBadge(): string {
 						</span>
 					</div>
 					<div class="text-xs text-gray-500 max-w-xs text-right">
-						Enable other AI agents to access your browser memory
+						Enable AI agents to access your browser memory
 					</div>
 				</div>
 			</div>

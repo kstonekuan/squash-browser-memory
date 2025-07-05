@@ -76,11 +76,6 @@ interface ProtocolMap {
 		nextRunTime?: number;
 		alarmExists: boolean;
 	};
-	"ambient:analysis-complete": (data: {
-		success: boolean;
-		itemCount?: number;
-		error?: string;
-	}) => void;
 }
 
 // Export the typed messaging functions
