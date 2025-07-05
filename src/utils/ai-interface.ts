@@ -103,7 +103,11 @@ export type AIProviderType = "chrome" | "claude";
 /**
  * Configuration for AI providers
  */
-export interface AIProviderConfig {
-	provider: AIProviderType;
-	claudeApiKey?: string;
-}
+export type AIProviderConfig =
+	| {
+			provider: "chrome";
+	  }
+	| {
+			provider: "claude";
+			claudeApiKey?: string;
+	  };

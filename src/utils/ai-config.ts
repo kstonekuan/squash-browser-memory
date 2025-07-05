@@ -15,22 +15,26 @@ const DEFAULT_CONFIG: AIProviderConfig = {
  */
 export async function loadAIConfig(): Promise<AIProviderConfig> {
 	try {
+		// Check if we're in an environment with chrome.storage access
+		if (
+			typeof chrome === "undefined" ||
+			!chrome.storage ||
+			!chrome.storage.local
+		) {
+			console.log("Chrome storage API not available, using default config");
+			return DEFAULT_CONFIG;
+		}
+
 		const result = await chrome.storage.local.get(AI_CONFIG_KEY);
 		const stored = result[AI_CONFIG_KEY];
 
-		if (!stored) {
-			console.log("No AI config found, using default");
-			return DEFAULT_CONFIG;
+		if (stored?.provider && ["chrome", "claude"].includes(stored.provider)) {
+			console.log("Loaded AI config:", { provider: stored.provider });
+			return stored;
 		}
 
-		// Validate the configuration
-		if (!stored.provider || !["chrome", "claude"].includes(stored.provider)) {
-			console.warn("Invalid AI provider in config, using default");
-			return DEFAULT_CONFIG;
-		}
-
-		console.log("Loaded AI config:", { provider: stored.provider });
-		return stored;
+		console.log("No valid AI config found, using default");
+		return DEFAULT_CONFIG;
 	} catch (error) {
 		console.error("Failed to load AI config:", error);
 		return DEFAULT_CONFIG;
@@ -54,8 +58,9 @@ export async function saveAIConfig(config: AIProviderConfig): Promise<void> {
  */
 export async function setClaudeApiKey(apiKey: string): Promise<void> {
 	const config = await loadAIConfig();
-	config.claudeApiKey = apiKey;
-	await saveAIConfig(config);
+	if (config.provider === "claude") {
+		await saveAIConfig({ ...config, claudeApiKey: apiKey });
+	}
 }
 
 /**
@@ -63,5 +68,8 @@ export async function setClaudeApiKey(apiKey: string): Promise<void> {
  */
 export async function getClaudeApiKey(): Promise<string | undefined> {
 	const config = await loadAIConfig();
-	return config.claudeApiKey;
+	if (config.provider === "claude") {
+		return config.claudeApiKey;
+	}
+	return undefined;
 }

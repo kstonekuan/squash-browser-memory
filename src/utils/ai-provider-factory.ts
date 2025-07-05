@@ -2,6 +2,7 @@
  * AI Provider Factory - Creates and manages AI providers
  */
 
+import { match } from "ts-pattern";
 import type {
 	AIProvider,
 	AIProviderConfig,
@@ -18,22 +19,25 @@ let claudeProvider: ClaudeProvider | null = null;
  * Get an AI provider instance based on configuration
  */
 export function getProvider(config: AIProviderConfig): AIProvider {
-	switch (config.provider) {
-		case "chrome":
+	return match(config)
+		.with({ provider: "chrome" }, () => {
 			if (!chromeProvider) {
 				chromeProvider = new ChromeAIProvider();
 			}
 			return chromeProvider;
-
-		case "claude":
-			if (!claudeProvider || config.claudeApiKey) {
-				claudeProvider = new ClaudeProvider(config.claudeApiKey);
+		})
+		.with({ provider: "claude" }, (conf) => {
+			if (!claudeProvider || conf.claudeApiKey) {
+				claudeProvider = new ClaudeProvider(conf.claudeApiKey);
 			}
-			return claudeProvider;
 
-		default:
-			throw new Error(`Unknown AI provider: ${config.provider}`);
-	}
+			if (!claudeProvider) {
+				throw new Error("Could not create Claude provider instance");
+			}
+
+			return claudeProvider;
+		})
+		.exhaustive();
 }
 
 /**
@@ -47,12 +51,8 @@ export function getAvailableProviders(): AIProviderType[] {
  * Get provider display names
  */
 export function getProviderDisplayName(type: AIProviderType): string {
-	switch (type) {
-		case "chrome":
-			return "Chrome AI (Local)";
-		case "claude":
-			return "Claude API (Remote)";
-		default:
-			return type;
-	}
+	return match(type)
+		.with("chrome", () => "Chrome AI (Local)")
+		.with("claude", () => "Claude API (Remote)")
+		.exhaustive();
 }

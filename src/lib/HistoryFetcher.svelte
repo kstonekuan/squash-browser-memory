@@ -13,7 +13,7 @@ let { isAnalyzing = $bindable(false), isAmbientAnalysisRunning = false } =
 const dispatch = createEventDispatcher();
 
 let error = $state("");
-let dateRange = $state("3hours"); // 3hours, day, week, all
+let dateRange = $state("1hour"); // 1hour, 3hours, day, week, all
 let fetchProgress = $state(0);
 let isFetching = $state(false);
 let rawHistoryData = $state<chrome.history.HistoryItem[] | null>(null);
@@ -95,6 +95,8 @@ function getStartTime(): number {
 
 	const now = Date.now();
 	switch (dateRange) {
+		case "1hour":
+			return now - 1 * 60 * 60 * 1000;
 		case "3hours":
 			return now - 3 * 60 * 60 * 1000;
 		case "day":
@@ -169,6 +171,16 @@ async function fetchHistory() {
 	<div>
 		<h3 class="text-sm font-medium text-gray-700 mb-2">Date Range</h3>
 		<div class="grid grid-cols-2 gap-2">
+			<label class="flex items-center">
+				<input
+					type="radio"
+					bind:group={dateRange}
+					value="1hour"
+					class="mr-2 text-blue-600 focus:ring-blue-500"
+					disabled={isFetching || isAnalyzing}
+				/>
+				<span class="text-sm">1 hour</span>
+			</label>
 			<label class="flex items-center">
 				<input
 					type="radio"

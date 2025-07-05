@@ -5,6 +5,7 @@ import {
 	loadAutoAnalysisSettings,
 	saveAutoAnalysisSettings,
 } from "../utils/ambient";
+import { sendMessage } from "../utils/messaging";
 
 // Default settings
 const defaultSettings: AutoAnalysisSettings = {
@@ -66,28 +67,37 @@ export async function toggleAmbientAnalysis(): Promise<void> {
 	}));
 
 	// Send message to background script
-	const response = await chrome.runtime.sendMessage({
-		type: "toggle-auto-analysis",
-		enabled: newEnabled,
-	});
+	try {
+		const response = await sendMessage("settings:toggle-auto-analysis", {
+			enabled: newEnabled,
+		});
 
-	if (!response?.success) {
+		if (!response?.success) {
+			// Revert on error
+			ambientSettings.update((settings) => ({
+				...settings,
+				enabled: !newEnabled,
+				// Restore previous timestamp if reverting
+				lastRunTimestamp: currentSettings!.lastRunTimestamp,
+			}));
+			throw new Error(response?.error || "Failed to update auto-analysis");
+		}
+
+		// If we have the actual next run time from the alarm, store it
+		if (response.nextRunTime && newEnabled) {
+			ambientSettings.update((settings) => ({
+				...settings,
+				nextAlarmTime: response.nextRunTime,
+			}));
+		}
+	} catch (error) {
 		// Revert on error
 		ambientSettings.update((settings) => ({
 			...settings,
 			enabled: !newEnabled,
-			// Restore previous timestamp if reverting
 			lastRunTimestamp: currentSettings!.lastRunTimestamp,
 		}));
-		throw new Error(response?.error || "Failed to update auto-analysis");
-	}
-
-	// If we have the actual next run time from the alarm, store it
-	if (response.nextRunTime && newEnabled) {
-		ambientSettings.update((settings) => ({
-			...settings,
-			nextAlarmTime: response.nextRunTime,
-		}));
+		throw error;
 	}
 }
 

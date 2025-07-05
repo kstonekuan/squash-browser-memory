@@ -11,7 +11,8 @@
 		"alarms",
 		"notifications",
 		"unlimitedStorage",
-		"activeTab"
+		"activeTab",
+		"offscreen"
 	],
 	"host_permissions": ["https://api.anthropic.com/*"],
 	"background": {
@@ -40,5 +41,11 @@
 		"32": "icon-32.png",
 		"48": "icon-48.png",
 		"128": "icon-128.png"
-	}
+	},
+	"web_accessible_resources": [
+		{
+			"resources": ["offscreen.html"],
+			"matches": ["<all_urls>"]
+		}
+	]
 }

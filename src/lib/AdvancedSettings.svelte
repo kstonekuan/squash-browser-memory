@@ -81,11 +81,6 @@ async function updateProviderStatuses() {
 
 	for (const providerType of providers) {
 		try {
-			const config = await loadAIConfig();
-			if (providerType === "claude") {
-				config.claudeApiKey = claudeApiKey;
-			}
-
 			const provider = getProvider({
 				provider: providerType,
 				claudeApiKey: providerType === "claude" ? claudeApiKey : undefined,

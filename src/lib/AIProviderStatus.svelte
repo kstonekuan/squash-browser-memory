@@ -4,6 +4,10 @@ import { loadAIConfig } from "../utils/ai-config";
 import type { AIProviderStatus } from "../utils/ai-interface";
 import { getProvider } from "../utils/ai-provider-factory";
 
+let { onProviderChange } = $props<{
+	onProviderChange?: () => void;
+}>();
+
 let status: Availability | AIProviderStatus | null = $state(null);
 let checking = $state(true);
 let providerName = $state("AI");

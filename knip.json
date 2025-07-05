@@ -1,6 +1,11 @@
 {
 	"$schema": "https://unpkg.com/knip@latest/schema.json",
-	"entry": ["src/sidepanel.ts", "src/background.ts", "content-scripts/**/*.ts"],
+	"entry": [
+		"src/sidepanel.ts",
+		"src/background.ts",
+		"src/offscreen.ts",
+		"content-scripts/**/*.ts"
+	],
 	"project": ["src/**/*.{ts,js,svelte}", "content-scripts/**/*.ts"],
 	"ignore": [
 		"vite.config.ts",

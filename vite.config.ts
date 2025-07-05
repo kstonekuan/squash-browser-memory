@@ -1,6 +1,7 @@
+import { crx } from "@crxjs/vite-plugin";
 import { svelte, vitePreprocess } from "@sveltejs/vite-plugin-svelte";
 import { defineConfig } from "vite";
-import webExtension from "vite-plugin-web-extension";
+import manifest from "./manifest.json";
 
 // https://vite.dev/config/
 export default defineConfig({
@@ -8,9 +9,7 @@ export default defineConfig({
 		svelte({
 			preprocess: vitePreprocess(),
 		}),
-		webExtension({
-			additionalInputs: ["sidepanel.html"],
-		}),
+		crx({ manifest }),
 	],
 	build: {
 		outDir: "dist",

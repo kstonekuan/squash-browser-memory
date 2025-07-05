@@ -4,6 +4,7 @@ import {
 	toggleAmbientAnalysis as toggleAmbient,
 } from "../stores/ambient-store";
 import type { AutoAnalysisSettings } from "../utils/ambient";
+import { sendMessage } from "../utils/messaging";
 
 let { analysisStatus = { status: "idle" } } = $props<{
 	analysisStatus?: {
@@ -32,10 +33,11 @@ $effect(() => {
 });
 
 // Query actual alarm time on mount and when enabled
+let lastQueriedEnabled = false;
 $effect(() => {
-	if (settings.enabled) {
-		chrome.runtime
-			.sendMessage({ type: "query-next-alarm-time" })
+	// Only query if we're transitioning from disabled to enabled or on first mount
+	if (settings.enabled && !lastQueriedEnabled) {
+		sendMessage("ambient:query-next-alarm")
 			.then((response) => {
 				if (response?.nextRunTime) {
 					ambientSettings.update((s) => ({
@@ -48,6 +50,7 @@ $effect(() => {
 				// Ignore errors - background might not be ready
 			});
 	}
+	lastQueriedEnabled = settings.enabled;
 });
 
 async function toggleAmbientAnalysis() {

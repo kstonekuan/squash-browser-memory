@@ -49,6 +49,18 @@ export function createEmptyMemory(): AnalysisMemory {
 // Load memory from Chrome storage
 export async function loadMemory(): Promise<AnalysisMemory | null> {
 	try {
+		// Check if we're in an environment with chrome.storage access
+		if (
+			typeof chrome === "undefined" ||
+			!chrome.storage ||
+			!chrome.storage.local
+		) {
+			console.log(
+				"Chrome storage API not available for memory, returning null",
+			);
+			return null;
+		}
+
 		const result = await chrome.storage.local.get(MEMORY_KEY);
 		const stored = result[MEMORY_KEY];
 
@@ -165,6 +177,18 @@ export async function loadMemory(): Promise<AnalysisMemory | null> {
 // Save memory to Chrome storage
 export async function saveMemory(memory: AnalysisMemory): Promise<void> {
 	try {
+		// Check if we're in an environment with chrome.storage access
+		if (
+			typeof chrome === "undefined" ||
+			!chrome.storage ||
+			!chrome.storage.local
+		) {
+			console.log(
+				"Chrome storage API not available for saving memory, skipping",
+			);
+			return;
+		}
+
 		// Normalize the date to an ISO string before saving to prevent serialization issues
 		const memoryToSave = {
 			...memory,
@@ -173,11 +197,17 @@ export async function saveMemory(memory: AnalysisMemory): Promise<void> {
 		};
 
 		await chrome.storage.local.set({ [MEMORY_KEY]: memoryToSave });
-		console.log("Saved memory to chrome.storage.local:", {
+		console.log("[Memory] Saved to chrome.storage.local:", {
+			key: MEMORY_KEY,
 			patterns: memory.patterns.length,
 			lastAnalyzedDate: memory.lastAnalyzedDate,
 			lastAnalyzedDateISO: memoryToSave.lastAnalyzedDate,
 			lastHistoryTimestamp: memory.lastHistoryTimestamp,
+			userProfile: {
+				coreIdentities: memory.userProfile?.coreIdentities?.length || 0,
+				currentTasks: memory.userProfile?.currentTasks?.length || 0,
+				summary: memory.userProfile?.summary || "No summary",
+			},
 		});
 	} catch (error) {
 		console.error("Failed to save memory:", error);
@@ -186,6 +216,18 @@ export async function saveMemory(memory: AnalysisMemory): Promise<void> {
 
 // Clear memory
 export async function clearMemory(): Promise<void> {
+	// Check if we're in an environment with chrome.storage access
+	if (
+		typeof chrome === "undefined" ||
+		!chrome.storage ||
+		!chrome.storage.local
+	) {
+		console.log(
+			"Chrome storage API not available for clearing memory, skipping",
+		);
+		return;
+	}
+
 	await chrome.storage.local.remove(MEMORY_KEY);
 	console.log("Analysis memory cleared from chrome.storage.local");
 }

@@ -142,11 +142,13 @@ export async function analyzeHistoryItems(
 
 	// Identify chunks using AI
 	console.log("Starting chunking phase");
-	if (onProgress)
+	if (onProgress) {
+		console.log("[Analyzer] Reporting chunking phase start");
 		onProgress({
 			phase: "chunking",
 			chunkDescription: `Analyzing ${items.length} items for time patterns`,
 		});
+	}
 	const chunkingResult = await identifyChunks(
 		items,
 		customPrompts?.chunkPrompt,
@@ -163,6 +165,11 @@ export async function analyzeHistoryItems(
 	);
 	console.log("Created", chunks.length, "chunks for processing");
 	if (onProgress && chunks.length > 0) {
+		console.log(
+			"[Analyzer] Reporting chunking complete with",
+			chunks.length,
+			"sessions",
+		);
 		onProgress({
 			phase: "chunking",
 			chunkDescription: `Identified ${chunks.length} browsing sessions`,
@@ -201,6 +208,9 @@ export async function analyzeHistoryItems(
 		};
 	});
 
+	// Small delay to ensure UI updates
+	await new Promise((resolve) => setTimeout(resolve, 500));
+
 	// Process each chunk
 	let processedChunks = 0;
 	const totalChunks = chunks.length;
@@ -216,6 +226,9 @@ export async function analyzeHistoryItems(
 		processedChunks++;
 
 		if (onProgress) {
+			console.log(
+				`[Analyzer] Reporting chunk ${processedChunks}/${totalChunks} progress`,
+			);
 			onProgress({
 				phase: "analyzing",
 				currentChunk: processedChunks,
@@ -256,6 +269,13 @@ export async function analyzeHistoryItems(
 				};
 
 				// Save memory after each chunk
+				console.log(`[Analyzer] Saving memory after chunk ${i + 1}:`, {
+					patterns: memory.patterns.length,
+					userProfile: {
+						coreIdentities: memory.userProfile.coreIdentities?.length || 0,
+						currentTasks: memory.userProfile.currentTasks?.length || 0,
+					},
+				});
 				await saveMemory(memory);
 			}
 

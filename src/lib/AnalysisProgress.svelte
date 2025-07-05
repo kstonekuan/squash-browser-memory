@@ -142,7 +142,7 @@ function getSubPhaseIcon(subPhase: SubPhase | undefined): string {
 								<div class="text-xs text-gray-500 mt-1">
 									{phaseItem.description}
 								</div>
-								{#if chunkProgress && phase === 'analyzing'}
+								{#if chunkProgress && phase === 'analyzing' && chunkProgress.current > 0}
 									<div class="text-xs text-blue-600 font-medium mt-1">
 										Chunk {chunkProgress.current} of {chunkProgress.total}
 									</div>

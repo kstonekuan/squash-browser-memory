@@ -33,9 +33,19 @@ async function loadMemoryData() {
 	loading = true;
 	hasAttemptedLoad = true;
 	try {
+		console.log("[MemoryViewer] Loading memory from storage...");
 		memory = await loadMemory();
+		console.log("[MemoryViewer] Memory loaded:", {
+			hasMemory: !!memory,
+			patterns: memory?.patterns?.length || 0,
+			lastAnalyzed: memory?.lastAnalyzedDate,
+			userProfile: {
+				coreIdentities: memory?.userProfile?.coreIdentities?.length || 0,
+				currentTasks: memory?.userProfile?.currentTasks?.length || 0,
+			},
+		});
 	} catch (error) {
-		console.error("Failed to load memory:", error);
+		console.error("[MemoryViewer] Failed to load memory:", error);
 	} finally {
 		loading = false;
 	}
@@ -43,12 +53,18 @@ async function loadMemoryData() {
 
 // Listen for storage changes to automatically refresh memory
 onMount(() => {
+	// Load memory on mount
+	loadMemoryData();
+
 	const handleStorageChange = (changes: {
 		[key: string]: chrome.storage.StorageChange;
 	}) => {
 		// Check if the memory key changed
 		if (changes.history_analysis_memory) {
-			console.log("Memory updated in storage, refreshing...");
+			console.log("[MemoryViewer] Memory updated in storage, refreshing...", {
+				oldValue: changes.history_analysis_memory.oldValue,
+				newValue: changes.history_analysis_memory.newValue,
+			});
 			refreshMemory();
 		}
 	};
@@ -66,13 +82,18 @@ onMount(() => {
 
 // Refresh memory data
 async function refreshMemory() {
+	console.log("[MemoryViewer] Manual refresh triggered");
 	loading = true;
 	try {
 		memory = await loadMemory();
 		// Force refresh next time if memory section is toggled
-		hasAttemptedLoad = false;
+		hasAttemptedLoad = true; // Mark as loaded so we show current state
+		console.log("[MemoryViewer] Memory refreshed:", {
+			hasMemory: !!memory,
+			patterns: memory?.patterns?.length || 0,
+		});
 	} catch (error) {
-		console.error("Failed to refresh memory:", error);
+		console.error("[MemoryViewer] Failed to refresh memory:", error);
 	} finally {
 		loading = false;
 	}
@@ -175,7 +196,9 @@ $effect(() => {
 // Handle section toggle
 function handleSectionToggle(isOpen: boolean) {
 	sectionIsOpen = isOpen;
-	if (isOpen && !hasAttemptedLoad && !loading) {
+	if (isOpen && !loading) {
+		// Always try to load when opening, reset the flag
+		hasAttemptedLoad = false;
 		loadMemoryData();
 	}
 }
