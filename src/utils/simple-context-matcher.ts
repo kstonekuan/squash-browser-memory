@@ -225,19 +225,23 @@ export class SimpleContextMatcher {
 		};
 
 		// Add core identities (string array)
-		addArrayItems(profile.coreIdentities, "identities");
+		addArrayItems(profile.stableTraits?.coreIdentities, "identities");
 
 		// Add current tasks (string array)
-		addArrayItems(profile.currentTasks, "tasks");
+		addArrayItems(profile.dynamicContext?.currentTasks, "tasks");
 
 		// Add current interests (string array)
-		addArrayItems(profile.currentInterests, "interests");
+		addArrayItems(profile.dynamicContext?.currentInterests, "interests");
 
 		// Add personal preferences (object array: {category, preference})
-		addObjectArray(profile.personalPreferences, "preferences", (item) => {
-			const obj = item as { category?: string; preference?: string };
-			return `${obj.category || ""}: ${obj.preference || ""}`;
-		});
+		addObjectArray(
+			profile.stableTraits?.personalPreferences,
+			"preferences",
+			(item) => {
+				const obj = item as { category?: string; preference?: string };
+				return `${obj.category || ""}: ${obj.preference || ""}`;
+			},
+		);
 
 		// Add summary as a single context item
 		addContext(profile.summary, "summary");

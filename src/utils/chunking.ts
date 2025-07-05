@@ -6,7 +6,7 @@ import {
 	setSeconds,
 	startOfDay,
 } from "date-fns";
-import type { z } from "zod";
+import type { z } from "zod/v4";
 import { createAISession, promptAI } from "./ai-session-factory";
 import { buildChunkingPrompt, CHUNK_SYSTEM_PROMPT } from "./constants";
 import type { ChunkTimeRange, HistoryChunk } from "./memory";

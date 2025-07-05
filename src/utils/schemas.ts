@@ -1,154 +1,139 @@
-// Structured output schemas for Chrome AI
+// Structured output schemas for Chrome AI and runtime validation
 
-import { z } from "zod";
-
-export const ANALYSIS_SCHEMA = {
-	type: "object",
-	properties: {
-		patterns: {
-			type: "array",
-			maxItems: 15,
-			items: {
-				type: "object",
-				properties: {
-					pattern: { type: "string", maxLength: 100 },
-					description: { type: "string", maxLength: 200 },
-					frequency: { type: "number" },
-					urls: {
-						type: "array",
-						items: { type: "string", maxLength: 150 },
-						maxItems: 5,
-					},
-					timePattern: { type: "string", maxLength: 50 },
-					suggestion: { type: "string", maxLength: 200 },
-					automationPotential: {
-						type: "string",
-						enum: ["high", "medium", "low"],
-					},
-				},
-				required: [
-					"pattern",
-					"description",
-					"frequency",
-					"urls",
-					"suggestion",
-					"automationPotential",
-				],
-			},
-		},
-		userProfile: {
-			type: "object",
-			properties: {
-				// === Stable Background ===
-				coreIdentities: {
-					type: "array",
-					items: { type: "string", maxLength: 80 },
-					maxItems: 5,
-				},
-				personalPreferences: {
-					type: "array",
-					items: {
-						type: "object",
-						properties: {
-							category: { type: "string", maxLength: 40 },
-							preference: { type: "string", maxLength: 80 },
-						},
-						required: ["category", "preference"],
-					},
-					maxItems: 8,
-				},
-
-				// === Current Context ===
-				currentTasks: {
-					type: "array",
-					items: { type: "string", maxLength: 80 },
-					maxItems: 10,
-				},
-				currentInterests: {
-					type: "array",
-					items: { type: "string", maxLength: 60 },
-					maxItems: 8,
-				},
-
-				// === Overall Summary ===
-				summary: { type: "string", maxLength: 500 },
-			},
-			required: [
-				"coreIdentities",
-				"personalPreferences",
-				"currentTasks",
-				"currentInterests",
-				"summary",
-			],
-		},
-	},
-	required: ["patterns", "userProfile"],
-};
-
-export const CHUNK_SCHEMA = {
-	type: "object",
-	properties: {
-		chunks: {
-			type: "array",
-			items: {
-				type: "object",
-				properties: {
-					startIndex: {
-						type: "number",
-						description:
-							"Index of the first timestamp in this session (e.g., 0, 5, 12)",
-					},
-					endIndex: {
-						type: "number",
-						description:
-							"Index of the last timestamp in this session (e.g., 4, 11, 23)",
-					},
-					description: { type: "string" }, // e.g., "Morning work session"
-				},
-				required: ["startIndex", "endIndex", "description"],
-			},
-		},
-	},
-	required: ["chunks"],
-};
+import { toJSONSchema, z } from "zod/v4";
 
 // Zod schemas for runtime validation
 const WorkflowPatternSchema = z.object({
-	pattern: z.string().max(100),
-	description: z.string().max(200),
-	frequency: z.number(),
-	urls: z.array(z.string().max(150)).max(5),
-	timePattern: z.string().max(50).optional(),
-	suggestion: z.string().max(200),
-	automationPotential: z.enum(["high", "medium", "low"]),
+	pattern: z.string().max(100).describe("Short name for the workflow pattern"),
+	description: z
+		.string()
+		.max(200)
+		.describe("Detailed description of what this workflow involves"),
+	frequency: z
+		.number()
+		.describe(
+			"How often this pattern occurs (e.g., number of times per day/week)",
+		),
+	urls: z
+		.array(z.string().max(150))
+		.max(5)
+		.describe("Example URLs that are part of this workflow"),
+	timePattern: z
+		.string()
+		.max(50)
+		.optional()
+		.describe(
+			"When this pattern typically occurs (e.g., 'mornings', 'weekdays', 'hourly')",
+		),
+	suggestion: z
+		.string()
+		.max(200)
+		.describe(
+			"Actionable suggestion for optimizing or automating this workflow",
+		),
+	automationPotential: z
+		.enum(["high", "medium", "low"])
+		.describe("How suitable this workflow is for automation"),
 });
 
 const UserProfileSchema = z.object({
-	coreIdentities: z.array(z.string().max(80)).max(5),
-	personalPreferences: z
-		.array(
-			z.object({
-				category: z.string().max(40),
-				preference: z.string().max(80),
-			}),
-		)
-		.max(8),
-	currentTasks: z.array(z.string().max(80)).max(10),
-	currentInterests: z.array(z.string().max(60)).max(8),
-	summary: z.string().max(500),
+	stableTraits: z
+		.object({
+			coreIdentities: z
+				.array(z.string().max(80))
+				.max(5)
+				.describe(
+					"Roles someone would claim as part of their identity. Examples: Senior UX Designer, Parent of two, Weekend volunteer firefighter, Dancer, Marathon runner",
+				),
+			personalPreferences: z
+				.array(
+					z.object({
+						category: z
+							.string()
+							.max(40)
+							.describe(
+								"Category of preference (e.g., Style, Travel, Diet, UI, Music, Coffee, Reading, Fitness)",
+							),
+						preference: z
+							.string()
+							.max(80)
+							.describe(
+								"Specific preference (e.g., Minimalist capsule wardrobe, prefers night trains, vegetarian, dark-theme, techno at 124 BPM)",
+							),
+					}),
+				)
+				.max(8)
+				.describe("Enduring personal choices and preferences"),
+		})
+		.describe(
+			"Stable traits that require high evidence (2+ distinct browsing signals) to establish or modify",
+		),
+	dynamicContext: z
+		.object({
+			currentTasks: z
+				.array(z.string().max(80))
+				.max(10)
+				.describe(
+					"Active goals and tasks the user is working on. Examples: Land 6-month retainer, Redesign app onboarding, Reach B2 Portuguese, Cycle Camino de Santiago, Publish UX case-study, Build Notion templates",
+				),
+			currentInterests: z
+				.array(z.string().max(60))
+				.max(8)
+				.describe(
+					"Recent areas of focus and interest. Examples: Figma micro-interactions, Zero-waste travel, EU Digital Services Act, Watercolor journaling, Figma variables beta, Interrail pricing, AI ethics, Lisbon coworking",
+				),
+		})
+		.describe(
+			"Dynamic context that updates frequently based on recent browsing activity",
+		),
+	summary: z
+		.string()
+		.max(500)
+		.describe(
+			"A vivid sentence combining the person's identities, preferences, and current focus",
+		),
 });
 
 export const AnalysisResultSchema = z.object({
-	patterns: z.array(WorkflowPatternSchema).max(15),
+	patterns: z
+		.array(WorkflowPatternSchema)
+		.max(15)
+		.describe(
+			"Workflow patterns discovered in browsing history with URLs, frequencies, and automation opportunities",
+		),
 	userProfile: UserProfileSchema,
 });
 
-export const ChunkSchema = z.object({
-	chunks: z.array(
-		z.object({
-			startIndex: z.number(),
-			endIndex: z.number(),
-			description: z.string(),
-		}),
-	),
-});
+export const ChunkSchema = z
+	.object({
+		chunks: z
+			.array(
+				z.object({
+					startIndex: z
+						.number()
+						.describe(
+							"Index of the first timestamp in this session from the provided data array (e.g., 0, 5, 12). IMPORTANT: Use the index shown in brackets [n] from the input data",
+						),
+					endIndex: z
+						.number()
+						.describe(
+							"Index of the last timestamp in this session from the provided data array (e.g., 4, 11, 23). IMPORTANT: Use the index shown in brackets [n] from the input data",
+						),
+					description: z
+						.string()
+						.describe(
+							"Descriptive label for this session (e.g., 'Morning work session', 'Evening research', 'Weekend browsing')",
+						),
+				}),
+			)
+			.describe(
+				"Array of browsing sessions. Rules: Gap >30min = new session, Sessions can span days if continuous, Return at least 1 chunk",
+			),
+	})
+	.describe(
+		"Browsing sessions grouped by natural time gaps (>30min gap = new session)",
+	);
+
+// Generate JSON schemas from Zod schemas for Chrome AI
+export const ANALYSIS_SCHEMA = toJSONSchema(AnalysisResultSchema);
+export const CHUNK_SCHEMA = toJSONSchema(ChunkSchema);

@@ -1,28 +1,11 @@
-export interface WorkflowPattern {
-	pattern: string;
-	description: string;
-	frequency: number;
-	urls: string[];
-	timePattern?: string;
-	suggestion: string;
-	automationPotential: "high" | "medium" | "low";
-}
+import type { z } from "zod/v4";
+import type { AnalysisResultSchema } from "./utils/schemas";
 
-export interface UserProfile {
-	// === Stable Background ===
-	coreIdentities: string[];
-	personalPreferences: {
-		category: string;
-		preference: string;
-	}[];
-
-	// === Current Context ===
-	currentTasks: string[];
-	currentInterests: string[];
-
-	// === Overall Summary ===
-	summary: string;
-}
+// Derive types from Zod schemas
+export type WorkflowPattern = z.infer<
+	typeof AnalysisResultSchema
+>["patterns"][number];
+export type UserProfile = z.infer<typeof AnalysisResultSchema>["userProfile"];
 
 export interface ChunkInfo {
 	startTime: Date;

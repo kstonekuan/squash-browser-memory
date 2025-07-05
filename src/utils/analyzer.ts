@@ -271,8 +271,10 @@ export async function analyzeHistoryItems(
 				console.log(`[Analyzer] Saving memory after chunk ${i + 1}:`, {
 					patterns: memory.patterns.length,
 					userProfile: {
-						coreIdentities: memory.userProfile.coreIdentities?.length || 0,
-						currentTasks: memory.userProfile.currentTasks?.length || 0,
+						coreIdentities:
+							memory.userProfile.stableTraits?.coreIdentities?.length || 0,
+						currentTasks:
+							memory.userProfile.dynamicContext?.currentTasks?.length || 0,
 					},
 				});
 				await saveMemory(memory);
@@ -429,7 +431,7 @@ async function mergeAnalysisResults(
 	// If memory is empty (no patterns), just return the new results
 	if (
 		memory.patterns.length === 0 &&
-		memory.userProfile.coreIdentities.length === 0
+		memory.userProfile.stableTraits.coreIdentities.length === 0
 	) {
 		return newResults;
 	}
@@ -624,7 +626,7 @@ async function analyzeChunkWithSubdivision(
 			// Step 2: Merge with existing memory (skip if memory is empty)
 			const mergedResults =
 				memory.patterns.length === 0 &&
-				memory.userProfile.coreIdentities.length === 0
+				memory.userProfile.stableTraits.coreIdentities.length === 0
 					? chunkResults
 					: await mergeAnalysisResults(
 							memory,
@@ -746,9 +748,9 @@ async function analyzeChunkWithSubdivision(
 			// Step 2: Merge with current memory (skip if current memory is from original empty memory)
 			const mergedResults =
 				currentMemory.patterns.length === 0 &&
-				currentMemory.userProfile.coreIdentities.length === 0 &&
+				currentMemory.userProfile.stableTraits.coreIdentities.length === 0 &&
 				memory.patterns.length === 0 &&
-				memory.userProfile.coreIdentities.length === 0
+				memory.userProfile.stableTraits.coreIdentities.length === 0
 					? subResults
 					: await mergeAnalysisResults(
 							currentMemory,

@@ -41,8 +41,10 @@ async function loadMemoryData() {
 			patterns: memory?.patterns?.length || 0,
 			lastAnalyzed: memory?.lastAnalyzedDate,
 			userProfile: {
-				coreIdentities: memory?.userProfile?.coreIdentities?.length || 0,
-				currentTasks: memory?.userProfile?.currentTasks?.length || 0,
+				coreIdentities:
+					memory?.userProfile?.stableTraits?.coreIdentities?.length || 0,
+				currentTasks:
+					memory?.userProfile?.dynamicContext?.currentTasks?.length || 0,
 			},
 		});
 	} catch (error) {
@@ -327,11 +329,11 @@ function getMemoryBadge(): string {
 								</div>
 								
 								<!-- Core Identities -->
-								{#if memory.userProfile.coreIdentities.length > 0}
+								{#if memory.userProfile.stableTraits.coreIdentities.length > 0}
 									<div class="mb-3">
 										<h4 class="text-sm font-medium text-gray-600 mb-2">Core Identities</h4>
 										<div class="flex flex-wrap gap-1">
-											{#each memory.userProfile.coreIdentities as identity}
+											{#each memory.userProfile.stableTraits.coreIdentities as identity}
 												<span 
 													class="inline-block px-2 py-1 text-xs bg-green-100 text-green-800 rounded-full cursor-pointer hover:bg-green-200 transition-colors" 
 													role="button"
@@ -348,11 +350,11 @@ function getMemoryBadge(): string {
 
 
 								<!-- Personal Preferences -->
-								{#if memory.userProfile.personalPreferences.length > 0}
+								{#if memory.userProfile.stableTraits.personalPreferences.length > 0}
 									<div class="mb-3">
 										<h4 class="text-sm font-medium text-gray-600 mb-2">Personal Preferences</h4>
 										<div class="flex flex-wrap gap-1">
-											{#each memory.userProfile.personalPreferences as pref}
+											{#each memory.userProfile.stableTraits.personalPreferences as pref}
 												<span 
 													class="inline-block px-2 py-1 text-xs bg-gray-200 text-gray-700 rounded-full cursor-pointer hover:bg-gray-300 transition-colors" 
 													role="button"
@@ -379,11 +381,11 @@ function getMemoryBadge(): string {
 								</div>
 
 								<!-- Current Tasks -->
-								{#if memory.userProfile.currentTasks.length > 0}
+								{#if memory.userProfile.dynamicContext.currentTasks.length > 0}
 									<div class="mb-3">
 										<h4 class="text-sm font-medium text-orange-700 mb-2">Current Tasks</h4>
 										<div class="flex flex-wrap gap-1">
-											{#each memory.userProfile.currentTasks as task}
+											{#each memory.userProfile.dynamicContext.currentTasks as task}
 												<span 
 													class="inline-block px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded-full cursor-pointer hover:bg-blue-200 transition-colors" 
 													role="button"
@@ -399,11 +401,11 @@ function getMemoryBadge(): string {
 								{/if}
 
 								<!-- Current Interests -->
-								{#if memory.userProfile.currentInterests.length > 0}
+								{#if memory.userProfile.dynamicContext.currentInterests.length > 0}
 									<div class="mb-3">
 										<h4 class="text-sm font-medium text-orange-700 mb-2">Current Interests</h4>
 										<div class="flex flex-wrap gap-1">
-											{#each memory.userProfile.currentInterests as interest}
+											{#each memory.userProfile.dynamicContext.currentInterests as interest}
 												<span 
 													class="inline-block px-2 py-1 text-xs bg-purple-100 text-purple-800 rounded-full cursor-pointer hover:bg-purple-200 transition-colors" 
 													role="button"

@@ -27,16 +27,20 @@ export interface ChunkTimeRange {
 }
 
 const MEMORY_KEY = "history_analysis_memory";
-const MEMORY_VERSION = "1.4.0"; // Simplified structure: profession->coreIdentities, currentGoals->currentTasks, added currentInterests, removed lifecycleHints
+const MEMORY_VERSION = "1.5.0"; // Nested structure: stableTraits and dynamicContext
 
 // Initialize empty memory
 export function createEmptyMemory(): AnalysisMemory {
 	return {
 		userProfile: {
-			coreIdentities: [],
-			personalPreferences: [],
-			currentTasks: [],
-			currentInterests: [],
+			stableTraits: {
+				coreIdentities: [],
+				personalPreferences: [],
+			},
+			dynamicContext: {
+				currentTasks: [],
+				currentInterests: [],
+			},
 			summary: "No profile data yet.",
 		},
 		patterns: [],
@@ -129,19 +133,24 @@ export async function loadMemory(): Promise<AnalysisMemory | null> {
 			stored.lastHistoryTimestamp = 0;
 		}
 
-		// Handle UserProfile fields (v1.4.0 structure)
-		if (!stored.userProfile.coreIdentities) {
-			stored.userProfile.coreIdentities = [];
+		// Handle UserProfile fields (v1.5.0 nested structure)
+		if (!stored.userProfile.stableTraits) {
+			stored.userProfile.stableTraits = {
+				coreIdentities: stored.userProfile.coreIdentities || [],
+				personalPreferences: stored.userProfile.personalPreferences || [],
+			};
 		}
-		if (!stored.userProfile.personalPreferences) {
-			stored.userProfile.personalPreferences = [];
+		if (!stored.userProfile.dynamicContext) {
+			stored.userProfile.dynamicContext = {
+				currentTasks: stored.userProfile.currentTasks || [],
+				currentInterests: stored.userProfile.currentInterests || [],
+			};
 		}
-		if (!stored.userProfile.currentTasks) {
-			stored.userProfile.currentTasks = [];
-		}
-		if (!stored.userProfile.currentInterests) {
-			stored.userProfile.currentInterests = [];
-		}
+		// Clean up old flat fields if they exist
+		delete stored.userProfile.coreIdentities;
+		delete stored.userProfile.personalPreferences;
+		delete stored.userProfile.currentTasks;
+		delete stored.userProfile.currentInterests;
 
 		// Validate the date conversion
 		if (Number.isNaN(stored.lastAnalyzedDate.getTime())) {
@@ -204,8 +213,10 @@ export async function saveMemory(memory: AnalysisMemory): Promise<void> {
 			lastAnalyzedDateISO: memoryToSave.lastAnalyzedDate,
 			lastHistoryTimestamp: memory.lastHistoryTimestamp,
 			userProfile: {
-				coreIdentities: memory.userProfile?.coreIdentities?.length || 0,
-				currentTasks: memory.userProfile?.currentTasks?.length || 0,
+				coreIdentities:
+					memory.userProfile?.stableTraits?.coreIdentities?.length || 0,
+				currentTasks:
+					memory.userProfile?.dynamicContext?.currentTasks?.length || 0,
 				summary: memory.userProfile?.summary || "No summary",
 			},
 		});
