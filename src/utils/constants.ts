@@ -21,7 +21,7 @@ Merge rules:
 - Maintain narrative coherence in the summary`;
 
 import { format } from "date-fns";
-import type { UserProfile, WorkflowPattern } from "../types";
+import type { MemoryData } from "../types";
 
 // Prompt builders
 export function buildChunkingPrompt(timestamps: number[]): string {
@@ -65,14 +65,8 @@ ${JSON.stringify(historyData)}`;
 }
 
 export function buildMergePrompt(
-	existingMemory: {
-		userProfile: UserProfile;
-		patterns: WorkflowPattern[];
-	},
-	newResults: {
-		userProfile: UserProfile;
-		patterns: WorkflowPattern[];
-	},
+	existingMemory: MemoryData,
+	newResults: MemoryData,
 ): string {
 	return `EXISTING MEMORY:
 ${JSON.stringify(existingMemory)}

@@ -1,11 +1,12 @@
 import type { z } from "zod/v4";
 import type { AnalysisResultSchema } from "./utils/schemas";
 
-// Derive types from Zod schemas
-export type WorkflowPattern = z.infer<
-	typeof AnalysisResultSchema
->["patterns"][number];
-export type UserProfile = z.infer<typeof AnalysisResultSchema>["userProfile"];
+// Core analysis result type derived from Zod schema (just patterns and userProfile)
+export type MemoryData = z.infer<typeof AnalysisResultSchema>;
+
+// Individual types for convenience
+export type WorkflowPattern = MemoryData["patterns"][number];
+export type UserProfile = MemoryData["userProfile"];
 
 export interface ChunkInfo {
 	startTime: Date;

@@ -4,6 +4,7 @@ import { format } from "date-fns";
 import type {
 	ChunkInfo,
 	FullAnalysisResult,
+	MemoryData,
 	UserProfile,
 	WorkflowPattern,
 } from "../types";
@@ -418,11 +419,11 @@ function hideTrackingParams(
 // Merge new analysis results with existing results using LLM
 async function mergeAnalysisResults(
 	memory: AnalysisMemory,
-	newResults: { userProfile: UserProfile; patterns: WorkflowPattern[] },
+	newResults: MemoryData,
 	customSystemPrompt?: string,
 	abortSignal?: AbortSignal,
 	onProgress?: ProgressCallback,
-): Promise<{ userProfile: UserProfile; patterns: WorkflowPattern[] }> {
+): Promise<MemoryData> {
 	// Check if aborted
 	if (abortSignal?.aborted) {
 		throw new Error("Analysis cancelled");
