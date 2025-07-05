@@ -1,13 +1,10 @@
 <script lang="ts">
-export type AnalysisPhase =
-	| "idle"
-	| "calculating"
-	| "chunking"
-	| "analyzing"
-	| "complete"
-	| "error";
+// Import from the centralized type definition
+import type { AnalysisProgress } from "../utils/messaging";
 
-export type SubPhase = "sending-analysis" | "sending-merge" | "processing";
+export type AnalysisPhase = AnalysisProgress["phase"];
+
+export type SubPhase = NonNullable<AnalysisProgress["subPhase"]>;
 
 let {
 	phase = "idle",

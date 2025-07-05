@@ -108,8 +108,8 @@ async function broadcastAnalysisStatus(
 // Track active analyses
 const activeAnalyses = new Map<string, AbortController>();
 
-// Run manual analysis directly in service worker
-async function runManualAnalysis(
+// Common analysis runner for both manual and ambient
+async function runAnalysis(
 	historyItems: chrome.history.HistoryItem[],
 	analysisId: string,
 	customPrompts?: {
@@ -117,17 +117,12 @@ async function runManualAnalysis(
 		chunkPrompt?: string;
 		mergePrompt?: string;
 	},
+	type: "manual" | "ambient" = "manual",
 ): Promise<void> {
+	const logPrefix = type === "manual" ? "[Manual Analysis]" : "[Ambient]";
 	console.log(
-		"[Manual Analysis] Starting analysis for",
-		historyItems.length,
-		"items with ID:",
-		analysisId,
+		`${logPrefix} Starting analysis for ${historyItems.length} items with ID: ${analysisId}`,
 	);
-
-	await broadcastAnalysisStatus("started", {
-		message: `Analyzing ${historyItems.length} history items...`,
-	});
 
 	const abortController = new AbortController();
 	activeAnalyses.set(analysisId, abortController);
@@ -139,7 +134,7 @@ async function runManualAnalysis(
 			customPrompts,
 			// Progress callback
 			async (info) => {
-				console.log(`[Background] Analysis progress: ${info.phase}`, info);
+				console.log(`${logPrefix} Analysis progress: ${info.phase}`, info);
 
 				// Send progress update
 				try {
@@ -163,13 +158,25 @@ async function runManualAnalysis(
 									: undefined,
 					});
 				} catch (err) {
-					console.error("[Background] Failed to send progress update:", err);
+					console.error(`${logPrefix} Failed to send progress update:`, err);
 				}
 			},
 			abortController.signal,
 		);
 
-		console.log("[Manual Analysis] Analysis completed:", result);
+		console.log(`${logPrefix} Analysis completed:`, result);
+
+		// Send final progress update
+		try {
+			await sendMessage("analysis:progress", {
+				analysisId,
+				phase: "complete",
+				subPhase: undefined,
+				chunkProgress: undefined,
+			});
+		} catch (err) {
+			console.error(`${logPrefix} Failed to send completion progress:`, err);
+		}
 
 		// Send success notification
 		await broadcastAnalysisStatus("completed", {
@@ -177,16 +184,30 @@ async function runManualAnalysis(
 			itemCount: historyItems.length,
 		});
 
+		// Handle success notification
 		const settings = await loadAutoAnalysisSettings();
-		if (settings.notifyOnSuccess) {
+		if (type === "manual" && settings.notifyOnSuccess) {
 			await createNotification(
 				"Manual Analysis Complete",
 				`Successfully analyzed ${historyItems.length} items`,
 				"success",
 			);
+		} else if (type === "ambient") {
+			await saveAutoAnalysisSettings({
+				...settings,
+				lastRunTimestamp: Date.now(),
+				lastRunStatus: "success",
+			});
+			if (settings.notifyOnSuccess) {
+				await createNotification(
+					"History Analysis Complete",
+					`Successfully analyzed ${historyItems.length} new items`,
+					"success",
+				);
+			}
 		}
 	} catch (error) {
-		console.error("[Manual Analysis] Error:", error);
+		console.error(`${logPrefix} Error:`, error);
 
 		const errorMessage =
 			error instanceof Error ? error.message : "Unknown error";
@@ -203,21 +224,58 @@ async function runManualAnalysis(
 				message: `Analysis failed: ${errorMessage}`,
 			});
 
-			await createNotification(
-				"Manual Analysis Failed",
-				`Analysis encountered an error: ${errorMessage}`,
-				"error",
-			);
+			// Handle error notification
+			const settings = await loadAutoAnalysisSettings();
+			if (type === "manual") {
+				await createNotification(
+					"Manual Analysis Failed",
+					`Analysis encountered an error: ${errorMessage}`,
+					"error",
+				);
+			} else if (type === "ambient") {
+				await saveAutoAnalysisSettings({
+					...settings,
+					lastRunTimestamp: Date.now(),
+					lastRunStatus: "error",
+					lastRunError: errorMessage,
+				});
+				if (settings.notifyOnError) {
+					await createNotification(
+						"History Analysis Failed",
+						`Ambient analysis encountered an error: ${errorMessage}`,
+						"error",
+					);
+				}
+			}
 		}
 
 		throw error;
 	} finally {
 		activeAnalyses.delete(analysisId);
-		if (currentManualAnalysisId === analysisId) {
+		if (type === "manual" && currentManualAnalysisId === analysisId) {
 			currentManualAnalysisId = null;
 			isManualAnalysisRunning = false;
+		} else if (type === "ambient") {
+			isAmbientAnalysisRunning = false;
 		}
 	}
+}
+
+// Run manual analysis directly in service worker
+async function runManualAnalysis(
+	historyItems: chrome.history.HistoryItem[],
+	analysisId: string,
+	customPrompts?: {
+		systemPrompt?: string;
+		chunkPrompt?: string;
+		mergePrompt?: string;
+	},
+): Promise<void> {
+	await broadcastAnalysisStatus("started", {
+		message: `Analyzing ${historyItems.length} history items...`,
+	});
+
+	return runAnalysis(historyItems, analysisId, customPrompts, "manual");
 }
 
 // Main ambient analysis function
@@ -322,80 +380,14 @@ async function runAmbientAnalysis(): Promise<void> {
 			const customPrompts = promptsResult.custom_prompts;
 
 			const analysisId = `ambient-${Date.now()}`;
-			const abortController = new AbortController();
-			activeAnalyses.set(analysisId, abortController);
-
-			try {
-				// Run analysis directly in service worker
-				const result = await analyzeHistoryItems(
-					historyItems,
-					customPrompts,
-					// Progress callback
-					async (info) => {
-						console.log(`[Ambient] Analysis progress: ${info.phase}`, info);
-
-						// Send progress update
-						try {
-							await sendMessage("analysis:progress", {
-								analysisId,
-								phase: info.phase,
-								subPhase: info.subPhase,
-								chunkProgress:
-									info.currentChunk !== undefined &&
-									info.totalChunks !== undefined
-										? {
-												current: info.currentChunk,
-												total: info.totalChunks,
-												description: info.chunkDescription || "",
-											}
-										: info.chunkDescription && !info.currentChunk
-											? {
-													current: 0,
-													total: 0,
-													description: info.chunkDescription,
-												}
-											: undefined,
-							});
-						} catch (err) {
-							console.error("[Ambient] Failed to send progress update:", err);
-						}
-					},
-					abortController.signal,
-				);
-
-				console.log("[Ambient Analysis] Analysis completed:", result);
-			} finally {
-				activeAnalyses.delete(analysisId);
-			}
+			await runAnalysis(historyItems, analysisId, customPrompts, "ambient");
 		}
-	} catch (error) {
-		console.error("[Ambient Analysis] Error:", error);
-
-		const errorMessage =
-			error instanceof Error ? error.message : "Unknown error";
-
-		await saveAutoAnalysisSettings({
-			...settings,
-			lastRunTimestamp: Date.now(),
-			lastRunStatus: "error",
-			lastRunError: errorMessage,
-		});
-
-		if (settings.notifyOnError) {
-			await createNotification(
-				"History Analysis Failed",
-				`Ambient analysis encountered an error: ${errorMessage}`,
-				"error",
-			);
+	} catch {
+		// Error already handled and logged by runAnalysis
+		// Just ensure the flag is reset (though it should already be reset in runAnalysis)
+		if (isAmbientAnalysisRunning) {
+			isAmbientAnalysisRunning = false;
 		}
-
-		isAmbientAnalysisRunning = false;
-		await broadcastAnalysisStatus("error", {
-			error: errorMessage,
-			message: `Analysis failed: ${errorMessage}`,
-		});
-
-		throw error;
 	}
 }
 

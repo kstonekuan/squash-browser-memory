@@ -82,9 +82,7 @@ async function handleAnalysis(
 		currentAnalysisId = response.analysisId || null;
 
 		// Analysis is now running in background
-
-		// Update UI to show it's running
-		analysisPhase = "analyzing";
+		// Don't set phase here - let progress updates handle it
 		ambientAnalysisStatus = {
 			status: "running",
 			message: `Analyzing ${items.length} history items...`,
