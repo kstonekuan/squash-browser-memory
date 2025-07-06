@@ -34,6 +34,20 @@ let isInitializingChromeAI = false;
 // Keepalive interval
 let keepaliveInterval: number | null = null;
 
+// Create a reusable download progress callback
+function createDownloadProgressCallback(): (progress: number) => void {
+	let lastLoggedProgress = 0;
+	return (progress: number) => {
+		const roundedProgress = Math.round(progress);
+		const tens = Math.floor(roundedProgress / 10) * 10;
+
+		if (tens > lastLoggedProgress) {
+			console.log(`[Offscreen] Chrome AI download progress: ${tens}%`);
+			lastLoggedProgress = tens;
+		}
+	};
+}
+
 // Start keepalive mechanism
 function startKeepalive() {
 	if (keepaliveInterval !== null) return;
@@ -211,9 +225,13 @@ onMessage("offscreen:initialize-chrome-ai", async () => {
 					console.log(
 						"[Offscreen] Chrome AI is downloading, monitoring progress...",
 					);
+
 					try {
 						// Re-initialize to wait for download completion
-						await chromeAIProvider!.initialize();
+						await chromeAIProvider!.initialize(
+							undefined,
+							createDownloadProgressCallback(),
+						);
 
 						// Download completed
 						await sendMessage("offscreen:chrome-ai-status", {
@@ -291,7 +309,10 @@ onMessage("offscreen:initialize-chrome-ai", async () => {
 					});
 
 					// Initialize to wait for download to complete
-					await chromeAIProvider!.initialize();
+					await chromeAIProvider!.initialize(
+						undefined,
+						createDownloadProgressCallback(),
+					);
 
 					// Download should be complete now
 					await sendMessage("offscreen:chrome-ai-status", {
@@ -304,8 +325,11 @@ onMessage("offscreen:initialize-chrome-ai", async () => {
 			if (shouldWaitForDownload) return;
 		}
 
-		// Initialize without progress callback
-		await chromeAIProvider.initialize();
+		// Initialize with progress callback
+		await chromeAIProvider.initialize(
+			undefined,
+			createDownloadProgressCallback(),
+		);
 
 		// Check if it needs download
 		if (chromeAIProvider.needsDownload?.()) {
@@ -377,9 +401,12 @@ onMessage("offscreen:trigger-chrome-ai-download", async () => {
 		resetChromeProvider();
 		chromeAIProvider = getProvider(config);
 
-		// Initialize to get the trigger function
+		// Initialize to get the trigger function with progress callback
 		try {
-			await chromeAIProvider.initialize();
+			await chromeAIProvider.initialize(
+				undefined,
+				createDownloadProgressCallback(),
+			);
 
 			// Check again if we need download
 			if (chromeAIProvider.needsDownload?.()) {
