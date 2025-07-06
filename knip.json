@@ -7,13 +7,5 @@
 		"content-scripts/**/*.ts"
 	],
 	"project": ["src/**/*.{ts,js,svelte}", "content-scripts/**/*.ts"],
-	"ignore": [
-		"vite.config.ts",
-		"vitest.config.ts"
-	],
-	"ignoreDependencies": ["@tailwindcss/forms", "tailwindcss", "@types/chrome"],
-	"ignoreExportsUsedInFile": {
-		"interface": true,
-		"type": true
-	}
+	"ignoreDependencies": ["@tailwindcss/forms", "tailwindcss", "@types/chrome"] 
 }

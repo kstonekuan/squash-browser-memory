@@ -16,7 +16,7 @@ export interface ChunkInfo {
 	isFallback?: boolean;
 }
 
-export interface AnalysisResult {
+interface AnalysisResult {
 	totalUrls: number;
 	dateRange: {
 		start: Date;

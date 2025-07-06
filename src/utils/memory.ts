@@ -1,5 +1,6 @@
 import { format, isValid, parseISO } from "date-fns";
 import type { UserProfile, WorkflowPattern } from "../types";
+import { sendMessage } from "./messaging";
 
 // Memory structure for accumulated analysis
 export interface AnalysisMemory {
@@ -51,8 +52,23 @@ export function createEmptyMemory(): AnalysisMemory {
 	};
 }
 
-// Load memory from Chrome storage
-export async function loadMemory(): Promise<AnalysisMemory | null> {
+/**
+ * Load memory via service worker message passing (for offscreen documents)
+ */
+export async function loadMemoryFromServiceWorker(): Promise<AnalysisMemory | null> {
+	try {
+		const response = await sendMessage("offscreen:read-memory", undefined);
+		return response.memory;
+	} catch (error) {
+		console.error("[Memory] Failed to load memory via service worker:", error);
+		return null;
+	}
+}
+
+/**
+ * Load memory from Chrome storage
+ */
+export async function loadMemoryFromStorage(): Promise<AnalysisMemory | null> {
 	try {
 		// Check if we're in an environment with chrome.storage access
 		if (
@@ -161,8 +177,25 @@ export async function loadMemory(): Promise<AnalysisMemory | null> {
 	}
 }
 
-// Save memory to Chrome storage
-export async function saveMemory(memory: AnalysisMemory): Promise<void> {
+/**
+ * Save memory via service worker message passing (for offscreen documents)
+ */
+export async function saveMemoryToServiceWorker(
+	memory: AnalysisMemory,
+): Promise<void> {
+	try {
+		await sendMessage("offscreen:write-memory", { memory });
+	} catch (error) {
+		console.error("[Memory] Failed to save memory via service worker:", error);
+	}
+}
+
+/**
+ * Save memory to Chrome storage
+ */
+export async function saveMemoryToStorage(
+	memory: AnalysisMemory,
+): Promise<void> {
 	try {
 		// Check if we're in an environment with chrome.storage access
 		if (
@@ -224,8 +257,10 @@ export async function saveMemory(memory: AnalysisMemory): Promise<void> {
 	}
 }
 
-// Clear memory
-export async function clearMemory(): Promise<void> {
+/**
+ * Clear memory from Chrome storage
+ */
+export async function clearMemoryFromStorage(): Promise<void> {
 	// Check if we're in an environment with chrome.storage access
 	if (
 		typeof chrome === "undefined" ||

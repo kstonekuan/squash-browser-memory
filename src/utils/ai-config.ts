@@ -11,9 +11,18 @@ const DEFAULT_CONFIG: AIProviderConfig = {
 };
 
 /**
+ * Load AI config for offscreen context (returns default config)
+ * Could be extended to use message passing if needed
+ */
+export async function loadAIConfigFromServiceWorker(): Promise<AIProviderConfig> {
+	console.log("AI config in offscreen context, using default");
+	return DEFAULT_CONFIG;
+}
+
+/**
  * Load AI provider configuration from storage
  */
-export async function loadAIConfig(): Promise<AIProviderConfig> {
+export async function loadAIConfigFromStorage(): Promise<AIProviderConfig> {
 	try {
 		// Check if we're in an environment with chrome.storage access
 		if (
@@ -44,7 +53,9 @@ export async function loadAIConfig(): Promise<AIProviderConfig> {
 /**
  * Save AI provider configuration to storage
  */
-export async function saveAIConfig(config: AIProviderConfig): Promise<void> {
+export async function saveAIConfigToStorage(
+	config: AIProviderConfig,
+): Promise<void> {
 	try {
 		await chrome.storage.local.set({ [AI_CONFIG_KEY]: config });
 		console.log("Saved AI config:", { provider: config.provider });
@@ -57,9 +68,9 @@ export async function saveAIConfig(config: AIProviderConfig): Promise<void> {
  * Set Claude API key
  */
 export async function setClaudeApiKey(apiKey: string): Promise<void> {
-	const config = await loadAIConfig();
+	const config = await loadAIConfigFromStorage();
 	if (config.provider === "claude") {
-		await saveAIConfig({ ...config, claudeApiKey: apiKey });
+		await saveAIConfigToStorage({ ...config, claudeApiKey: apiKey });
 	}
 }
 
@@ -67,7 +78,7 @@ export async function setClaudeApiKey(apiKey: string): Promise<void> {
  * Get Claude API key
  */
 export async function getClaudeApiKey(): Promise<string | undefined> {
-	const config = await loadAIConfig();
+	const config = await loadAIConfigFromStorage();
 	if (config.provider === "claude") {
 		return config.claudeApiKey;
 	}

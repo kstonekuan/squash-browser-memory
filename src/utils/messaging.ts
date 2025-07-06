@@ -27,7 +27,7 @@ export interface AnalysisProgress {
 }
 
 // Analysis status for broadcasting
-export interface AnalysisStatus {
+interface AnalysisStatus {
 	status: "started" | "completed" | "error" | "skipped";
 	message?: string;
 	itemCount?: number;
@@ -63,6 +63,7 @@ interface ProtocolMap {
 		analysisId?: string;
 		phase?: string;
 		chunkProgress?: AnalysisProgress["chunkProgress"];
+		subPhase?: AnalysisProgress["subPhase"];
 	};
 
 	// Ambient analysis settings

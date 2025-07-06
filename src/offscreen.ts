@@ -1,6 +1,17 @@
 /// <reference types="@types/dom-chromium-ai" />
 
 import { analyzeHistoryItems, type ProgressCallback } from "./utils/analyzer";
+import {
+	loadMemoryFromServiceWorker,
+	saveMemoryToServiceWorker,
+} from "./utils/memory";
+import {
+	cleanupAnalysis,
+	handleCancelLogic,
+	prepareForNewAnalysis,
+	registerAnalysis,
+	shouldStopKeepalive,
+} from "./utils/message-handlers";
 import type { AnalysisProgress } from "./utils/messaging";
 import { onMessage, sendMessage } from "./utils/messaging";
 
@@ -57,35 +68,39 @@ onMessage("offscreen:start-analysis", async (message) => {
 	const { historyItems, customPrompts, analysisId, trigger } = message.data;
 
 	// Cancel any existing analysis
-	if (currentAnalysisId && activeAnalyses.has(currentAnalysisId)) {
-		const oldController = activeAnalyses.get(currentAnalysisId);
-		oldController?.abort();
-		activeAnalyses.delete(currentAnalysisId);
-	}
+	prepareForNewAnalysis(currentAnalysisId, activeAnalyses);
 
 	// Start new analysis
 	currentAnalysisId = analysisId;
 	const abortController = new AbortController();
-	activeAnalyses.set(analysisId, abortController);
+	registerAnalysis(analysisId, abortController, activeAnalyses);
 
 	// Start keepalive
 	startKeepalive();
 
 	try {
+		// Load memory before analysis
+		const memory = await loadMemoryFromServiceWorker();
+
 		const result = await analyzeHistoryItems(
 			historyItems,
+			memory,
 			customPrompts,
 			createProgressCallback(),
 			trigger,
 			abortController.signal,
 		);
 
+		// Save the updated memory
+		await saveMemoryToServiceWorker(result.memory);
+
 		await sendProgress({ phase: "complete" });
 
-		// Send completion message
+		// Send completion message (without memory to avoid duplicating it)
+		const { memory: _, ...resultWithoutMemory } = result;
 		await sendMessage("offscreen:analysis-complete", {
 			analysisId,
-			result,
+			result: resultWithoutMemory,
 		});
 	} catch (error) {
 		const errorMessage =
@@ -101,13 +116,14 @@ onMessage("offscreen:start-analysis", async (message) => {
 			error: errorMessage,
 		});
 	} finally {
-		activeAnalyses.delete(analysisId);
-		if (currentAnalysisId === analysisId) {
-			currentAnalysisId = null;
-		}
+		currentAnalysisId = cleanupAnalysis(
+			analysisId,
+			currentAnalysisId,
+			activeAnalyses,
+		);
 
 		// Stop keepalive if no active analyses
-		if (activeAnalyses.size === 0) {
+		if (shouldStopKeepalive(activeAnalyses)) {
 			stopKeepalive();
 		}
 	}
@@ -116,36 +132,31 @@ onMessage("offscreen:start-analysis", async (message) => {
 onMessage("offscreen:cancel", async (message) => {
 	const { analysisId } = message.data;
 
-	if (analysisId && activeAnalyses.has(analysisId)) {
-		const controller = activeAnalyses.get(analysisId);
-		controller?.abort();
-		activeAnalyses.delete(analysisId);
+	const result = handleCancelLogic(
+		analysisId,
+		activeAnalyses,
+		currentAnalysisId,
+	);
+	currentAnalysisId = result.newCurrentAnalysisId;
 
-		if (currentAnalysisId === analysisId) {
-			currentAnalysisId = null;
-		}
-
-		// Stop keepalive if no active analyses
-		if (activeAnalyses.size === 0) {
-			stopKeepalive();
-		}
-
-		return { success: true };
-	} else {
-		return { success: false, error: "Analysis not found" };
+	// Stop keepalive if no active analyses
+	if (result.success && shouldStopKeepalive(activeAnalyses)) {
+		stopKeepalive();
 	}
+
+	return { success: result.success, error: result.error };
 });
 
 // Handle memory operations
 onMessage("offscreen:read-memory", async () => {
-	const { loadMemory } = await import("./utils/memory");
-	const memory = await loadMemory();
+	const { loadMemoryFromServiceWorker } = await import("./utils/memory");
+	const memory = await loadMemoryFromServiceWorker();
 	return { memory };
 });
 
 onMessage("offscreen:write-memory", async (message) => {
-	const { saveMemory } = await import("./utils/memory");
-	await saveMemory(message.data.memory);
+	const { saveMemoryToServiceWorker } = await import("./utils/memory");
+	await saveMemoryToServiceWorker(message.data.memory);
 	return { success: true };
 });
 

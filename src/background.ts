@@ -7,7 +7,18 @@ import {
 	loadAutoAnalysisSettings,
 	saveAutoAnalysisSettings,
 } from "./utils/ambient";
-import { loadMemory, saveMemory } from "./utils/memory";
+import { loadMemoryFromStorage, saveMemoryToStorage } from "./utils/memory";
+import {
+	type AlarmAPI,
+	cancelAnalysisLogic,
+	checkAnalysisRunningLogic,
+	getAnalysisStateLogic,
+	handleAutoAnalysisToggleLogic,
+	handleStartupAlarmCheckLogic,
+	queryNextAlarmLogic,
+	shouldCreateOffscreenDocument,
+	updateProgressMap,
+} from "./utils/message-handlers";
 import type { AnalysisProgress } from "./utils/messaging";
 import { onMessage, sendMessage } from "./utils/messaging";
 
@@ -35,7 +46,7 @@ async function ensureOffscreenDocument(): Promise<void> {
 		contextTypes: ["OFFSCREEN_DOCUMENT" as chrome.runtime.ContextType],
 	});
 
-	if (contexts.length > 0) {
+	if (!shouldCreateOffscreenDocument(contexts)) {
 		console.log("[Background] Offscreen document already exists");
 		return;
 	}
@@ -423,77 +434,38 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
 	}
 });
 
-// Handle toggling auto-analysis
-async function handleAutoAnalysisToggle(enabled: boolean) {
-	if (enabled) {
-		await chrome.alarms.clear(ALARM_NAME);
-		await chrome.alarms.create(ALARM_NAME, {
-			delayInMinutes: 1, // First run after 1 minute
-		});
-
-		const alarm = await chrome.alarms.get(ALARM_NAME);
-		if (alarm) {
-			console.log(
-				`Auto-analysis enabled. Next run: ${format(new Date(alarm.scheduledTime), "PPpp")}`,
-			);
-		} else {
-			console.error("Failed to create analysis alarm");
-			throw new Error("Failed to create alarm");
-		}
-	} else {
-		const cleared = await chrome.alarms.clear(ALARM_NAME);
-		console.log(`Auto-analysis disabled. Alarm cleared: ${cleared}`);
-	}
-}
+// Chrome API adapters for dependency injection
+const chromeAlarmAPI: AlarmAPI = {
+	clear: (name: string) => chrome.alarms.clear(name),
+	create: (name: string, alarmInfo: chrome.alarms.AlarmCreateInfo) =>
+		chrome.alarms.create(name, alarmInfo),
+	get: (name: string) => chrome.alarms.get(name),
+};
 
 // Check alarm status on startup
 chrome.runtime.onStartup.addListener(async () => {
-	const alarm = await chrome.alarms.get(ALARM_NAME);
-	if (alarm) {
-		console.log(
-			"Analysis alarm is active, next run:",
-			format(new Date(alarm.scheduledTime), "PPpp"),
-		);
-	} else {
-		console.log("Analysis alarm is not active");
-
-		const settings = await loadAutoAnalysisSettings();
-		if (settings.enabled) {
-			await chrome.alarms.create(ALARM_NAME, {
-				delayInMinutes: 60, // Schedule next run in 1 hour
-			});
-			console.log("Re-created analysis alarm");
-		}
-	}
+	await handleStartupAlarmCheckLogic(ALARM_NAME, chromeAlarmAPI);
 });
 
 // Set up message handlers
 onMessage("settings:toggle-auto-analysis", async (message) => {
 	const data = message.data;
-	try {
-		await handleAutoAnalysisToggle(data.enabled);
-		const alarm = await chrome.alarms.get(ALARM_NAME);
-		return {
-			success: true,
-			nextRunTime: alarm ? alarm.scheduledTime : undefined,
-		};
-	} catch (error) {
-		return {
-			success: false,
-			error: error instanceof Error ? error.message : "Unknown error",
-		};
-	}
+	return handleAutoAnalysisToggleLogic(
+		data.enabled,
+		ALARM_NAME,
+		chromeAlarmAPI,
+	);
 });
 
 onMessage("analysis:start-manual", async (message) => {
 	const { historyItems, customPrompts } = message.data;
 
 	// Check if analysis is already running
-	if (isAnalysisRunning) {
-		console.log("[Background] Analysis already in progress, skipping.");
+	const { canStart, error } = checkAnalysisRunningLogic(isAnalysisRunning);
+	if (!canStart) {
 		return {
 			success: false,
-			error: "Analysis is already in progress",
+			error,
 		};
 	}
 
@@ -529,16 +501,19 @@ onMessage("analysis:start-manual", async (message) => {
 
 onMessage("analysis:cancel", async (message) => {
 	const data = message.data;
-	console.log("[Background] Received cancellation request");
 
-	if (!currentAnalysisId || currentAnalysisId !== data.analysisId) {
-		return { success: false, error: "No matching analysis in progress" };
+	const { shouldCancel, error } = cancelAnalysisLogic(
+		currentAnalysisId,
+		data.analysisId,
+		activeAnalyses,
+	);
+
+	if (!shouldCancel) {
+		return { success: false, error };
 	}
 
 	// Send cancel message to offscreen document
 	if (activeAnalyses.has(data.analysisId)) {
-		console.log("[Background] Cancelling analysis:", data.analysisId);
-
 		try {
 			// Ensure offscreen document exists
 			const contexts = await chrome.runtime.getContexts({
@@ -567,42 +542,24 @@ onMessage("ambient:query-status", async () => {
 });
 
 onMessage("ambient:query-next-alarm", async () => {
-	const alarm = await chrome.alarms.get(ALARM_NAME);
-	return {
-		nextRunTime: alarm ? alarm.scheduledTime : undefined,
-		alarmExists: !!alarm,
-	};
+	return queryNextAlarmLogic(ALARM_NAME, chromeAlarmAPI);
 });
 
 onMessage("analysis:get-state", async () => {
-	// Return the current analysis state
-	const currentProgress = currentAnalysisId
-		? analysisProgressMap.get(currentAnalysisId)
-		: undefined;
-
-	return {
-		isRunning: isAnalysisRunning,
-		isManualAnalysisRunning: isAnalysisRunning, // For compatibility - both are the same now
-		isAmbientAnalysisRunning: isAnalysisRunning,
-		analysisId: currentAnalysisId || undefined,
-		phase: currentProgress?.phase,
-		chunkProgress: currentProgress?.chunkProgress,
-	};
+	return getAnalysisStateLogic(
+		isAnalysisRunning,
+		currentAnalysisId,
+		analysisProgressMap,
+	);
 });
 
 // Handle offscreen document messages
 onMessage("offscreen:progress", async (message) => {
 	const progress = message.data;
 
-	console.log("[Background] Received progress from offscreen:", {
-		phase: progress.phase,
-		analysisId: progress.analysisId,
-		chunkProgress: progress.chunkProgress,
-	});
-
 	// Store progress for state queries
 	if (progress.analysisId) {
-		analysisProgressMap.set(progress.analysisId, progress);
+		updateProgressMap(progress.analysisId, progress, analysisProgressMap);
 	}
 
 	// Forward to side panel
@@ -616,12 +573,12 @@ onMessage("offscreen:progress", async (message) => {
 });
 
 onMessage("offscreen:read-memory", async () => {
-	const memory = await loadMemory();
+	const memory = await loadMemoryFromStorage();
 	return { memory };
 });
 
 onMessage("offscreen:write-memory", async (message) => {
-	await saveMemory(message.data.memory);
+	await saveMemoryToStorage(message.data.memory);
 	return { success: true };
 });
 

@@ -11,7 +11,7 @@ import CollapsibleSection from "./lib/CollapsibleSection.svelte";
 import HistoryFetcher from "./lib/HistoryFetcher.svelte";
 import MemoryViewer from "./lib/MemoryViewer.svelte";
 import type { FullAnalysisResult } from "./types";
-import { analyzeHistoryItems, clearMemory } from "./utils/analyzer";
+import { clearMemory } from "./utils/analyzer";
 import { onMessage, sendMessage } from "./utils/messaging";
 
 let analysisResult: FullAnalysisResult | null = $state(null);
@@ -30,7 +30,6 @@ let chunkProgress = $state<{
 	description: string;
 } | null>(null);
 let subPhase: SubPhase | undefined = $state(undefined);
-let abortController: AbortController | null = null;
 let providerKey = $state(0); // Key to force AIProviderStatus re-render
 let isAmbientAnalysisRunning = $state(false);
 let isManualAnalysisRunning = $state(false);
@@ -45,10 +44,8 @@ let ambientAnalysisStatus = $state<{
 	reason?: string;
 }>({ status: "idle" });
 
-async function handleAnalysis(
-	event: CustomEvent<{ items: chrome.history.HistoryItem[] }>,
-) {
-	const { items } = event.detail;
+async function handleAnalysis(data: { items: chrome.history.HistoryItem[] }) {
+	const { items } = data;
 
 	console.log("[App] Starting manual analysis for", items.length, "items");
 
@@ -60,9 +57,12 @@ async function handleAnalysis(
 	// Mark as manual analysis to track properly
 	isManualAnalysisRunning = true;
 
+	// Generate a temporary analysis ID to match progress updates
+	const tempAnalysisId = `manual-${Date.now()}`;
+	currentAnalysisId = tempAnalysisId;
+
 	try {
 		// Send analysis request to background script
-
 		const response = await sendMessage("analysis:start-manual", {
 			historyItems: items,
 			customPrompts: customPrompts,
@@ -77,13 +77,16 @@ async function handleAnalysis(
 				analysisPhase = "idle";
 				isAnalyzing = false;
 				isManualAnalysisRunning = false;
+				currentAnalysisId = null;
 				return;
 			}
 			throw new Error(response.error || "Failed to start analysis");
 		}
 
-		// Store the analysis ID for cancellation
-		currentAnalysisId = response.analysisId || null;
+		// Update with the actual analysis ID from response if different
+		if (response.analysisId && response.analysisId !== tempAnalysisId) {
+			currentAnalysisId = response.analysisId;
+		}
 
 		// Analysis is now running in background
 		// Don't set phase here - let progress updates handle it
@@ -186,6 +189,9 @@ onMount(() => {
 				if (response.chunkProgress) {
 					chunkProgress = response.chunkProgress;
 				}
+				if (response.subPhase) {
+					subPhase = response.subPhase;
+				}
 			}
 		})
 		.catch(() => {
@@ -280,18 +286,31 @@ onMount(() => {
 		const isOurAnalysis =
 			data.analysisId && data.analysisId === currentAnalysisId;
 
+		// Fallback: if we're running a manual analysis and get a manual analysis progress update
+		// without an exact ID match, it's likely still our analysis (due to timing issues)
+		const isLikelyOurAnalysis =
+			isManualAnalysisRunning &&
+			data.analysisId?.startsWith("manual-") &&
+			!isOurAnalysis;
+
 		console.log("[App] Analysis ID match:", {
 			isOurAnalysis,
+			isLikelyOurAnalysis,
 			dataId: data.analysisId,
 			currentId: currentAnalysisId,
+			isManualAnalysisRunning,
 		});
 
-		if (isOurAnalysis) {
+		if (isOurAnalysis || isLikelyOurAnalysis) {
 			console.log("[App] Updating UI with progress");
 			analysisPhase = data.phase;
 			subPhase = data.subPhase;
 			if (data.chunkProgress) {
 				chunkProgress = data.chunkProgress;
+			}
+			// Update currentAnalysisId if using fallback
+			if (isLikelyOurAnalysis && data.analysisId) {
+				currentAnalysisId = data.analysisId;
 			}
 		} else {
 			console.log("[App] Ignoring progress - not our analysis");
@@ -312,7 +331,7 @@ onMount(() => {
 
 			<div class="mt-4 pt-4 border-t border-gray-200">
 				<HistoryFetcher 
-					on:analysis-request={handleAnalysis} 
+					onAnalysisRequest={handleAnalysis} 
 					{isAnalyzing}
 					isAmbientAnalysisRunning={isAnyAnalysisRunning}
 				/>

@@ -1,5 +1,5 @@
 <script lang="ts">
-import { format, formatDistanceToNow } from "date-fns";
+import { formatDistanceToNow } from "date-fns";
 import {
 	ambientSettings,
 	toggleAmbientAnalysis,
@@ -7,8 +7,8 @@ import {
 } from "../stores/ambient-store";
 import {
 	getClaudeApiKey,
-	loadAIConfig,
-	saveAIConfig,
+	loadAIConfigFromStorage,
+	saveAIConfigToStorage,
 	setClaudeApiKey,
 } from "../utils/ai-config";
 import type { AIProviderType } from "../utils/ai-interface";
@@ -69,7 +69,7 @@ $effect(() => {
 
 // Load current configuration on mount
 (async () => {
-	const config = await loadAIConfig();
+	const config = await loadAIConfigFromStorage();
 	currentProvider = config.provider;
 	claudeApiKey = (await getClaudeApiKey()) || "";
 
@@ -104,9 +104,9 @@ async function updateProviderStatuses() {
 
 async function handleProviderChange(provider: AIProviderType) {
 	currentProvider = provider;
-	const config = await loadAIConfig();
+	const config = await loadAIConfigFromStorage();
 	config.provider = provider;
-	await saveAIConfig(config);
+	await saveAIConfigToStorage(config);
 	await updateProviderStatuses();
 	onProviderChange?.();
 }
@@ -235,7 +235,7 @@ function formatLastRunTime(): string {
 								class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
 							/>
 							<p class="mt-1 text-xs text-gray-600">
-								Get your API key from <a href="https://console.anthropic.com/" target="_blank" class="text-blue-600 hover:text-blue-800">Anthropic Console</a>
+								Get your API key from <a href="https://console.anthropic.com/" target="_blank" class="text-blue-600 hover:text-blue-800" rel="noopener">Anthropic Console</a>
 							</p>
 						</div>
 					{/if}

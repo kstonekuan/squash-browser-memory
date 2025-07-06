@@ -1,6 +1,6 @@
 <script lang="ts">
 import { onMount } from "svelte";
-import { loadAIConfig } from "../utils/ai-config";
+import { loadAIConfigFromStorage } from "../utils/ai-config";
 import type { AIProviderStatus } from "../utils/ai-interface";
 import { getProvider } from "../utils/ai-provider-factory";
 
@@ -14,7 +14,7 @@ let providerName = $state("AI");
 
 onMount(async () => {
 	try {
-		const config = await loadAIConfig();
+		const config = await loadAIConfigFromStorage();
 		const provider = getProvider(config);
 		providerName = provider.getProviderName();
 

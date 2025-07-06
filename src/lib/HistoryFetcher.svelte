@@ -1,18 +1,20 @@
 <script lang="ts">
 import { format, subDays, subHours, subWeeks } from "date-fns";
-import { createEventDispatcher, onMount } from "svelte";
+import { onMount } from "svelte";
 import { match } from "ts-pattern";
-import { loadAIConfig } from "../utils/ai-config";
+import { loadAIConfigFromStorage } from "../utils/ai-config";
 import type { AIProviderType } from "../utils/ai-interface";
-import { loadMemory } from "../utils/memory";
+import { loadMemoryFromStorage } from "../utils/memory";
 
-let { isAnalyzing = $bindable(false), isAmbientAnalysisRunning = false } =
-	$props<{
-		isAnalyzing?: boolean;
-		isAmbientAnalysisRunning?: boolean;
-	}>();
-
-const dispatch = createEventDispatcher();
+let {
+	isAnalyzing = $bindable(false),
+	isAmbientAnalysisRunning = false,
+	onAnalysisRequest = () => {},
+} = $props<{
+	isAnalyzing?: boolean;
+	isAmbientAnalysisRunning?: boolean;
+	onAnalysisRequest?: (data: { items: chrome.history.HistoryItem[] }) => void;
+}>();
 
 let error = $state("");
 type DateRange = "1hour" | "3hours" | "day" | "week" | "all";
@@ -28,7 +30,7 @@ let lastHistoryTimestamp = $state(0);
 // Listen for storage changes to update provider
 onMount(() => {
 	// Load initial config
-	loadAIConfig()
+	loadAIConfigFromStorage()
 		.then((config) => {
 			currentProvider = config.provider;
 		})
@@ -38,7 +40,7 @@ onMount(() => {
 		});
 
 	// Load memory to get the last analyzed timestamp
-	loadMemory()
+	loadMemoryFromStorage()
 		.then((memory) => {
 			if (memory && memory.lastHistoryTimestamp > 0) {
 				lastHistoryTimestamp = memory.lastHistoryTimestamp;
@@ -149,8 +151,8 @@ async function fetchHistory() {
 		// Store raw data for display
 		rawHistoryData = results;
 
-		// Emit the history data directly
-		dispatch("analysis-request", {
+		// Call the callback prop with the history data
+		onAnalysisRequest({
 			items: results,
 		});
 	} catch (err) {

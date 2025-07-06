@@ -4,7 +4,7 @@
  * AI Session Factory - Creates AI sessions based on current configuration
  */
 
-import { loadAIConfig } from "./ai-config";
+import { loadAIConfigFromStorage } from "./ai-config";
 import type { AISession } from "./ai-interface";
 import { getProvider } from "./ai-provider-factory";
 
@@ -15,7 +15,7 @@ export async function createAISession(
 	systemPrompt?: string,
 ): Promise<AISession | null> {
 	try {
-		const config = await loadAIConfig();
+		const config = await loadAIConfigFromStorage();
 		const provider = getProvider(config);
 
 		const session = await provider.createSession(systemPrompt);

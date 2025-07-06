@@ -1,4 +1,42 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+
+// Mock @webext-core/messaging to prevent loading webextension-polyfill
+vi.mock("@webext-core/messaging", () => ({
+	defineExtensionMessaging: () => ({
+		sendMessage: vi.fn(),
+		onMessage: vi.fn(),
+	}),
+}));
+
+// Mock memory operations
+vi.mock("../utils/memory", () => ({
+	loadMemoryFromStorage: vi.fn().mockResolvedValue(null),
+	saveMemoryToStorage: vi.fn().mockResolvedValue(undefined),
+	clearMemoryFromStorage: vi.fn().mockResolvedValue(undefined),
+	loadMemoryFromServiceWorker: vi.fn().mockResolvedValue(null),
+	saveMemoryToServiceWorker: vi.fn().mockResolvedValue(undefined),
+	createEmptyMemory: () => ({
+		userProfile: {
+			stableTraits: { coreIdentities: [], personalPreferences: [] },
+			dynamicContext: { currentTasks: [], currentInterests: [] },
+			summary: "No profile data yet.",
+		},
+		patterns: [],
+		lastAnalyzedDate: new Date(0),
+		lastHistoryTimestamp: 0,
+		version: "1.5.0",
+	}),
+}));
+
+// Mock AI config
+vi.mock("../utils/ai-config", () => ({
+	loadAIConfigFromStorage: vi.fn().mockResolvedValue({ provider: "chrome" }),
+	saveAIConfigToStorage: vi.fn().mockResolvedValue(undefined),
+	loadAIConfigFromServiceWorker: vi
+		.fn()
+		.mockResolvedValue({ provider: "chrome" }),
+}));
+
 import { calculateStats } from "../utils/analyzer";
 import { buildAnalysisPrompt } from "../utils/constants";
 import { hideTrackingParams } from "../utils/shared-utils";

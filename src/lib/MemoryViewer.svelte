@@ -2,7 +2,7 @@
 import { format } from "date-fns";
 import { onMount } from "svelte";
 import type { AnalysisMemory } from "../utils/memory";
-import { loadMemory } from "../utils/memory";
+import { loadMemoryFromStorage } from "../utils/memory";
 import CollapsibleSection from "./CollapsibleSection.svelte";
 
 const { autoExpand = false } = $props<{ autoExpand?: boolean }>();
@@ -35,7 +35,7 @@ async function loadMemoryData() {
 	hasAttemptedLoad = true;
 	try {
 		console.log("[MemoryViewer] Loading memory from storage...");
-		memory = await loadMemory();
+		memory = await loadMemoryFromStorage();
 		console.log("[MemoryViewer] Memory loaded:", {
 			hasMemory: !!memory,
 			patterns: memory?.patterns?.length || 0,
@@ -88,7 +88,7 @@ async function refreshMemory() {
 	console.log("[MemoryViewer] Manual refresh triggered");
 	loading = true;
 	try {
-		memory = await loadMemory();
+		memory = await loadMemoryFromStorage();
 		// Force refresh next time if memory section is toggled
 		hasAttemptedLoad = true; // Mark as loaded so we show current state
 		console.log("[MemoryViewer] Memory refreshed:", {

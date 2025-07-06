@@ -13,7 +13,7 @@ import type { ChunkTimeRange, HistoryChunk } from "./memory";
 import { CHUNK_SCHEMA, ChunkSchema } from "./schemas";
 import { extractJSONFromResponse } from "./shared-utils";
 
-export interface ChunkingResult {
+interface ChunkingResult {
 	timeRanges: ChunkTimeRange[];
 	rawResponse?: string;
 	error?: string;

@@ -1,5 +1,7 @@
 // Universal content script for context button injection across platforms
-// Self-contained version without external dependencies
+
+import type { AnalysisMemory } from "../src/utils/memory";
+import { loadMemoryFromStorage } from "../src/utils/memory";
 
 interface PlatformConfig {
 	composerActions: string[];
@@ -389,43 +391,6 @@ class SimplePlatformAdapter {
 	}
 }
 
-// Type for memory data structure
-interface MemoryData {
-	userProfile?: {
-		profession?: string;
-		interests?: string[];
-		goals?: string[];
-		preferences?: string[];
-		traits?: string[];
-		obsessions?: string[];
-		[key: string]: unknown;
-	};
-	[key: string]: unknown;
-}
-
-// Simple storage interface for Chrome extension
-async function getMemory(): Promise<MemoryData | null> {
-	return new Promise((resolve) => {
-		// First, let's see what's actually in storage
-		chrome.storage.local.get(null, (allItems) => {
-			console.log("All items in chrome.storage.local:", Object.keys(allItems));
-
-			chrome.storage.local.get(["history_analysis_memory"], (result) => {
-				console.log("Looking for history_analysis_memory:", result);
-				resolve(result.history_analysis_memory || null);
-			});
-		});
-	});
-}
-
-export async function saveMemory(memory: MemoryData): Promise<void> {
-	return new Promise((resolve) => {
-		chrome.storage.local.set({ history_analysis_memory: memory }, () => {
-			resolve();
-		});
-	});
-}
-
 // Simple string similarity function
 function compareTwoStrings(str1: string, str2: string): number {
 	if (str1 === str2) return 1;
@@ -463,7 +428,7 @@ function compareTwoStrings(str1: string, str2: string): number {
 
 // Simple context matcher using string similarity only
 class SimpleContextMatcher {
-	private memory: MemoryData | null = null;
+	private memory: AnalysisMemory | null = null;
 	private preGeneratedContexts: Array<{
 		text: string;
 		category: string;
@@ -472,7 +437,7 @@ class SimpleContextMatcher {
 
 	async initialize(): Promise<void> {
 		try {
-			this.memory = await getMemory();
+			this.memory = await loadMemoryFromStorage();
 			console.log("Simple context matcher initialized", {
 				hasMemory: !!this.memory,
 				hasUserProfile: !!this.memory?.userProfile,
@@ -653,19 +618,23 @@ class SimpleContextMatcher {
 		};
 
 		// Add core identities (string array)
-		addArrayItems(profile.coreIdentities, "identities");
+		addArrayItems(profile.stableTraits.coreIdentities, "identities");
 
 		// Add current tasks (string array)
-		addArrayItems(profile.currentTasks, "tasks");
+		addArrayItems(profile.dynamicContext.currentTasks, "tasks");
 
 		// Add current interests (string array)
-		addArrayItems(profile.currentInterests, "interests");
+		addArrayItems(profile.dynamicContext.currentInterests, "interests");
 
 		// Add personal preferences (object array: {category, preference})
-		addObjectArray(profile.personalPreferences, "preferences", (item) => {
-			const obj = item as { category?: string; preference?: string };
-			return `${obj.category || ""}: ${obj.preference || ""}`;
-		});
+		addObjectArray(
+			profile.stableTraits.personalPreferences,
+			"preferences",
+			(item) => {
+				const obj = item as { category?: string; preference?: string };
+				return `${obj.category || ""}: ${obj.preference || ""}`;
+			},
+		);
 
 		// Add summary as a single context item
 		addContext(profile.summary, "summary");

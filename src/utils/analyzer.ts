@@ -8,7 +8,10 @@ import type {
 	UserProfile,
 	WorkflowPattern,
 } from "../types";
-import { loadAIConfig } from "./ai-config";
+import {
+	loadAIConfigFromServiceWorker,
+	loadAIConfigFromStorage,
+} from "./ai-config";
 import { getProvider } from "./ai-provider-factory";
 import { createAISession, promptAI } from "./ai-session-factory";
 import { createHistoryChunks, identifyChunks } from "./chunking";
@@ -18,12 +21,7 @@ import {
 	buildMergePrompt,
 	MERGE_SYSTEM_PROMPT,
 } from "./constants";
-import {
-	type AnalysisMemory,
-	createEmptyMemory,
-	loadMemory,
-	saveMemory,
-} from "./memory";
+import { type AnalysisMemory, createEmptyMemory } from "./memory";
 import { ANALYSIS_SCHEMA, AnalysisResultSchema } from "./schemas";
 import {
 	calculateOptimalChunkSize,
@@ -33,7 +31,21 @@ import {
 } from "./shared-utils";
 
 // Re-export clearMemory for use in UI
-export { clearMemory } from "./memory";
+export { clearMemoryFromStorage as clearMemory } from "./memory";
+
+// Extended result type that includes memory
+interface AnalysisResultWithMemory extends FullAnalysisResult {
+	memory: AnalysisMemory;
+}
+
+// Detect if we're running in the offscreen document
+const isOffscreen =
+	typeof self !== "undefined" && self.location?.pathname?.includes("offscreen");
+
+// Use appropriate AI config function based on context
+const loadAIConfig = isOffscreen
+	? loadAIConfigFromServiceWorker
+	: loadAIConfigFromStorage;
 
 // Calculate statistics from Chrome history items
 export function calculateStats(items: chrome.history.HistoryItem[]): {
@@ -111,11 +123,12 @@ export interface CustomPrompts {
 // Analyze Chrome history items with memory and chunking
 export async function analyzeHistoryItems(
 	items: chrome.history.HistoryItem[],
+	memory: AnalysisMemory | null,
 	customPrompts?: CustomPrompts,
 	onProgress?: ProgressCallback,
 	_trigger: "manual" | "alarm" = "manual",
 	abortSignal?: AbortSignal,
-): Promise<FullAnalysisResult> {
+): Promise<AnalysisResultWithMemory> {
 	const analysisStartTime = performance.now();
 
 	// Check if already aborted
@@ -136,12 +149,9 @@ export async function analyzeHistoryItems(
 		});
 	const stats = calculateStats(items);
 
-	// Load existing memory
-	let memory = await loadMemory();
-	if (!memory) {
-		memory = createEmptyMemory();
-	}
-	console.log("Memory loaded, patterns found:", memory.patterns.length);
+	// Use provided memory or create empty
+	let workingMemory = memory || createEmptyMemory();
+	console.log("Memory loaded, patterns found:", workingMemory.patterns.length);
 
 	// Check if aborted before chunking
 	if (abortSignal?.aborted) {
@@ -195,17 +205,18 @@ export async function analyzeHistoryItems(
 	if (chunks.length === 0) {
 		return {
 			analysis: {
-				patterns: memory.patterns,
+				patterns: workingMemory.patterns,
 				totalUrls: stats.totalUrls,
 				dateRange: stats.dateRange,
 				topDomains: stats.topDomains,
-				userProfile: memory.userProfile,
+				userProfile: workingMemory.userProfile,
 			},
 			diagnostics: {
 				chunks: [],
 				chunkingRawResponse: chunkingResult.rawResponse,
 				chunkingError: chunkingResult.error,
 			},
+			memory: workingMemory,
 		};
 	}
 
@@ -262,7 +273,7 @@ export async function analyzeHistoryItems(
 			// Analyze this chunk - if it's too large, subdivide it
 			const { results } = await analyzeChunkWithSubdivision(
 				chunk.items,
-				memory,
+				workingMemory,
 				customPrompts,
 				onProgress,
 				abortSignal,
@@ -270,33 +281,34 @@ export async function analyzeHistoryItems(
 				totalChunks,
 			);
 
-			// Update memory with merged results
+			// Update working memory with merged results
 			if (results) {
 				// Find the most recent timestamp in this chunk
 				const mostRecentInChunk = getMostRecentTimestamp(chunk.items);
 
-				memory = {
+				workingMemory = {
 					userProfile: results.userProfile,
 					patterns: results.patterns,
 					lastAnalyzedDate: new Date(),
 					lastHistoryTimestamp: Math.max(
-						memory.lastHistoryTimestamp,
+						workingMemory.lastHistoryTimestamp,
 						mostRecentInChunk,
 					),
-					version: memory.version,
+					version: workingMemory.version,
 				};
 
-				// Save memory after each chunk
-				console.log(`[Analyzer] Saving memory after chunk ${i + 1}:`, {
-					patterns: memory.patterns.length,
+				// Log memory state after chunk
+				console.log(`[Analyzer] Memory updated after chunk ${i + 1}:`, {
+					patterns: workingMemory.patterns.length,
 					userProfile: {
 						coreIdentities:
-							memory.userProfile.stableTraits?.coreIdentities?.length || 0,
+							workingMemory.userProfile.stableTraits?.coreIdentities?.length ||
+							0,
 						currentTasks:
-							memory.userProfile.dynamicContext?.currentTasks?.length || 0,
+							workingMemory.userProfile.dynamicContext?.currentTasks?.length ||
+							0,
 					},
 				});
-				await saveMemory(memory);
 			}
 
 			// Small delay between chunks to avoid quota issues
@@ -314,7 +326,11 @@ export async function analyzeHistoryItems(
 				) {
 					console.error("Additional context for UnknownError:");
 					console.error("- Chunk had", chunk.items.length, "items");
-					console.error("- Memory has", memory.patterns.length, "patterns");
+					console.error(
+						"- Memory has",
+						workingMemory.patterns.length,
+						"patterns",
+					);
 					console.error("- This was chunk", i + 1, "of", totalChunks);
 				}
 			}
@@ -323,10 +339,9 @@ export async function analyzeHistoryItems(
 		}
 	}
 
-	// Final save with completion timestamp
-	memory.lastAnalyzedDate = new Date();
-	await saveMemory(memory);
-	console.log("Final memory saved with completion timestamp");
+	// Update final timestamp
+	workingMemory.lastAnalyzedDate = new Date();
+	console.log("Final memory state with completion timestamp");
 
 	// Return final results from memory
 	const analysisEndTime = performance.now();
@@ -337,25 +352,26 @@ export async function analyzeHistoryItems(
 	console.log(`Total time: ${totalDuration}s`);
 	console.log(`Items analyzed: ${stats.totalUrls}`);
 	console.log(`Chunks processed: ${processedChunks}`);
-	console.log(`Patterns found: ${memory.patterns.length}`);
+	console.log(`Patterns found: ${workingMemory.patterns.length}`);
 	console.log(
-		`Last analyzed: ${format(memory.lastAnalyzedDate, "yyyy-MM-dd'T'HH:mm:ss'Z'")}`,
+		`Last analyzed: ${format(workingMemory.lastAnalyzedDate, "yyyy-MM-dd'T'HH:mm:ss'Z'")}`,
 	);
 	console.log(`========================\n`);
 
 	return {
 		analysis: {
-			patterns: memory.patterns,
+			patterns: workingMemory.patterns,
 			totalUrls: stats.totalUrls,
 			dateRange: stats.dateRange,
 			topDomains: stats.topDomains,
-			userProfile: memory.userProfile,
+			userProfile: workingMemory.userProfile,
 		},
 		diagnostics: {
 			chunks: chunkInfos,
 			chunkingRawResponse: chunkingResult.rawResponse,
 			chunkingError: chunkingResult.error,
 		},
+		memory: workingMemory,
 	};
 }
 
