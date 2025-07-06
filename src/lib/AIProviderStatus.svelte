@@ -8,9 +8,11 @@ let { onProviderChange } = $props<{
 	onProviderChange?: () => void;
 }>();
 
-let status: Availability | AIProviderStatus | null = $state(null);
+let status: AIProviderStatus | null = $state(null);
 let checking = $state(true);
 let providerName = $state("AI");
+let isDownloading = $state(false);
+let downloadProgress = $state(0);
 
 onMount(async () => {
 	try {
@@ -18,8 +20,31 @@ onMount(async () => {
 		const provider = getProvider(config);
 		providerName = provider.getProviderName();
 
-		// Use the provider's getStatus method for all providers
-		status = await provider.getStatus();
+		// For Chrome AI, try to initialize with download progress
+		if (config.provider === "chrome") {
+			try {
+				// First check basic availability
+				status = await provider.getStatus();
+
+				// If not available, try to initialize which will trigger download
+				if (status === "unavailable") {
+					isDownloading = true;
+					await provider.initialize(undefined, (progress) => {
+						downloadProgress = progress;
+					});
+					// Re-check status after initialization
+					status = await provider.getStatus();
+				}
+			} catch (error) {
+				console.error("Error initializing Chrome AI:", error);
+				status = "unavailable";
+			} finally {
+				isDownloading = false;
+			}
+		} else {
+			// For other providers, just check status
+			status = await provider.getStatus();
+		}
 	} catch (error) {
 		console.error("Error checking AI provider status:", error);
 		status = "unavailable";
@@ -28,16 +53,10 @@ onMount(async () => {
 	}
 });
 
-function getStatusColor(
-	status: Availability | AIProviderStatus | null,
-): string {
+function getStatusColor(status: AIProviderStatus | null): string {
 	switch (status) {
 		case "available":
 			return "text-green-600";
-		case "downloadable":
-			return "text-yellow-600";
-		case "downloading":
-			return "text-blue-600";
 		case "needs-configuration":
 			return "text-yellow-600";
 		case "rate-limited":
@@ -49,14 +68,10 @@ function getStatusColor(
 	}
 }
 
-function getStatusIcon(status: Availability | AIProviderStatus | null): string {
+function getStatusIcon(status: AIProviderStatus | null): string {
 	switch (status) {
 		case "available":
 			return "✓";
-		case "downloadable":
-			return "↓";
-		case "downloading":
-			return "⟳";
 		case "needs-configuration":
 			return "⚙";
 		case "rate-limited":
@@ -68,16 +83,10 @@ function getStatusIcon(status: Availability | AIProviderStatus | null): string {
 	}
 }
 
-function getStatusMessage(
-	status: Availability | AIProviderStatus | null,
-): string {
+function getStatusMessage(status: AIProviderStatus | null): string {
 	switch (status) {
 		case "available":
 			return `${providerName} is ready to use`;
-		case "downloadable":
-			return `${providerName} model can be downloaded`;
-		case "downloading":
-			return `${providerName} model is downloading...`;
 		case "needs-configuration":
 			return `${providerName} needs configuration`;
 		case "rate-limited":
@@ -97,18 +106,27 @@ function getStatusMessage(
 		<div class="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-600"></div>
 		<span>Checking {providerName} availability...</span>
 	</div>
+{:else if isDownloading}
+	<div class="space-y-3">
+		<div class="flex items-center gap-2 text-sm text-blue-600">
+			<div class="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+			<span>Downloading Chrome AI model...</span>
+		</div>
+		<div class="w-full bg-gray-200 rounded-full h-2">
+			<div 
+				class="bg-blue-600 h-2 rounded-full transition-all duration-300"
+				style="width: {downloadProgress}%"
+			></div>
+		</div>
+		<p class="text-xs text-gray-600">
+			{Math.round(downloadProgress)}% complete - This is a one-time download of approximately 2GB
+		</p>
+	</div>
 {:else}
 	<div class={`flex items-center gap-2 text-sm ${getStatusColor(status)}`}>
 		<span class="text-lg">{getStatusIcon(status)}</span>
 		<span>{getStatusMessage(status)}</span>
 	</div>
-	
-	{#if status === 'downloadable'}
-		<div class="mt-2 text-xs text-gray-600">
-			<p>The AI model will be downloaded automatically when you first use it.</p>
-			<p>This is a one-time download of approximately 22GB.</p>
-		</div>
-	{/if}
 	
 	{#if status === 'needs-configuration'}
 		<div class="mt-2 text-xs text-gray-600">
@@ -116,7 +134,15 @@ function getStatusMessage(
 		</div>
 	{/if}
 	
-	{#if status === 'unavailable'}
+	{#if status === 'unavailable' && providerName === 'Chrome AI'}
+		<div class="mt-2 text-xs text-gray-600">
+			<p>Chrome AI is not available. Please ensure:</p>
+			<ul class="mt-1 ml-4 list-disc">
+				<li>You're using Chrome 138 or later</li>
+				<li>"Prompt API for Gemini Nano" is enabled in chrome://flags</li>
+			</ul>
+		</div>
+	{:else if status === 'unavailable'}
 		<div class="mt-2 text-xs text-gray-600">
 			<p>{providerName} is not available or not configured properly.</p>
 		</div>

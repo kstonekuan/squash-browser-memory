@@ -7,7 +7,7 @@ import {
 	startOfDay,
 } from "date-fns";
 import type { z } from "zod/v4";
-import { createAISession, promptAI } from "./ai-session-factory";
+import { getInitializedProvider, promptAI } from "./ai-provider-utils";
 import { buildChunkingPrompt, CHUNK_SYSTEM_PROMPT } from "./constants";
 import type { ChunkTimeRange, HistoryChunk } from "./memory";
 import { CHUNK_SCHEMA, ChunkSchema } from "./schemas";
@@ -58,22 +58,22 @@ export async function identifyChunks(
 	console.log("Timestamp count:", timestamps.length);
 	console.log("======================\n");
 
-	const session = await createAISession(
+	const provider = await getInitializedProvider(
 		customChunkPrompt || CHUNK_SYSTEM_PROMPT,
 	);
 
-	if (!session) {
+	if (!provider) {
 		// Fallback to half-day chunking
 		return {
 			timeRanges: createHalfDayChunks(timestamps),
-			error: "Failed to create AI session",
+			error: "Failed to initialize AI provider",
 			isFallback: true,
 		};
 	}
 
 	try {
 		const startTime = performance.now();
-		const response = await promptAI(session, prompt, {
+		const response = await promptAI(provider, prompt, {
 			responseConstraint: CHUNK_SCHEMA,
 		});
 		const endTime = performance.now();
@@ -144,7 +144,7 @@ export async function identifyChunks(
 			isFallback: true,
 		};
 	} finally {
-		session.destroy();
+		// No cleanup needed with stateless providers
 	}
 }
 
@@ -234,22 +234,22 @@ async function identifyChunksForBatch(
 	console.log("Batch timestamp count:", timestamps.length);
 	console.log("=============================\n");
 
-	const session = await createAISession(
+	const provider = await getInitializedProvider(
 		customChunkPrompt || CHUNK_SYSTEM_PROMPT,
 	);
 
-	if (!session) {
+	if (!provider) {
 		// Fallback to half-day chunking
 		return {
 			timeRanges: createHalfDayChunks(timestamps),
-			error: "Failed to create AI session",
+			error: "Failed to initialize AI provider",
 			isFallback: true,
 		};
 	}
 
 	try {
 		const startTime = performance.now();
-		const response = await promptAI(session, prompt, {
+		const response = await promptAI(provider, prompt, {
 			responseConstraint: CHUNK_SCHEMA,
 		});
 		const endTime = performance.now();
@@ -316,7 +316,7 @@ async function identifyChunksForBatch(
 			isFallback: true,
 		};
 	} finally {
-		session.destroy();
+		// No cleanup needed with stateless providers
 	}
 }
 

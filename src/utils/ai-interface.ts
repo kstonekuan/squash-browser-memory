@@ -5,36 +5,6 @@
  * Allows swapping between Chrome AI and remote AI providers
  */
 
-export interface AISession {
-	/**
-	 * Send a prompt to the AI and get a response
-	 */
-	prompt(text: string, options?: LanguageModelPromptOptions): Promise<string>;
-
-	/**
-	 * Measure token usage for a given prompt (if supported)
-	 */
-	measureInputUsage?(
-		prompt: string,
-		options?: LanguageModelPromptOptions,
-	): Promise<number>;
-
-	/**
-	 * The input token quota/limit for this session (if available)
-	 */
-	inputQuota?: number;
-
-	/**
-	 * The current input token usage for this session (if available)
-	 */
-	inputUsage?: number;
-
-	/**
-	 * Clean up the session
-	 */
-	destroy(): void;
-}
-
 export interface AIProvider {
 	/**
 	 * Check if this AI provider is available
@@ -47,9 +17,27 @@ export interface AIProvider {
 	getStatus(): Promise<AIProviderStatus>;
 
 	/**
-	 * Create a new AI session
+	 * Initialize the provider with a system prompt
+	 * @param systemPrompt The system prompt to use
+	 * @param onDownloadProgress Optional callback for download progress (0-100)
 	 */
-	createSession(systemPrompt?: string): Promise<AISession | null>;
+	initialize(
+		systemPrompt?: string,
+		onDownloadProgress?: (progress: number) => void,
+	): Promise<void>;
+
+	/**
+	 * Send a prompt to the AI and get a response
+	 */
+	prompt(text: string, options?: LanguageModelPromptOptions): Promise<string>;
+
+	/**
+	 * Measure token usage for a given prompt (if supported)
+	 */
+	measureInputUsage?(
+		prompt: string,
+		options?: LanguageModelPromptOptions,
+	): Promise<number>;
 
 	/**
 	 * Get the provider name for UI display
@@ -94,9 +82,7 @@ export type AIProviderStatus =
 	| "unavailable"
 	| "needs-configuration"
 	| "rate-limited"
-	| "error"
-	| "downloadable" // Chrome AI specific - model can be downloaded
-	| "downloading"; // Chrome AI specific - model is downloading
+	| "error";
 
 export type AIProviderType = "chrome" | "claude";
 

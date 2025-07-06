@@ -312,6 +312,14 @@ onMount(() => {
 			if (isLikelyOurAnalysis && data.analysisId) {
 				currentAnalysisId = data.analysisId;
 			}
+
+			// Sync ambient analysis status when progress phase is complete
+			if (isAmbientAnalysisRunning && data.phase === "complete") {
+				ambientAnalysisStatus = {
+					status: "completed",
+					message: "Analysis completed",
+				};
+			}
 		} else {
 			console.log("[App] Ignoring progress - not our analysis");
 		}

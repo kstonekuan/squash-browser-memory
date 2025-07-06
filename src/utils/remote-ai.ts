@@ -9,28 +9,101 @@ import type {
 	AIProvider,
 	AIProviderCapabilities,
 	AIProviderStatus,
-	AISession,
 } from "./ai-interface";
 
 const CLAUDE_MODEL = "claude-3-5-haiku-latest";
 const CLAUDE_MAX_TOKENS = 8192;
 
-class ClaudeSession implements AISession {
-	private client: Anthropic;
-	private systemPrompt: string;
+export class ClaudeProvider implements AIProvider {
+	private apiKey?: string;
+	private client?: Anthropic;
+	private systemPrompt?: string;
 
-	constructor(apiKey: string, systemPrompt: string) {
-		this.client = new Anthropic({
-			apiKey: apiKey,
-			dangerouslyAllowBrowser: true, // Required for browser usage
-		});
+	constructor(apiKey?: string) {
+		this.apiKey = apiKey;
+		if (apiKey) {
+			this.client = new Anthropic({
+				apiKey: apiKey,
+				dangerouslyAllowBrowser: true, // Required for browser usage
+			});
+		}
+	}
+
+	async isAvailable(): Promise<boolean> {
+		if (!this.apiKey || !this.client) {
+			return false;
+		}
+
+		// Use SDK to check if API key is valid by making a minimal request
+		try {
+			// Use token counting which is cheaper and doesn't consume generation tokens
+			await this.client.messages.countTokens({
+				model: CLAUDE_MODEL,
+				messages: [{ role: "user", content: "test" }],
+			});
+
+			return true;
+		} catch (error) {
+			if (error instanceof Anthropic.APIError) {
+				// API key is invalid if we get 401 or 403
+				if (error.status === 401 || error.status === 403) {
+					return false;
+				}
+			}
+			console.error("Claude availability check failed:", error);
+			return false;
+		}
+	}
+
+	async getStatus(): Promise<AIProviderStatus> {
+		if (!this.apiKey) {
+			return "needs-configuration";
+		}
+
+		try {
+			const available = await this.isAvailable();
+			return available ? "available" : "error";
+		} catch (error) {
+			if (error instanceof Error && error.message.includes("429")) {
+				return "rate-limited";
+			}
+			return "error";
+		}
+	}
+
+	async initialize(
+		systemPrompt?: string,
+		_onDownloadProgress?: (progress: number) => void,
+	): Promise<void> {
+		if (!this.apiKey) {
+			throw new Error("Claude API key is required");
+		}
+
 		this.systemPrompt = systemPrompt;
+
+		// Ensure client is initialized
+		if (!this.client) {
+			this.client = new Anthropic({
+				apiKey: this.apiKey,
+				dangerouslyAllowBrowser: true,
+			});
+		}
+
+		// Verify the API key is valid
+		const available = await this.isAvailable();
+		if (!available) {
+			throw new Error("Claude API key is invalid or rate limited");
+		}
 	}
 
 	async prompt(
 		text: string,
 		options?: LanguageModelPromptOptions,
 	): Promise<string> {
+		if (!this.client) {
+			throw new Error("Claude not initialized. Call initialize() first.");
+		}
+
 		console.log("Claude API: Sending message");
 
 		// Handle JSON schema constraint
@@ -98,93 +171,35 @@ class ClaudeSession implements AISession {
 		prompt: string,
 		options?: LanguageModelPromptOptions,
 	): Promise<number> {
-		// Claude doesn't provide a direct token count API for input
-		// Use a rough estimation: ~4 characters per token
-		const baseTokens = Math.ceil(prompt.length / 4);
-
-		// Add system prompt tokens if present
-		const systemTokens = this.systemPrompt
-			? Math.ceil(this.systemPrompt.length / 4)
-			: 0;
-
-		// Add constraint tokens if present
-		const constraintTokens = options?.responseConstraint
-			? Math.ceil(JSON.stringify(options.responseConstraint).length / 4)
-			: 0;
-
-		return baseTokens + systemTokens + constraintTokens;
-	}
-
-	destroy(): void {
-		// No cleanup needed for HTTP-based API
-	}
-}
-
-export class ClaudeProvider implements AIProvider {
-	private apiKey?: string;
-
-	constructor(apiKey?: string) {
-		this.apiKey = apiKey;
-	}
-
-	async isAvailable(): Promise<boolean> {
-		if (!this.apiKey) {
-			return false;
+		if (!this.client) {
+			throw new Error("Claude not initialized. Call initialize() first.");
 		}
 
-		// Use SDK to check if API key is valid by making a minimal request
-		try {
-			const client = new Anthropic({
-				apiKey: this.apiKey,
-				dangerouslyAllowBrowser: true,
-			});
+		// Build the full message content including any response constraints
+		let userContent = prompt;
+		if (options?.responseConstraint) {
+			userContent += `\n\nIMPORTANT: Respond with valid JSON only, matching this schema: ${JSON.stringify(options.responseConstraint)}`;
+		}
 
-			// Use token counting which is cheaper and doesn't consume generation tokens
-			await client.messages.countTokens({
+		try {
+			// Use Claude's actual token counting API
+			const result = await this.client.messages.countTokens({
 				model: CLAUDE_MODEL,
-				messages: [{ role: "user", content: "test" }],
+				system: this.systemPrompt,
+				messages: [
+					{
+						role: "user",
+						content: userContent,
+					},
+				],
 			});
 
-			return true;
+			return result.input_tokens;
 		} catch (error) {
-			if (error instanceof Anthropic.APIError) {
-				// API key is invalid if we get 401 or 403
-				if (error.status === 401 || error.status === 403) {
-					return false;
-				}
-			}
-			console.error("Claude availability check failed:", error);
-			return false;
+			console.error("Error counting tokens:", error);
+			// Fall back to estimation if API fails
+			return Math.ceil((prompt.length + (this.systemPrompt?.length || 0)) / 4);
 		}
-	}
-
-	async getStatus(): Promise<AIProviderStatus> {
-		if (!this.apiKey) {
-			return "needs-configuration";
-		}
-
-		try {
-			const available = await this.isAvailable();
-			return available ? "available" : "error";
-		} catch (error) {
-			if (error instanceof Error && error.message.includes("429")) {
-				return "rate-limited";
-			}
-			return "error";
-		}
-	}
-
-	async createSession(systemPrompt: string): Promise<AISession | null> {
-		if (!this.apiKey) {
-			throw new Error("Claude API key is required");
-		}
-
-		const available = await this.isAvailable();
-		if (!available) {
-			return null;
-		}
-
-		return new ClaudeSession(this.apiKey, systemPrompt);
 	}
 
 	getProviderName(): string {
@@ -201,13 +216,17 @@ export class ClaudeProvider implements AIProvider {
 
 	setApiKey(apiKey: string): void {
 		this.apiKey = apiKey;
+		this.client = new Anthropic({
+			apiKey: apiKey,
+			dangerouslyAllowBrowser: true,
+		});
 	}
 
 	getCapabilities(): AIProviderCapabilities {
 		return {
 			maxInputTokens: 200000, // Claude 3.5 Haiku supports 200K input tokens
 			optimalChunkTokens: 50000, // Optimal chunk size for Claude 3.5 Haiku
-			supportsTokenMeasurement: false, // Claude API doesn't provide direct token measurement
+			supportsTokenMeasurement: true, // Claude API provides token counting via countTokens()
 		};
 	}
 }

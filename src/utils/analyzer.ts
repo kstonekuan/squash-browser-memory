@@ -13,7 +13,7 @@ import {
 	loadAIConfigFromStorage,
 } from "./ai-config";
 import { getProvider } from "./ai-provider-factory";
-import { createAISession, promptAI } from "./ai-session-factory";
+import { getInitializedProvider, promptAI } from "./ai-provider-utils";
 import { createHistoryChunks, identifyChunks } from "./chunking";
 import {
 	ANALYSIS_SYSTEM_PROMPT,
@@ -412,11 +412,11 @@ async function mergeAnalysisResults(
 		newPatterns: newResults.patterns.length,
 	});
 
-	const session = await createAISession(
+	const provider = await getInitializedProvider(
 		customSystemPrompt || MERGE_SYSTEM_PROMPT,
 	);
 
-	if (!session) {
+	if (!provider) {
 		throw new Error("AI is not available for merging.");
 	}
 
@@ -433,7 +433,7 @@ async function mergeAnalysisResults(
 		}
 
 		const startTime = performance.now();
-		const response = await promptAI(session, mergePrompt, {
+		const response = await promptAI(provider, mergePrompt, {
 			responseConstraint: ANALYSIS_SCHEMA,
 			signal: abortSignal,
 		});
@@ -512,7 +512,7 @@ async function mergeAnalysisResults(
 		console.error("Failed to merge with memory, returning new results:", error);
 		return newResults;
 	} finally {
-		session.destroy();
+		// No cleanup needed with stateless providers
 	}
 }
 
@@ -585,22 +585,17 @@ async function analyzeChunkWithSubdivision(
 
 		// Get provider capabilities for optimal chunking
 		const config = await loadAIConfig();
-		const provider = getProvider(config);
-		const capabilities = provider.getCapabilities();
+		const providerForCapabilities = getProvider(config);
+		const capabilities = providerForCapabilities.getCapabilities();
 
-		// Create a session for token measurement
-		const session = await createAISession(analysisSystemPrompt);
-		if (!session) {
+		// Initialize provider for token measurement
+		const provider = await getInitializedProvider(analysisSystemPrompt);
+		if (!provider) {
 			throw new Error("AI is not available for measuring tokens.");
 		}
 
 		// Determine max tokens
-		let maxTokens = capabilities.optimalChunkTokens;
-		if (session.inputQuota !== undefined && session.inputUsage !== undefined) {
-			const availableTokens = session.inputQuota - session.inputUsage;
-			console.log(`Chrome AI available tokens: ${availableTokens}`);
-			maxTokens = availableTokens;
-		}
+		const maxTokens = capabilities.optimalChunkTokens;
 
 		// Calculate optimal size using binary search
 		const optimalSize = await calculateOptimalChunkSize(
@@ -609,10 +604,12 @@ async function analyzeChunkWithSubdivision(
 			async (testItems) => {
 				if (
 					!capabilities.supportsTokenMeasurement ||
-					!session.measureInputUsage
+					!provider.measureInputUsage
 				) {
 					// Fallback to estimation
-					const tokensPerItem = provider.getProviderName().includes("Claude")
+					const tokensPerItem = providerForCapabilities
+						.getProviderName()
+						.includes("Claude")
 						? 50
 						: 25;
 					return testItems.length * tokensPerItem;
@@ -620,16 +617,16 @@ async function analyzeChunkWithSubdivision(
 
 				const testData = testHistoryData.slice(0, testItems.length);
 				const testPrompt = buildAnalysisPrompt(testItems, testData);
-				return await session.measureInputUsage(testPrompt, {
+				return await provider.measureInputUsage(testPrompt, {
 					responseConstraint: ANALYSIS_SCHEMA,
 					signal: abortSignal,
 				});
 			},
-			provider.getProviderName().includes("Claude") ? 50 : 25,
+			providerForCapabilities.getProviderName().includes("Claude") ? 50 : 25,
 			abortSignal,
 		);
 
-		session.destroy();
+		// No cleanup needed with stateless providers
 		console.log(`Optimal subdivision size: ${optimalSize} items per sub-chunk`);
 
 		// Process in sub-chunks
@@ -737,11 +734,11 @@ async function analyzeChunk(
 		itemCount: items.length,
 	});
 
-	const session = await createAISession(
+	const provider = await getInitializedProvider(
 		customSystemPrompt || ANALYSIS_SYSTEM_PROMPT,
 	);
 
-	if (!session) {
+	if (!provider) {
 		throw new Error("AI is not available.");
 	}
 
@@ -764,7 +761,7 @@ async function analyzeChunk(
 		}
 
 		const startTime = performance.now();
-		const response = await promptAI(session, prompt, {
+		const response = await promptAI(provider, prompt, {
 			responseConstraint: ANALYSIS_SCHEMA,
 			signal: abortSignal,
 		});
@@ -847,6 +844,6 @@ async function analyzeChunk(
 			throw error;
 		}
 	} finally {
-		session.destroy();
+		// No cleanup needed with stateless providers
 	}
 }

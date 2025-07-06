@@ -7,5 +7,5 @@
 		"content-scripts/**/*.ts"
 	],
 	"project": ["src/**/*.{ts,js,svelte}", "content-scripts/**/*.ts"],
-	"ignoreDependencies": ["@tailwindcss/forms", "tailwindcss", "@types/chrome"] 
+	"ignoreDependencies": ["@tailwindcss/forms", "tailwindcss", "@types/chrome"]
 }
