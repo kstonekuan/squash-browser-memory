@@ -9,10 +9,7 @@
 	"project": ["src/**/*.{ts,js,svelte}", "content-scripts/**/*.ts"],
 	"ignore": [
 		"vite.config.ts",
-		"vitest.config.ts",
-		"src/lib/ContextSelector.svelte",
-		"src/utils/platform-adapter.ts",
-		"src/utils/simple-context-matcher.ts"
+		"vitest.config.ts"
 	],
 	"ignoreDependencies": ["@tailwindcss/forms", "tailwindcss", "@types/chrome"],
 	"ignoreExportsUsedInFile": {
