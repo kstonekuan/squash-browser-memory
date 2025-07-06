@@ -7,13 +7,19 @@ import {
 import type { AutoAnalysisSettings } from "../utils/ambient";
 import { sendMessage } from "../utils/messaging";
 
-let { analysisStatus = { status: "idle" } } = $props<{
+let { analysisStatus = { status: "idle" }, aiStatus = "unavailable" } = $props<{
 	analysisStatus?: {
 		status: "idle" | "running" | "completed" | "skipped" | "error";
 		message?: string;
 		itemCount?: number;
 		reason?: string;
 	};
+	aiStatus?:
+		| "available"
+		| "unavailable"
+		| "needs-configuration"
+		| "rate-limited"
+		| "error";
 }>();
 
 let settings = $state<AutoAnalysisSettings>({
@@ -184,11 +190,12 @@ function getNextAnalysisTime(): string {
 		<div class="ml-4 flex flex-col items-end gap-2">
 			<button
 				onclick={toggleAmbientAnalysis}
-				disabled={loading || toggling}
+				disabled={loading || toggling || aiStatus !== 'available'}
+				title={aiStatus !== 'available' ? 'AI must be available to enable ambient analysis' : ''}
 				class={`
 					relative inline-flex h-8 w-14 items-center rounded-full transition-colors
 					${settings.enabled ? "bg-blue-600" : "bg-gray-200"}
-					${loading || toggling ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}
+					${loading || toggling || aiStatus !== 'available' ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}
 				`}
 			>
 				<span class="sr-only">Enable ambient analysis</span>
@@ -264,6 +271,14 @@ function getNextAnalysisTime(): string {
 		</div>
 	{/if}
 
+	{#if aiStatus !== 'available' && !settings.enabled}
+		<div class="mt-3 p-3 rounded-lg bg-amber-50 border border-amber-200">
+			<p class="text-xs text-amber-800">
+				Ambient analysis requires AI to be available. Please check the AI provider status above.
+			</p>
+		</div>
+	{/if}
+	
 	{#if settings.enabled}
 		<div class="mt-3 p-3 rounded-lg {getStatusColor()}">
 			<p class="text-xs">

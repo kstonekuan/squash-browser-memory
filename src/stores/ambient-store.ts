@@ -110,3 +110,47 @@ export async function updateAmbientSettings(
 		...updates,
 	}));
 }
+
+// Helper function to disable ambient analysis (used when AI becomes unavailable)
+export async function disableAmbientAnalysis(): Promise<void> {
+	// Get current settings first
+	let currentSettings: AutoAnalysisSettings;
+	const unsubscribe = ambientSettings.subscribe((s) => {
+		currentSettings = s;
+	});
+	unsubscribe();
+
+	// Only proceed if it's currently enabled
+	if (!currentSettings!.enabled) {
+		return;
+	}
+
+	// Update settings to disabled
+	ambientSettings.update((settings) => ({
+		...settings,
+		enabled: false,
+	}));
+
+	// Send message to background script to clear alarms
+	try {
+		const response = await sendMessage("settings:toggle-auto-analysis", {
+			enabled: false,
+		});
+
+		if (!response?.success) {
+			// Revert on error
+			ambientSettings.update((settings) => ({
+				...settings,
+				enabled: true,
+			}));
+			throw new Error(response?.error || "Failed to disable auto-analysis");
+		}
+	} catch (error) {
+		// Revert on error
+		ambientSettings.update((settings) => ({
+			...settings,
+			enabled: true,
+		}));
+		throw error;
+	}
+}

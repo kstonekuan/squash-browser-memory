@@ -56,3 +56,11 @@ export function getProviderDisplayName(type: AIProviderType): string {
 		.with("claude", () => "Claude API (Remote)")
 		.exhaustive();
 }
+
+/**
+ * Reset Chrome AI provider instance
+ * Used when side panel is reopened to ensure proper initialization flow
+ */
+export function resetChromeProvider(): void {
+	chromeProvider = null;
+}

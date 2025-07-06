@@ -2,7 +2,7 @@
 import { onMount } from "svelte";
 import { match } from "ts-pattern";
 import AdvancedSettings from "./lib/AdvancedSettings.svelte";
-import AIProviderStatus from "./lib/AIProviderStatus.svelte";
+import AIProviderStatusComponent from "./lib/AIProviderStatus.svelte";
 import AmbientAnalysisCard from "./lib/AmbientAnalysisCard.svelte";
 import type { AnalysisPhase, SubPhase } from "./lib/AnalysisProgress.svelte";
 import AnalysisProgress from "./lib/AnalysisProgress.svelte";
@@ -10,56 +10,83 @@ import AnalysisResults from "./lib/AnalysisResults.svelte";
 import CollapsibleSection from "./lib/CollapsibleSection.svelte";
 import HistoryFetcher from "./lib/HistoryFetcher.svelte";
 import MemoryViewer from "./lib/MemoryViewer.svelte";
+import { disableAmbientAnalysis } from "./stores/ambient-store";
 import type { FullAnalysisResult } from "./types";
+import { loadAIConfigFromStorage } from "./utils/ai-config";
+import type {
+	AIProvider,
+	AIProviderStatus,
+	AIProviderType,
+} from "./utils/ai-interface";
+import { getProvider, resetChromeProvider } from "./utils/ai-provider-factory";
 import { clearMemory } from "./utils/analyzer";
 import { onMessage, sendMessage } from "./utils/messaging";
 
 let analysisResult: FullAnalysisResult | null = $state(null);
 let memoryAutoExpand = $state(false);
-let isAnalyzing = $state(false);
-let analysisPhase: AnalysisPhase = $state("idle");
 let rawHistoryData: chrome.history.HistoryItem[] | null = $state(null);
 let customPrompts = $state<{
 	systemPrompt?: string;
 	chunkPrompt?: string;
 	mergePrompt?: string;
 }>({});
-let chunkProgress = $state<{
-	current: number;
-	total: number;
-	description: string;
-} | null>(null);
-let subPhase: SubPhase | undefined = $state(undefined);
-let providerKey = $state(0); // Key to force AIProviderStatus re-render
-let isAmbientAnalysisRunning = $state(false);
-let isManualAnalysisRunning = $state(false);
-let isAnyAnalysisRunning = $derived(
-	isAmbientAnalysisRunning || isManualAnalysisRunning,
-);
-let currentAnalysisId: string | null = $state(null);
-let ambientAnalysisStatus = $state<{
+let currentAIStatus = $state<AIProviderStatus>("unavailable");
+let currentProvider = $state<AIProviderType>("chrome");
+let aiNeedsDownload = $state(false);
+let aiIsDownloading = $state(false);
+let aiDownloadProgress = $state(0);
+let currentAIProvider = $state<AIProvider | null>(null);
+
+// Unified analysis state
+type AnalysisType = "manual" | "ambient" | null;
+let currentAnalysisType = $state<AnalysisType>(null);
+let currentAnalysisId = $state<string | null>(null);
+
+// Unified status for both ambient card and progress bar
+let analysisStatus = $state<{
 	status: "idle" | "running" | "completed" | "skipped" | "error";
 	message?: string;
 	itemCount?: number;
 	reason?: string;
 }>({ status: "idle" });
 
+// Analysis progress state
+let analysisPhase: AnalysisPhase = $state("idle");
+let chunkProgress = $state<{
+	current: number;
+	total: number;
+	description: string;
+} | null>(null);
+let subPhase: SubPhase | undefined = $state(undefined);
+
+// Derived state
+let isAnalyzing = $derived(
+	currentAnalysisType === "manual" && analysisStatus.status === "running",
+);
+let isAmbientAnalysisRunning = $derived(
+	currentAnalysisType === "ambient" && analysisStatus.status === "running",
+);
+let isAnyAnalysisRunning = $derived(analysisStatus.status === "running");
+
 async function handleAnalysis(data: { items: chrome.history.HistoryItem[] }) {
 	const { items } = data;
 
 	console.log("[App] Starting manual analysis for", items.length, "items");
 
-	isAnalyzing = true;
 	analysisResult = null;
-	analysisPhase = "calculating";
 	rawHistoryData = items;
 
-	// Mark as manual analysis to track properly
-	isManualAnalysisRunning = true;
-
-	// Generate a temporary analysis ID to match progress updates
+	// Set analysis type and generate ID
+	currentAnalysisType = "manual";
 	const tempAnalysisId = `manual-${Date.now()}`;
 	currentAnalysisId = tempAnalysisId;
+
+	// Update unified status
+	analysisStatus = {
+		status: "running",
+		message: `Analyzing ${items.length} history items...`,
+	};
+	analysisPhase = "calculating";
 
 	try {
 		// Send analysis request to background script
@@ -75,8 +102,8 @@ async function handleAnalysis(data: { items: chrome.history.HistoryItem[] }) {
 					"An analysis is already in progress. Please wait for it to complete.",
 				);
 				analysisPhase = "idle";
-				isAnalyzing = false;
-				isManualAnalysisRunning = false;
+				analysisStatus = { status: "idle" };
+				currentAnalysisType = null;
 				currentAnalysisId = null;
 				return;
 			}
@@ -87,18 +114,16 @@ async function handleAnalysis(data: { items: chrome.history.HistoryItem[] }) {
 		if (response.analysisId && response.analysisId !== tempAnalysisId) {
 			currentAnalysisId = response.analysisId;
 		}
-
-		// Analysis is now running in background
-		// Don't set phase here - let progress updates handle it
-		ambientAnalysisStatus = {
-			status: "running",
-			message: `Analyzing ${items.length} history items...`,
-		};
 	} catch (error) {
 		console.error("Failed to start manual analysis:", error);
 		analysisPhase = "error";
-		isAnalyzing = false;
-		isManualAnalysisRunning = false;
+		analysisStatus = {
+			status: "error",
+			message:
+				error instanceof Error ? error.message : "Failed to start analysis",
+		};
+		currentAnalysisType = null;
+		currentAnalysisId = null;
 		alert(error instanceof Error ? error.message : "Failed to start analysis");
 	}
 }
@@ -115,10 +140,15 @@ function handlePromptsChange(prompts: {
 	};
 }
 
-function handleProviderChange() {
-	// Force re-render of AIProviderStatus by changing the key
-	providerKey += 1;
-}
+// Effect to disable ambient analysis when AI becomes unavailable
+$effect(() => {
+	if (currentAIStatus !== "available" && currentAIStatus !== null) {
+		console.log("[App] AI is not available, disabling ambient analysis");
+		disableAmbientAnalysis().catch((error) => {
+			console.error("[App] Failed to disable ambient analysis:", error);
+		});
+	}
+});
 
 async function handleClearMemory() {
 	if (confirm("This will clear all stored analysis memory. Continue?")) {
@@ -139,15 +169,14 @@ async function handleCancelAnalysis() {
 		});
 
 		if (response.success) {
-			// Update UI
+			// Update unified state
 			analysisPhase = "error";
-			isAnalyzing = false;
-			isManualAnalysisRunning = false;
-			currentAnalysisId = null;
-			ambientAnalysisStatus = {
+			analysisStatus = {
 				status: "error",
 				message: "Analysis cancelled by user",
 			};
+			currentAnalysisType = null;
+			currentAnalysisId = null;
 		} else {
 			console.error("Failed to cancel analysis:", response.error);
 			alert(`Failed to cancel analysis: ${response.error}`);
@@ -163,13 +192,97 @@ function handleDismissAnalysis() {
 	memoryAutoExpand = false;
 }
 
+async function checkInitialAIStatus() {
+	try {
+		const config = await loadAIConfigFromStorage();
+		currentProvider = config.provider;
+
+		// Reset Chrome AI provider to ensure fresh state
+		if (config.provider === "chrome") {
+			resetChromeProvider();
+		}
+
+		const provider = getProvider(config);
+		currentAIProvider = provider;
+
+		// Check current status
+		const status = await provider.getStatus();
+		currentAIStatus = status;
+
+		// For Chrome AI, if unavailable, try to initialize to check if it needs download
+		if (config.provider === "chrome" && status === "unavailable") {
+			try {
+				await provider.initialize(undefined, (progress) => {
+					aiDownloadProgress = progress;
+				});
+
+				// Check if needs download
+				if (provider.needsDownload?.()) {
+					aiNeedsDownload = true;
+				} else {
+					// Re-check status after initialization attempt
+					const newStatus = await provider.getStatus();
+					currentAIStatus = newStatus;
+				}
+			} catch (error) {
+				// Keep status as unavailable
+				console.log("Chrome AI initialization check:", error);
+			}
+		}
+	} catch (error) {
+		console.error("Error checking initial AI status:", error);
+		currentAIStatus = "unavailable";
+	}
+}
+
+async function handleAIDownload() {
+	if (!currentAIProvider || !currentAIProvider.triggerModelDownload) return;
+
+	aiNeedsDownload = false;
+	aiIsDownloading = true;
+
+	try {
+		await currentAIProvider.triggerModelDownload();
+
+		// Re-check status after download
+		const newStatus = await currentAIProvider.getStatus();
+		currentAIStatus = newStatus;
+		aiNeedsDownload = false;
+	} catch (error) {
+		console.error("Error downloading Chrome AI model:", error);
+		currentAIStatus = "unavailable";
+	} finally {
+		aiIsDownloading = false;
+		aiDownloadProgress = 0;
+	}
+}
+
 // Query ambient analysis status on mount and listen for updates
 onMount(() => {
+	// Check AI status first
+	checkInitialAIStatus();
+
+	// Listen for storage changes to detect provider changes
+	const storageListener = (changes: {
+		[key: string]: chrome.storage.StorageChange;
+	}) => {
+		if (changes.ai_config || changes.ai_provider_config) {
+			// Provider configuration changed, re-check status
+			console.log("[App] AI provider config changed, rechecking status");
+			checkInitialAIStatus();
+		}
+	};
+	chrome.storage.onChanged.addListener(storageListener);
+
 	// Query current status from background
 	sendMessage("ambient:query-status")
 		.then((response) => {
 			if (response?.isRunning) {
-				isAmbientAnalysisRunning = true;
+				currentAnalysisType = "ambient";
+				analysisStatus = {
+					status: "running",
+					message: "Ambient analysis in progress...",
+				};
 			}
 		})
 		.catch(() => {
@@ -180,10 +293,18 @@ onMount(() => {
 	sendMessage("analysis:get-state")
 		.then((response) => {
 			if (response?.isRunning) {
-				isManualAnalysisRunning = response.isManualAnalysisRunning;
-				isAmbientAnalysisRunning = response.isAmbientAnalysisRunning;
-				isAnalyzing =
-					response.isManualAnalysisRunning || response.isAmbientAnalysisRunning;
+				// Determine analysis type from response
+				if (response.isAmbientAnalysisRunning) {
+					currentAnalysisType = "ambient";
+				} else if (response.isManualAnalysisRunning) {
+					currentAnalysisType = "manual";
+				}
+
+				analysisStatus = {
+					status: "running",
+					message: "Analysis in progress...",
+				};
+
 				currentAnalysisId = response.analysisId || null;
 				analysisPhase = (response.phase as AnalysisPhase) || "analyzing";
 				if (response.chunkProgress) {
@@ -204,33 +325,39 @@ onMount(() => {
 
 		match(data.status)
 			.with("started", () => {
-				isAmbientAnalysisRunning = true;
-				ambientAnalysisStatus = {
+				// Determine type from message or current state
+				if (!currentAnalysisType) {
+					currentAnalysisType = data.message?.includes("manual")
+						? "manual"
+						: "ambient";
+				}
+				analysisStatus = {
 					status: "running",
 					message: data.message || "Starting analysis...",
 				};
 			})
 			.with("completed", () => {
-				isAmbientAnalysisRunning = false;
-				ambientAnalysisStatus = {
+				analysisStatus = {
 					status: "completed",
 					message: data.message || "Analysis completed",
 					itemCount: data.itemCount,
 				};
 
-				// If this was a manual analysis, update the UI accordingly
-				if (isManualAnalysisRunning) {
-					isManualAnalysisRunning = false;
+				// Update UI state
+				if (currentAnalysisType === "manual") {
 					isAnalyzing = false;
 					analysisPhase = "complete";
-					currentAnalysisId = null;
 					memoryAutoExpand = true;
 				}
 
+				// Clear analysis type
+				currentAnalysisType = null;
+				currentAnalysisId = null;
+
 				// Reset to idle after 10 seconds
 				setTimeout(() => {
-					if (ambientAnalysisStatus.status === "completed") {
-						ambientAnalysisStatus = { status: "idle" };
+					if (analysisStatus.status === "completed") {
+						analysisStatus = { status: "idle" };
 					}
 					if (analysisPhase === "complete") {
 						analysisPhase = "idle";
@@ -238,33 +365,36 @@ onMount(() => {
 				}, 10000);
 			})
 			.with("skipped", () => {
-				isAmbientAnalysisRunning = false;
-				ambientAnalysisStatus = {
+				analysisStatus = {
 					status: "skipped",
 					message: data.message || "Analysis skipped",
 					reason: data.reason,
 				};
+
+				currentAnalysisType = null;
+				currentAnalysisId = null;
+
 				// Reset to idle after 10 seconds
 				setTimeout(() => {
-					if (ambientAnalysisStatus.status === "skipped") {
-						ambientAnalysisStatus = { status: "idle" };
+					if (analysisStatus.status === "skipped") {
+						analysisStatus = { status: "idle" };
 					}
 				}, 10000);
 			})
 			.with("error", () => {
-				isAmbientAnalysisRunning = false;
-				ambientAnalysisStatus = {
+				analysisStatus = {
 					status: "error",
 					message: data.message || "Analysis failed",
 				};
 
-				// If this was a manual analysis, update the UI accordingly
-				if (isManualAnalysisRunning) {
-					isManualAnalysisRunning = false;
+				// Update UI state for manual analysis
+				if (currentAnalysisType === "manual") {
 					isAnalyzing = false;
 					analysisPhase = "error";
-					currentAnalysisId = null;
 				}
+
+				currentAnalysisType = null;
+				currentAnalysisId = null;
 			})
 			.exhaustive();
 	});
@@ -277,7 +407,7 @@ onMount(() => {
 			phase: data.phase,
 			analysisId: data.analysisId,
 			currentAnalysisId,
-			isManualAnalysisRunning,
+			currentAnalysisType,
 			chunkProgress: data.chunkProgress,
 		});
 
@@ -289,7 +419,7 @@ onMount(() => {
 		// Fallback: if we're running a manual analysis and get a manual analysis progress update
 		// without an exact ID match, it's likely still our analysis (due to timing issues)
 		const isLikelyOurAnalysis =
-			isManualAnalysisRunning &&
+			currentAnalysisType === "manual" &&
 			data.analysisId?.startsWith("manual-") &&
 			!isOurAnalysis;
 
@@ -298,7 +428,7 @@ onMount(() => {
 			isLikelyOurAnalysis,
 			dataId: data.analysisId,
 			currentId: currentAnalysisId,
-			isManualAnalysisRunning,
+			currentAnalysisType,
 		});
 
 		if (isOurAnalysis || isLikelyOurAnalysis) {
@@ -312,18 +442,15 @@ onMount(() => {
 			if (isLikelyOurAnalysis && data.analysisId) {
 				currentAnalysisId = data.analysisId;
 			}
-
-			// Sync ambient analysis status when progress phase is complete
-			if (isAmbientAnalysisRunning && data.phase === "complete") {
-				ambientAnalysisStatus = {
-					status: "completed",
-					message: "Analysis completed",
-				};
-			}
 		} else {
 			console.log("[App] Ignoring progress - not our analysis");
 		}
 	});
+
+	// Cleanup
+	return () => {
+		chrome.storage.onChanged.removeListener(storageListener);
+	};
 });
 </script>
 
@@ -333,26 +460,33 @@ onMount(() => {
 
 		<!-- AI Provider Status and History Fetcher together -->
 		<div class="bg-white rounded-lg shadow-sm p-4 mb-4">
-			{#key providerKey}
-				<AIProviderStatus onProviderChange={handleProviderChange} />
-			{/key}
+			<AIProviderStatusComponent 
+				status={currentAIStatus}
+				providerType={currentProvider}
+				needsDownload={aiNeedsDownload}
+				isDownloading={aiIsDownloading}
+				downloadProgress={aiDownloadProgress}
+				onDownloadClick={handleAIDownload}
+			/>
 
 			<div class="mt-4 pt-4 border-t border-gray-200">
 				<HistoryFetcher 
 					onAnalysisRequest={handleAnalysis} 
 					{isAnalyzing}
 					isAmbientAnalysisRunning={isAnyAnalysisRunning}
+					aiStatus={currentAIStatus}
+					provider={currentProvider}
 				/>
 			</div>
 		</div>
 
 		<!-- Ambient Analysis Card - Prominent position -->
-		<AmbientAnalysisCard analysisStatus={ambientAnalysisStatus} />
+		<AmbientAnalysisCard {analysisStatus} aiStatus={currentAIStatus} />
 
 		<AnalysisProgress 
 			phase={analysisPhase} 
-			chunkProgress={chunkProgress} 
-				subPhase={subPhase}
+			{chunkProgress}
+			{subPhase}
 			onCancel={handleCancelAnalysis}
 			isAmbientAnalysis={isAmbientAnalysisRunning}
 		/>
@@ -376,7 +510,12 @@ onMount(() => {
 
 		<!-- Advanced Settings -->
 		<div class="mt-4">
-			<AdvancedSettings onPromptsChange={handlePromptsChange} />
+			<AdvancedSettings 
+				onPromptsChange={handlePromptsChange}
+				onProviderChange={checkInitialAIStatus}
+				aiStatus={currentAIStatus}
+				currentProviderType={currentProvider}
+			/>
 		</div>
 
 		<!-- Analysis Results -->

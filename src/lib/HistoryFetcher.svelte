@@ -2,18 +2,21 @@
 import { format, subDays, subHours, subWeeks } from "date-fns";
 import { onMount } from "svelte";
 import { match } from "ts-pattern";
-import { loadAIConfigFromStorage } from "../utils/ai-config";
-import type { AIProviderType } from "../utils/ai-interface";
+import type { AIProviderStatus, AIProviderType } from "../utils/ai-interface";
 import { loadMemoryFromStorage } from "../utils/memory";
 
 let {
 	isAnalyzing = $bindable(false),
 	isAmbientAnalysisRunning = false,
 	onAnalysisRequest = () => {},
+	aiStatus = "unavailable",
+	provider = "chrome",
 } = $props<{
 	isAnalyzing?: boolean;
 	isAmbientAnalysisRunning?: boolean;
 	onAnalysisRequest?: (data: { items: chrome.history.HistoryItem[] }) => void;
+	aiStatus?: AIProviderStatus;
+	provider?: AIProviderType;
 }>();
 
 let error = $state("");
@@ -23,22 +26,10 @@ let fetchProgress = $state(0);
 let isFetching = $state(false);
 let rawHistoryData = $state<chrome.history.HistoryItem[] | null>(null);
 let showRawData = $state(false);
-let currentProvider = $state<AIProviderType>("chrome");
 let onlyNewHistory = $state(false);
 let lastHistoryTimestamp = $state(0);
 
-// Listen for storage changes to update provider
 onMount(() => {
-	// Load initial config
-	loadAIConfigFromStorage()
-		.then((config) => {
-			currentProvider = config.provider;
-		})
-		.catch((error) => {
-			console.error("Failed to load AI config:", error);
-			currentProvider = "chrome"; // fallback
-		});
-
 	// Load memory to get the last analyzed timestamp
 	loadMemoryFromStorage()
 		.then((memory) => {
@@ -49,29 +40,10 @@ onMount(() => {
 		.catch((error) => {
 			console.error("Failed to load memory:", error);
 		});
-
-	// Listen for storage changes to update provider
-	const storageListener = (changes: {
-		[key: string]: chrome.storage.StorageChange;
-	}) => {
-		if (changes.ai_config) {
-			const newConfig = changes.ai_config.newValue;
-			if (newConfig?.provider) {
-				currentProvider = newConfig.provider;
-			}
-		}
-	};
-
-	chrome.storage.onChanged.addListener(storageListener);
-
-	// Cleanup
-	return () => {
-		chrome.storage.onChanged.removeListener(storageListener);
-	};
 });
 
 function getPrivacyMessage(): string {
-	switch (currentProvider) {
+	switch (provider) {
 		case "chrome":
 			return "Your browsing history never leaves your device. Analysis is performed using Chrome's built-in AI.";
 		case "claude":
@@ -82,7 +54,7 @@ function getPrivacyMessage(): string {
 }
 
 function getPrivacyColor(): string {
-	switch (currentProvider) {
+	switch (provider) {
 		case "chrome":
 			return "bg-blue-50 text-blue-700";
 		case "claude":
@@ -256,11 +228,13 @@ async function fetchHistory() {
 
 	<button
 		onclick={fetchHistory}
-		disabled={isFetching || isAnalyzing || isAmbientAnalysisRunning}
+		disabled={isFetching || isAnalyzing || isAmbientAnalysisRunning || aiStatus !== 'available'}
 		class="w-full py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
-		title={isAmbientAnalysisRunning ? "Cannot run manual analysis while ambient analysis is in progress" : ""}
+		title={aiStatus !== 'available' ? "AI is not available. Please check AI provider status above." : isAmbientAnalysisRunning ? "Cannot run manual analysis while ambient analysis is in progress" : ""}
 	>
-		{#if isFetching}
+		{#if aiStatus !== 'available'}
+			AI Not Available
+		{:else if isFetching}
 			Fetching...
 		{:else if isAnalyzing}
 			Analyzing...
@@ -274,6 +248,20 @@ async function fetchHistory() {
 	{#if error}
 		<div class="bg-red-50 border border-red-200 rounded-lg p-3">
 			<p class="text-sm text-red-800">{error}</p>
+		</div>
+	{/if}
+	
+	{#if aiStatus !== 'available'}
+		<div class="bg-amber-50 border border-amber-200 rounded-lg p-3">
+			<p class="text-sm text-amber-800">
+				{#if aiStatus === 'needs-configuration'}
+					AI provider needs configuration. Please check Advanced Settings.
+				{:else if aiStatus === 'rate-limited'}
+					AI provider is rate limited. Please try again later.
+				{:else}
+					AI is not available. Please check the AI provider status above.
+				{/if}
+			</p>
 		</div>
 	{/if}
 	

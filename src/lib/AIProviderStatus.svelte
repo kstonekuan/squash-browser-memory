@@ -1,59 +1,25 @@
 <script lang="ts">
-import { onMount } from "svelte";
-import { loadAIConfigFromStorage } from "../utils/ai-config";
-import type { AIProviderStatus } from "../utils/ai-interface";
-import { getProvider } from "../utils/ai-provider-factory";
+import type { AIProviderStatus, AIProviderType } from "../utils/ai-interface";
 
-let { onProviderChange } = $props<{
-	onProviderChange?: () => void;
+let {
+	status = "unavailable",
+	providerType = "chrome",
+	needsDownload = false,
+	isDownloading = false,
+	downloadProgress = 0,
+	onDownloadClick,
+} = $props<{
+	status?: AIProviderStatus;
+	providerType?: AIProviderType;
+	needsDownload?: boolean;
+	isDownloading?: boolean;
+	downloadProgress?: number;
+	onDownloadClick?: () => void;
 }>();
 
-let status: AIProviderStatus | null = $state(null);
-let checking = $state(true);
-let providerName = $state("AI");
-let isDownloading = $state(false);
-let downloadProgress = $state(0);
+let providerName = $derived(providerType === "chrome" ? "Chrome AI" : "Claude");
 
-onMount(async () => {
-	try {
-		const config = await loadAIConfigFromStorage();
-		const provider = getProvider(config);
-		providerName = provider.getProviderName();
-
-		// For Chrome AI, try to initialize with download progress
-		if (config.provider === "chrome") {
-			try {
-				// First check basic availability
-				status = await provider.getStatus();
-
-				// If not available, try to initialize which will trigger download
-				if (status === "unavailable") {
-					isDownloading = true;
-					await provider.initialize(undefined, (progress) => {
-						downloadProgress = progress;
-					});
-					// Re-check status after initialization
-					status = await provider.getStatus();
-				}
-			} catch (error) {
-				console.error("Error initializing Chrome AI:", error);
-				status = "unavailable";
-			} finally {
-				isDownloading = false;
-			}
-		} else {
-			// For other providers, just check status
-			status = await provider.getStatus();
-		}
-	} catch (error) {
-		console.error("Error checking AI provider status:", error);
-		status = "unavailable";
-	} finally {
-		checking = false;
-	}
-});
-
-function getStatusColor(status: AIProviderStatus | null): string {
+function getStatusColor(status: AIProviderStatus): string {
 	switch (status) {
 		case "available":
 			return "text-green-600";
@@ -63,12 +29,11 @@ function getStatusColor(status: AIProviderStatus | null): string {
 			return "text-orange-600";
 		case "error":
 		case "unavailable":
-		case null:
 			return "text-red-600";
 	}
 }
 
-function getStatusIcon(status: AIProviderStatus | null): string {
+function getStatusIcon(status: AIProviderStatus): string {
 	switch (status) {
 		case "available":
 			return "✓";
@@ -78,12 +43,11 @@ function getStatusIcon(status: AIProviderStatus | null): string {
 			return "⏳";
 		case "error":
 		case "unavailable":
-		case null:
 			return "✗";
 	}
 }
 
-function getStatusMessage(status: AIProviderStatus | null): string {
+function getStatusMessage(status: AIProviderStatus): string {
 	switch (status) {
 		case "available":
 			return `${providerName} is ready to use`;
@@ -95,18 +59,11 @@ function getStatusMessage(status: AIProviderStatus | null): string {
 			return `${providerName} has an error`;
 		case "unavailable":
 			return `${providerName} is not available`;
-		default:
-			return `Checking ${providerName} availability...`;
 	}
 }
 </script>
 
-{#if checking}
-	<div class="flex items-center gap-2 text-sm text-gray-600">
-		<div class="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-600"></div>
-		<span>Checking {providerName} availability...</span>
-	</div>
-{:else if isDownloading}
+{#if isDownloading}
 	<div class="space-y-3">
 		<div class="flex items-center gap-2 text-sm text-blue-600">
 			<div class="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
@@ -134,7 +91,19 @@ function getStatusMessage(status: AIProviderStatus | null): string {
 		</div>
 	{/if}
 	
-	{#if status === 'unavailable' && providerName === 'Chrome AI'}
+	{#if status === 'unavailable' && providerName === 'Chrome AI' && needsDownload}
+		<div class="mt-3">
+			<button
+				onclick={onDownloadClick}
+				class="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+			>
+				Download Chrome AI Model
+			</button>
+			<div class="mt-2 text-xs text-gray-600">
+				<p>Click to download the AI model (approximately 2GB)</p>
+			</div>
+		</div>
+	{:else if status === 'unavailable' && providerName === 'Chrome AI'}
 		<div class="mt-2 text-xs text-gray-600">
 			<p>Chrome AI is not available. Please ensure:</p>
 			<ul class="mt-1 ml-4 list-disc">

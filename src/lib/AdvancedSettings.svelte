@@ -26,13 +26,25 @@ import {
 import { ANALYSIS_SCHEMA, CHUNK_SCHEMA } from "../utils/schemas";
 import CollapsibleSection from "./CollapsibleSection.svelte";
 
-let { onPromptsChange, onProviderChange } = $props<{
+let {
+	onPromptsChange,
+	onProviderChange,
+	aiStatus = "unavailable",
+	currentProviderType = "chrome",
+} = $props<{
 	onPromptsChange?: (prompts: {
 		system: string;
 		chunk: string;
 		merge: string;
 	}) => void;
 	onProviderChange?: () => void;
+	aiStatus?:
+		| "available"
+		| "unavailable"
+		| "needs-configuration"
+		| "rate-limited"
+		| "error";
+	currentProviderType?: AIProviderType;
 }>();
 
 let editableSystemPrompt = $state(ANALYSIS_SYSTEM_PROMPT);
@@ -43,13 +55,9 @@ let showChunkSchema = $state(false);
 let showMergeSchema = $state(false);
 
 // AI Provider state
-let currentProvider = $state<AIProviderType>("chrome");
+let currentProvider = $state<AIProviderType>(currentProviderType);
 let claudeApiKey = $state("");
 let showApiKey = $state(false);
-let providerStatus = $state<Record<AIProviderType, string>>({
-	chrome: "Unknown",
-	claude: "Unknown",
-});
 
 // Auto-analysis state
 let autoAnalysisSettings = $state<AutoAnalysisSettings>({
@@ -67,47 +75,21 @@ $effect(() => {
 	return unsubscribe;
 });
 
-// Load current configuration on mount
+// Update current provider when prop changes
+$effect(() => {
+	currentProvider = currentProviderType;
+});
+
+// Load Claude API key on mount
 (async () => {
-	const config = await loadAIConfigFromStorage();
-	currentProvider = config.provider;
 	claudeApiKey = (await getClaudeApiKey()) || "";
-
-	// Check provider statuses
-	await updateProviderStatuses();
 })();
-
-async function updateProviderStatuses() {
-	const providers: AIProviderType[] = ["chrome", "claude"];
-
-	for (const providerType of providers) {
-		try {
-			const provider = getProvider({
-				provider: providerType,
-				claudeApiKey: providerType === "claude" ? claudeApiKey : undefined,
-			});
-			const status = await provider.getStatus();
-
-			providerStatus[providerType] =
-				status === "available"
-					? "Available"
-					: status === "needs-configuration"
-						? "Needs API Key"
-						: status === "rate-limited"
-							? "Rate Limited"
-							: "Unavailable";
-		} catch (error) {
-			providerStatus[providerType] = "Error";
-		}
-	}
-}
 
 async function handleProviderChange(provider: AIProviderType) {
 	currentProvider = provider;
 	const config = await loadAIConfigFromStorage();
 	config.provider = provider;
 	await saveAIConfigToStorage(config);
-	await updateProviderStatuses();
 	onProviderChange?.();
 }
 
@@ -115,7 +97,6 @@ async function handleApiKeyChange() {
 	if (claudeApiKey.trim()) {
 		await setClaudeApiKey(claudeApiKey.trim());
 	}
-	await updateProviderStatuses();
 	onProviderChange?.();
 }
 
@@ -132,6 +113,27 @@ function resetPrompts() {
 	editableChunkPrompt = CHUNK_SYSTEM_PROMPT;
 	editableMergePrompt = MERGE_SYSTEM_PROMPT;
 	handlePromptChange();
+}
+
+function getProviderStatus(provider: AIProviderType): string {
+	// For the current provider, use the unified status
+	if (provider === currentProvider) {
+		switch (aiStatus) {
+			case "available":
+				return "Available";
+			case "needs-configuration":
+				return "Needs API Key";
+			case "rate-limited":
+				return "Rate Limited";
+			case "error":
+				return "Error";
+			case "unavailable":
+			default:
+				return "Unavailable";
+		}
+	}
+	// For other providers, show as unknown
+	return "Unknown";
 }
 
 function getStatusColor(status: string): string {
@@ -203,8 +205,8 @@ function formatLastRunTime(): string {
 											</div>
 										</div>
 									</div>
-									<span class={`text-xs font-medium ${getStatusColor(providerStatus[provider])}`}>
-										{providerStatus[provider]}
+									<span class={`text-xs font-medium ${getStatusColor(getProviderStatus(provider))}`}>
+										{getProviderStatus(provider)}
 									</span>
 								</label>
 							{/each}
@@ -245,8 +247,8 @@ function formatLastRunTime(): string {
 						<div class="text-sm">
 							<span class="font-medium text-gray-700">Current Provider: </span>
 							<span class="text-gray-900">{getProviderDisplayName(currentProvider)}</span>
-							<span class={`ml-2 text-xs font-medium ${getStatusColor(providerStatus[currentProvider])}`}>
-								({providerStatus[currentProvider]})
+							<span class={`ml-2 text-xs font-medium ${getStatusColor(getProviderStatus(currentProvider))}`}>
+								({getProviderStatus(currentProvider)})
 							</span>
 						</div>
 					</div>

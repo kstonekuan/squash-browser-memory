@@ -71,16 +71,6 @@ async function ensureOffscreenDocument(): Promise<void> {
 	}
 }
 
-async function _closeOffscreenDocument(): Promise<void> {
-	try {
-		await chrome.offscreen.closeDocument();
-		console.log("[Background] Offscreen document closed");
-	} catch (error) {
-		// Document might not exist, ignore error
-		console.debug("[Background] Error closing offscreen document:", error);
-	}
-}
-
 // Create notification
 async function createNotification(
 	title: string,
