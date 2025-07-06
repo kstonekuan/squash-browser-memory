@@ -121,11 +121,25 @@ graph TD
 
 The extension supports two types of AI providers, configured via a factory pattern (`ai-provider-factory.ts`). The AI analysis is performed within the offscreen document, which communicates with the selected AI provider.
 
+**Provider Selection Flow:**
+1. User selects AI provider in Advanced Settings (side panel)
+2. Configuration is saved to Chrome storage
+3. When analysis starts, the offscreen document loads the configuration
+4. For Chrome AI: Uses the pre-initialized instance in the offscreen document
+5. For Claude: Creates a new Claude provider instance with the stored API key
+
 #### 4.1. Chrome AI (Local)
 - **Local Processing**: Uses Chrome's built-in Language Model API (no external API calls). The offscreen document creates a session with the local model.
 - **Privacy-First**: All data processing happens locally in the browser.
 - **Token Management**: Automatic chunking to stay within Chrome AI's token limits.
 - **Retry Logic**: Exponential backoff for quota-exceeded scenarios.
+- **Model Download**: Chrome AI requires a one-time download of the Gemini Nano model (~22GB). The download is managed by the offscreen document and continues even if the side panel is closed.
+- **Initialization Flow**: 
+  1. Side panel detects Chrome AI availability
+  2. Sends initialization request to background service worker
+  3. Background ensures offscreen document exists
+  4. Offscreen document handles Chrome AI initialization and download
+  5. Status updates are sent back to the side panel
 
 #### 4.2. Remote AI (e.g., Anthropic Claude)
 - **Remote Processing**: The offscreen document sends browsing history to a third-party API.

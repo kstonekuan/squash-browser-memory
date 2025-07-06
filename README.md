@@ -74,7 +74,8 @@ This feature will enable a new level of personalization across your AI-powered t
 ### 1. Chrome AI (Local)
 
 - **How it works**: Uses Chrome's built-in AI (Gemini Nano). Your browsing history **never leaves your device**.
-- **Requirements**: Chrome version 138 or later.
+- **Requirements**: Chrome version 138 or later with "Prompt API for Gemini Nano" flag enabled in chrome://flags.
+- **Model Download**: The first time you use Chrome AI, you'll need to download the AI model (approximately 22GB). The download continues even if you close the extension.
 - **Best for**: Users who prioritize privacy and want to perform analysis without an internet connection.
 
 ### 2. Anthropic Claude (Remote)
