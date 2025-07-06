@@ -76,7 +76,7 @@ function getStatusMessage(status: AIProviderStatus): string {
 			></div>
 		</div>
 		<p class="text-xs text-gray-600">
-			{Math.round(downloadProgress)}% complete - This is a one-time download of approximately 2GB
+			{Math.round(downloadProgress)}% complete - This is a one-time download of approximately 22GB
 		</p>
 	</div>
 {:else}
@@ -100,7 +100,7 @@ function getStatusMessage(status: AIProviderStatus): string {
 				Download Chrome AI Model
 			</button>
 			<div class="mt-2 text-xs text-gray-600">
-				<p>Click to download the AI model (approximately 2GB)</p>
+				<p>Click to download the AI model (approximately 22GB)</p>
 			</div>
 		</div>
 	{:else if status === 'unavailable' && providerName === 'Chrome AI'}

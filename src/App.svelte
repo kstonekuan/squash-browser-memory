@@ -1,4 +1,6 @@
 <script lang="ts">
+/// <reference types="@types/dom-chromium-ai" />
+
 import { onMount } from "svelte";
 import { match } from "ts-pattern";
 import AdvancedSettings from "./lib/AdvancedSettings.svelte";
@@ -205,29 +207,54 @@ async function checkInitialAIStatus() {
 		const provider = getProvider(config);
 		currentAIProvider = provider;
 
-		// Check current status
-		const status = await provider.getStatus();
-		currentAIStatus = status;
+		// For Chrome AI, check availability directly first
+		if (config.provider === "chrome" && typeof LanguageModel !== "undefined") {
+			const availability = await LanguageModel.availability();
+			console.log("[App] Chrome AI availability:", availability);
 
-		// For Chrome AI, if unavailable, try to initialize to check if it needs download
-		if (config.provider === "chrome" && status === "unavailable") {
-			try {
-				await provider.initialize(undefined, (progress) => {
-					aiDownloadProgress = progress;
-				});
+			if (availability === "downloading") {
+				// Chrome AI is currently downloading
+				aiIsDownloading = true;
+				currentAIStatus = "unavailable"; // Still unavailable until download completes
 
-				// Check if needs download
-				if (provider.needsDownload?.()) {
-					aiNeedsDownload = true;
-				} else {
-					// Re-check status after initialization attempt
+				// Initialize to attach progress callback to existing download
+				try {
+					await provider.initialize(undefined, (progress) => {
+						aiDownloadProgress = progress;
+					});
+					// After download completes, status will be available
 					const newStatus = await provider.getStatus();
 					currentAIStatus = newStatus;
+					aiIsDownloading = false;
+				} catch (error) {
+					console.error("Error attaching to Chrome AI download:", error);
+					aiIsDownloading = false;
 				}
-			} catch (error) {
-				// Keep status as unavailable
-				console.log("Chrome AI initialization check:", error);
+			} else if (availability === "available") {
+				currentAIStatus = "available";
+			} else if (availability === "downloadable") {
+				// Check if it needs download button
+				currentAIStatus = "unavailable";
+				try {
+					await provider.initialize(undefined, (progress) => {
+						aiDownloadProgress = progress;
+					});
+
+					// Check if needs download
+					if (provider.needsDownload?.()) {
+						aiNeedsDownload = true;
+					}
+				} catch (error) {
+					console.log("Chrome AI initialization check:", error);
+				}
+			} else {
+				// unavailable
+				currentAIStatus = "unavailable";
 			}
+		} else {
+			// Non-Chrome AI provider, use standard status check
+			const status = await provider.getStatus();
+			currentAIStatus = status;
 		}
 	} catch (error) {
 		console.error("Error checking initial AI status:", error);

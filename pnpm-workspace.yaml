@@ -1,6 +1,3 @@
 onlyBuiltDependencies:
   - '@tailwindcss/oxide'
   - esbuild
-
-overrides:
-  simple-chromium-ai: link:../simple-chromium-ai
