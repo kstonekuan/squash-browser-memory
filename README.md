@@ -1,6 +1,10 @@
 # Squash History Workflow Analyzer
 
-An intelligent Chrome extension that analyzes your browsing history to identify repetitive workflows, discover behavioral patterns, and suggest optimizations.
+Squash adds an invisible memory layer to your browser, compressing every click into portable context for any AI agent
+
+## Overview
+
+Squash is an ambient agent that watches high-level browser signals as you browse, learning how you think, decide, and work. It compresses those traces into portable, inspectable, and revocable on-device memory packs. When you use ChatGPT, Claude, or any other agent, Squash supplies the right context so the tool behaves like a teammate who already knows your style. We target AI power-users and prosumers who juggle many tools and hate re-explaining themselves.
 
 ## Features
 

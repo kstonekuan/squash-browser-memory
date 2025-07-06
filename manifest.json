@@ -2,7 +2,7 @@
 	"manifest_version": 3,
 	"name": "Squash History Workflow Analyzer",
 	"version": "1.0.0",
-	"description": "Analyze your browsing history to find repetitive workflows that can be automated",
+	"description": "Squash adds an invisible memory layer to your browser, compressing every click into portable context for any AI agent",
 	"minimum_chrome_version": "138",
 	"permissions": [
 		"history",
