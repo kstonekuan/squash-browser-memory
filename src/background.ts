@@ -587,6 +587,12 @@ onMessage("offscreen:keepalive", async () => {
 	return { success: true };
 });
 
+onMessage("offscreen:get-ai-config", async () => {
+	const { loadAIConfigFromStorage } = await import("./utils/ai-config");
+	const config = await loadAIConfigFromStorage();
+	return config;
+});
+
 // Handle errors
 self.addEventListener("error", (event) => {
 	console.error("Background script error:", event.error);

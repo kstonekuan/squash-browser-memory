@@ -1,7 +1,8 @@
 import { format } from "date-fns";
 import { describe, expect, it } from "vitest";
+import type { ChunkTimeRange } from "../types";
 import { createHalfDayChunks, createHistoryChunks } from "../utils/chunking";
-import type { ChunkTimeRange, HistoryChunk } from "../utils/memory";
+import type { HistoryChunk } from "../utils/memory";
 
 // Helper function to create test history items
 function createTestHistoryItem(

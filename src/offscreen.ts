@@ -1,5 +1,6 @@
 /// <reference types="@types/dom-chromium-ai" />
 
+import { loadAIConfigFromServiceWorker } from "./utils/ai-config";
 import { analyzeHistoryItems, type ProgressCallback } from "./utils/analyzer";
 import {
 	loadMemoryFromServiceWorker,
@@ -79,12 +80,14 @@ onMessage("offscreen:start-analysis", async (message) => {
 	startKeepalive();
 
 	try {
-		// Load memory before analysis
+		// Load memory and AI config before analysis
 		const memory = await loadMemoryFromServiceWorker();
+		const aiConfig = await loadAIConfigFromServiceWorker();
 
 		const result = await analyzeHistoryItems(
 			historyItems,
 			memory,
+			aiConfig,
 			customPrompts,
 			createProgressCallback(),
 			trigger,
@@ -96,11 +99,10 @@ onMessage("offscreen:start-analysis", async (message) => {
 
 		await sendProgress({ phase: "complete" });
 
-		// Send completion message (without memory to avoid duplicating it)
-		const { memory: _, ...resultWithoutMemory } = result;
+		// Send completion message
 		await sendMessage("offscreen:analysis-complete", {
 			analysisId,
-			result: resultWithoutMemory,
+			result: result,
 		});
 	} catch (error) {
 		const errorMessage =

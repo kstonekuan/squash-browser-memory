@@ -1,7 +1,7 @@
 <script lang="ts">
 import { format } from "date-fns";
 import { onMount } from "svelte";
-import type { AnalysisMemory } from "../utils/memory";
+import type { AnalysisMemory } from "../types";
 import { loadMemoryFromStorage } from "../utils/memory";
 import CollapsibleSection from "./CollapsibleSection.svelte";
 

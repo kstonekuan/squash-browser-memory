@@ -1,15 +1,6 @@
 import { format, isValid, parseISO } from "date-fns";
-import type { UserProfile, WorkflowPattern } from "../types";
+import type { AnalysisMemory } from "../types";
 import { sendMessage } from "./messaging";
-
-// Memory structure for accumulated analysis
-export interface AnalysisMemory {
-	userProfile: UserProfile;
-	patterns: WorkflowPattern[];
-	lastAnalyzedDate: Date;
-	lastHistoryTimestamp: number; // Timestamp of the most recent history item analyzed
-	version: string;
-}
 
 // Chunk of history for processing
 export interface HistoryChunk {
@@ -19,13 +10,6 @@ export interface HistoryChunk {
 	chunkIndex: number;
 	totalChunks: number;
 	isFallback?: boolean;
-}
-
-// Time range for a chunk
-export interface ChunkTimeRange {
-	startTime: number; // timestamp
-	endTime: number; // timestamp
-	description: string; // e.g., "Morning work session", "Evening browsing"
 }
 
 const MEMORY_KEY = "history_analysis_memory";

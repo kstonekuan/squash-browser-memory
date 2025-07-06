@@ -2,16 +2,15 @@
 
 import { format } from "date-fns";
 import type {
+	AnalysisMemory,
 	ChunkInfo,
 	FullAnalysisResult,
+	HistoryStats,
 	MemoryData,
 	UserProfile,
 	WorkflowPattern,
 } from "../types";
-import {
-	loadAIConfigFromServiceWorker,
-	loadAIConfigFromStorage,
-} from "./ai-config";
+import type { AIProviderConfig } from "./ai-interface";
 import { getProvider } from "./ai-provider-factory";
 import { getInitializedProvider, promptAI } from "./ai-provider-utils";
 import { createHistoryChunks, identifyChunks } from "./chunking";
@@ -21,7 +20,7 @@ import {
 	buildMergePrompt,
 	MERGE_SYSTEM_PROMPT,
 } from "./constants";
-import { type AnalysisMemory, createEmptyMemory } from "./memory";
+import { createEmptyMemory } from "./memory";
 import { ANALYSIS_SCHEMA, AnalysisResultSchema } from "./schemas";
 import {
 	calculateOptimalChunkSize,
@@ -33,26 +32,10 @@ import {
 // Re-export clearMemory for use in UI
 export { clearMemoryFromStorage as clearMemory } from "./memory";
 
-// Extended result type that includes memory
-interface AnalysisResultWithMemory extends FullAnalysisResult {
-	memory: AnalysisMemory;
-}
-
-// Detect if we're running in the offscreen document
-const isOffscreen =
-	typeof self !== "undefined" && self.location?.pathname?.includes("offscreen");
-
-// Use appropriate AI config function based on context
-const loadAIConfig = isOffscreen
-	? loadAIConfigFromServiceWorker
-	: loadAIConfigFromStorage;
-
 // Calculate statistics from Chrome history items
-export function calculateStats(items: chrome.history.HistoryItem[]): {
-	totalUrls: number;
-	topDomains: { domain: string; count: number }[];
-	dateRange: { start: Date; end: Date };
-} {
+export function calculateStats(
+	items: chrome.history.HistoryItem[],
+): HistoryStats {
 	if (!items || items.length === 0) {
 		return {
 			totalUrls: 0,
@@ -124,11 +107,12 @@ export interface CustomPrompts {
 export async function analyzeHistoryItems(
 	items: chrome.history.HistoryItem[],
 	memory: AnalysisMemory | null,
+	aiConfig: AIProviderConfig,
 	customPrompts?: CustomPrompts,
 	onProgress?: ProgressCallback,
 	_trigger: "manual" | "alarm" = "manual",
 	abortSignal?: AbortSignal,
-): Promise<AnalysisResultWithMemory> {
+): Promise<FullAnalysisResult> {
 	const analysisStartTime = performance.now();
 
 	// Check if already aborted
@@ -173,6 +157,7 @@ export async function analyzeHistoryItems(
 	}
 	const chunkingResult = await identifyChunks(
 		items,
+		aiConfig,
 		customPrompts?.chunkPrompt,
 	);
 	console.log(
@@ -204,18 +189,9 @@ export async function analyzeHistoryItems(
 
 	if (chunks.length === 0) {
 		return {
-			analysis: {
-				patterns: workingMemory.patterns,
-				totalUrls: stats.totalUrls,
-				dateRange: stats.dateRange,
-				topDomains: stats.topDomains,
-				userProfile: workingMemory.userProfile,
-			},
-			diagnostics: {
-				chunks: [],
-				chunkingRawResponse: chunkingResult.rawResponse,
-				chunkingError: chunkingResult.error,
-			},
+			stats,
+			chunks: [],
+			chunkingResult,
 			memory: workingMemory,
 		};
 	}
@@ -274,6 +250,7 @@ export async function analyzeHistoryItems(
 			const { results } = await analyzeChunkWithSubdivision(
 				chunk.items,
 				workingMemory,
+				aiConfig,
 				customPrompts,
 				onProgress,
 				abortSignal,
@@ -359,18 +336,9 @@ export async function analyzeHistoryItems(
 	console.log(`========================\n`);
 
 	return {
-		analysis: {
-			patterns: workingMemory.patterns,
-			totalUrls: stats.totalUrls,
-			dateRange: stats.dateRange,
-			topDomains: stats.topDomains,
-			userProfile: workingMemory.userProfile,
-		},
-		diagnostics: {
-			chunks: chunkInfos,
-			chunkingRawResponse: chunkingResult.rawResponse,
-			chunkingError: chunkingResult.error,
-		},
+		stats: stats,
+		chunks: chunkInfos,
+		chunkingResult: chunkingResult,
 		memory: workingMemory,
 	};
 }
@@ -379,6 +347,7 @@ export async function analyzeHistoryItems(
 async function mergeAnalysisResults(
 	memory: AnalysisMemory,
 	newResults: MemoryData,
+	aiConfig: AIProviderConfig,
 	customSystemPrompt?: string,
 	abortSignal?: AbortSignal,
 	onProgress?: ProgressCallback,
@@ -413,6 +382,7 @@ async function mergeAnalysisResults(
 	});
 
 	const provider = await getInitializedProvider(
+		aiConfig,
 		customSystemPrompt || MERGE_SYSTEM_PROMPT,
 	);
 
@@ -520,6 +490,7 @@ async function mergeAnalysisResults(
 async function analyzeChunkWithSubdivision(
 	items: chrome.history.HistoryItem[],
 	memory: AnalysisMemory,
+	aiConfig: AIProviderConfig,
 	customPrompts?: CustomPrompts,
 	onProgress?: ProgressCallback,
 	abortSignal?: AbortSignal,
@@ -543,6 +514,7 @@ async function analyzeChunkWithSubdivision(
 			// Step 1: Analyze the chunk
 			const chunkResults = await analyzeChunk(
 				items,
+				aiConfig,
 				customPrompts?.systemPrompt,
 				onProgress,
 				abortSignal,
@@ -556,6 +528,7 @@ async function analyzeChunkWithSubdivision(
 					: await mergeAnalysisResults(
 							memory,
 							chunkResults,
+							aiConfig,
 							customPrompts?.mergePrompt || MERGE_SYSTEM_PROMPT,
 							abortSignal,
 							onProgress,
@@ -569,8 +542,7 @@ async function analyzeChunkWithSubdivision(
 				error.name === "QuotaExceededError"
 			) {
 				// Get provider capabilities for better error messaging
-				const config = await loadAIConfig();
-				const provider = getProvider(config);
+				const provider = getProvider(aiConfig);
 				console.log(
 					`Chunk with ${items.length} items exceeds token limit for ${provider.getProviderName()}, subdividing...`,
 				);
@@ -584,12 +556,14 @@ async function analyzeChunkWithSubdivision(
 		console.log("Chunk too large, calculating optimal subdivision size...");
 
 		// Get provider capabilities for optimal chunking
-		const config = await loadAIConfig();
-		const providerForCapabilities = getProvider(config);
+		const providerForCapabilities = getProvider(aiConfig);
 		const capabilities = providerForCapabilities.getCapabilities();
 
 		// Initialize provider for token measurement
-		const provider = await getInitializedProvider(analysisSystemPrompt);
+		const provider = await getInitializedProvider(
+			aiConfig,
+			analysisSystemPrompt,
+		);
 		if (!provider) {
 			throw new Error("AI is not available for measuring tokens.");
 		}
@@ -664,6 +638,7 @@ async function analyzeChunkWithSubdivision(
 			// Step 1: Analyze sub-chunk
 			const subResults = await analyzeChunk(
 				subItems,
+				aiConfig,
 				analysisSystemPrompt,
 				undefined, // Don't pass onProgress to avoid duplicate updates
 				abortSignal,
@@ -679,6 +654,7 @@ async function analyzeChunkWithSubdivision(
 					: await mergeAnalysisResults(
 							currentMemory,
 							subResults,
+							aiConfig,
 							customPrompts?.mergePrompt || MERGE_SYSTEM_PROMPT,
 							abortSignal,
 							onProgress,
@@ -718,6 +694,7 @@ async function analyzeChunkWithSubdivision(
 // Analyze a single chunk of history items
 async function analyzeChunk(
 	items: chrome.history.HistoryItem[],
+	aiConfig: AIProviderConfig,
 	customSystemPrompt?: string,
 	onProgress?: ProgressCallback,
 	abortSignal?: AbortSignal,
@@ -735,6 +712,7 @@ async function analyzeChunk(
 	});
 
 	const provider = await getInitializedProvider(
+		aiConfig,
 		customSystemPrompt || ANALYSIS_SYSTEM_PROMPT,
 	);
 

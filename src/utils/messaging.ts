@@ -4,9 +4,9 @@
  */
 
 import { defineExtensionMessaging } from "@webext-core/messaging";
-import type { FullAnalysisResult } from "../types";
+import type { AnalysisMemory, FullAnalysisResult } from "../types";
+import type { AIProviderConfig } from "./ai-interface";
 import type { CustomPrompts } from "./analyzer";
-import type { AnalysisMemory } from "./memory";
 
 // Progress information for analysis
 export interface AnalysisProgress {
@@ -116,6 +116,9 @@ interface ProtocolMap {
 	"offscreen:keepalive": () => {
 		success: boolean;
 	};
+
+	// AI config management
+	"offscreen:get-ai-config": () => AIProviderConfig;
 }
 
 // Export the typed messaging functions

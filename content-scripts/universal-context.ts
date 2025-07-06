@@ -1,6 +1,6 @@
 // Universal content script for context button injection across platforms
 
-import type { AnalysisMemory } from "../src/utils/memory";
+import type { AnalysisMemory } from "../src/types";
 import { loadMemoryFromStorage } from "../src/utils/memory";
 
 interface PlatformConfig {

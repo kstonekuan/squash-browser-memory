@@ -7,22 +7,18 @@ import {
 	startOfDay,
 } from "date-fns";
 import type { z } from "zod/v4";
+import type { ChunkingResult, ChunkTimeRange } from "../types";
+import type { AIProviderConfig } from "./ai-interface";
 import { getInitializedProvider, promptAI } from "./ai-provider-utils";
 import { buildChunkingPrompt, CHUNK_SYSTEM_PROMPT } from "./constants";
-import type { ChunkTimeRange, HistoryChunk } from "./memory";
+import type { HistoryChunk } from "./memory";
 import { CHUNK_SCHEMA, ChunkSchema } from "./schemas";
 import { extractJSONFromResponse } from "./shared-utils";
-
-interface ChunkingResult {
-	timeRanges: ChunkTimeRange[];
-	rawResponse?: string;
-	error?: string;
-	isFallback: boolean;
-}
 
 // Analyze timestamps to identify natural browsing sessions
 export async function identifyChunks(
 	items: chrome.history.HistoryItem[],
+	aiConfig: AIProviderConfig,
 	customChunkPrompt?: string,
 ): Promise<ChunkingResult> {
 	if (items.length === 0) {
@@ -48,7 +44,11 @@ export async function identifyChunks(
 	// Recursively analyze timestamps in batches if too many
 	const MAX_TIMESTAMPS_PER_BATCH = 80; // Conservative limit to stay under token limits
 	if (timestamps.length > MAX_TIMESTAMPS_PER_BATCH) {
-		return await analyzeTimestampsInBatches(timestamps, customChunkPrompt);
+		return await analyzeTimestampsInBatches(
+			timestamps,
+			aiConfig,
+			customChunkPrompt,
+		);
 	}
 
 	const prompt = buildChunkingPrompt(timestamps);
@@ -59,6 +59,7 @@ export async function identifyChunks(
 	console.log("======================\n");
 
 	const provider = await getInitializedProvider(
+		aiConfig,
 		customChunkPrompt || CHUNK_SYSTEM_PROMPT,
 	);
 
@@ -151,6 +152,7 @@ export async function identifyChunks(
 // Helper to analyze large timestamp sets in batches
 async function analyzeTimestampsInBatches(
 	timestamps: number[],
+	aiConfig: AIProviderConfig,
 	customChunkPrompt?: string,
 ): Promise<ChunkingResult> {
 	const MAX_TIMESTAMPS_PER_BATCH = 80;
@@ -174,6 +176,7 @@ async function analyzeTimestampsInBatches(
 		try {
 			const batchResult = await identifyChunksForBatch(
 				batchItems,
+				aiConfig,
 				customChunkPrompt,
 			);
 
@@ -205,6 +208,7 @@ async function analyzeTimestampsInBatches(
 // Helper to identify chunks for a batch (without recursion)
 async function identifyChunksForBatch(
 	items: chrome.history.HistoryItem[],
+	aiConfig: AIProviderConfig,
 	customChunkPrompt?: string,
 ): Promise<ChunkingResult> {
 	if (items.length === 0) {
@@ -235,6 +239,7 @@ async function identifyChunksForBatch(
 	console.log("=============================\n");
 
 	const provider = await getInitializedProvider(
+		aiConfig,
 		customChunkPrompt || CHUNK_SYSTEM_PROMPT,
 	);
 

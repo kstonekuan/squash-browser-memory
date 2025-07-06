@@ -11,12 +11,22 @@ const DEFAULT_CONFIG: AIProviderConfig = {
 };
 
 /**
- * Load AI config for offscreen context (returns default config)
- * Could be extended to use message passing if needed
+ * Load AI config for offscreen context by communicating with the service worker
  */
 export async function loadAIConfigFromServiceWorker(): Promise<AIProviderConfig> {
-	console.log("AI config in offscreen context, using default");
-	return DEFAULT_CONFIG;
+	try {
+		// Import messaging only when needed to avoid circular dependencies
+		const { sendMessage } = await import("./messaging");
+		const config = await sendMessage("offscreen:get-ai-config", undefined);
+		console.log("Loaded AI config from service worker:", {
+			provider: config.provider,
+		});
+		return config;
+	} catch (error) {
+		console.error("Failed to load AI config from service worker:", error);
+		console.log("Falling back to default config");
+		return DEFAULT_CONFIG;
+	}
 }
 
 /**

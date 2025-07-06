@@ -4,8 +4,7 @@
  * AI Provider Utilities - Helper functions for working with AI providers
  */
 
-import { loadAIConfigFromStorage } from "./ai-config";
-import type { AIProvider } from "./ai-interface";
+import type { AIProvider, AIProviderConfig } from "./ai-interface";
 import { getProvider } from "./ai-provider-factory";
 
 // Store the current provider instance
@@ -14,13 +13,16 @@ let isInitialized = false;
 
 /**
  * Get or create an initialized AI provider using the current configuration
+ * @param systemPrompt Optional system prompt to use
+ * @param onDownloadProgress Optional callback for download progress
+ * @param config Optional AI provider config to use instead of loading from storage
  */
 export async function getInitializedProvider(
+	config: AIProviderConfig,
 	systemPrompt?: string,
 	onDownloadProgress?: (progress: number) => void,
 ): Promise<AIProvider | null> {
 	try {
-		const config = await loadAIConfigFromStorage();
 		const provider = getProvider(config);
 
 		// Check if we need to reinitialize (different provider or not initialized)
