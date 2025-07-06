@@ -1,4 +1,4 @@
-# History Workflow Analyzer
+# Squash History Workflow Analyzer
 
 An intelligent Chrome extension that analyzes your browsing history to identify repetitive workflows, discover behavioral patterns, and suggest optimizations.
 

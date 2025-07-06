@@ -1,6 +1,6 @@
 {
 	"manifest_version": 3,
-	"name": "History Workflow Analyzer",
+	"name": "Squash History Workflow Analyzer",
 	"version": "1.0.0",
 	"description": "Analyze your browsing history to find repetitive workflows that can be automated",
 	"minimum_chrome_version": "138",

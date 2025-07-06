@@ -1,4 +1,4 @@
-# History Workflow Analyzer - Architecture Documentation
+# Squash History Workflow Analyzer - Architecture Documentation
 
 ## Overview
 
