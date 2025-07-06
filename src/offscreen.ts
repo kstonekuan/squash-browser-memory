@@ -39,11 +39,12 @@ function createDownloadProgressCallback(): (progress: number) => void {
 	let lastLoggedProgress = 0;
 	return (progress: number) => {
 		const roundedProgress = Math.round(progress);
-		const tens = Math.floor(roundedProgress / 10) * 10;
 
-		if (tens > lastLoggedProgress) {
-			console.log(`[Offscreen] Chrome AI download progress: ${tens}%`);
-			lastLoggedProgress = tens;
+		if (roundedProgress % 10 === 0 && roundedProgress > lastLoggedProgress) {
+			console.log(
+				`[Offscreen] Chrome AI download progress: ${roundedProgress}% (Might be inaccurate)`,
+			);
+			lastLoggedProgress = roundedProgress;
 		}
 	};
 }
