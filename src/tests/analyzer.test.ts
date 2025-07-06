@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { calculateStats, hideTrackingParams } from "../utils/analyzer";
+import { calculateStats } from "../utils/analyzer";
 import { buildAnalysisPrompt } from "../utils/constants";
+import { hideTrackingParams } from "../utils/shared-utils";
 
 describe("calculateStats", () => {
 	it("should calculate stats for empty array", () => {

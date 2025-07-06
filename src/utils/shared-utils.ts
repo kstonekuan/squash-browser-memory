@@ -111,3 +111,115 @@ export async function calculateOptimalChunkSize(
 
 	return optimalSize;
 }
+
+/**
+ * Hide tracking URL parameters (copied from analyzer.ts)
+ */
+export function hideTrackingParams(
+	params: Record<string, string>,
+): Record<string, string> {
+	const filtered: Record<string, string> = {};
+
+	// Known tracking/analytics parameters that don't help with browsing pattern analysis
+	const trackingParams = new Set([
+		"utm_source",
+		"utm_medium",
+		"utm_campaign",
+		"utm_term",
+		"utm_content",
+		"gclid",
+		"gbraid",
+		"wbraid",
+		"ga_",
+		"gad_source",
+		"fbclid",
+		"fb_action_ids",
+		"fb_action_types",
+		"msclkid",
+		"yclid",
+		"ei",
+		"sei",
+		"ved",
+		"uact",
+		"sca_esv",
+		"gs_lp",
+		"gs_lcrp",
+		"sclient",
+		"iflsig",
+		"aqs",
+		"sourceid",
+		"ie",
+		"oe",
+		"sid",
+		"sessionid",
+		"vid",
+		"cid",
+		"client_id",
+		"s_kwcid",
+		"ef_id",
+		"ref",
+		"referer",
+		"referrer",
+		"source",
+	]);
+
+	for (const [key, value] of Object.entries(params)) {
+		const lowerKey = key.toLowerCase();
+		const isTrackingParam =
+			trackingParams.has(lowerKey) || /^(utm_|ga_|fb_|__)/i.test(key);
+
+		if (isTrackingParam) {
+			filtered[key] = "<hidden>";
+		} else {
+			filtered[key] = value;
+		}
+	}
+
+	return filtered;
+}
+
+/**
+ * Parse a URL and extract domain, path, and params with tracking params hidden
+ */
+export function parseHistoryItemUrl(item: chrome.history.HistoryItem): {
+	d: string;
+	p: string;
+	q?: Record<string, string>;
+	t: string;
+	ts: number;
+	v: number;
+} {
+	const urlParts: {
+		domain: string;
+		path: string;
+		params: Record<string, string>;
+	} = { domain: "", path: "", params: {} };
+
+	try {
+		if (item.url) {
+			const url = new URL(item.url);
+			urlParts.domain = url.hostname;
+			urlParts.path = url.pathname;
+
+			const params: Record<string, string> = {};
+			url.searchParams.forEach((value, key) => {
+				params[key] = value;
+			});
+			urlParts.params = hideTrackingParams(params);
+		}
+	} catch {
+		const match = item.url?.match(/^https?:\/\/([^/]+)/);
+		if (match) {
+			urlParts.domain = match[1];
+		}
+	}
+
+	return {
+		d: urlParts.domain,
+		p: urlParts.path || "",
+		q: Object.keys(urlParts.params).length > 0 ? urlParts.params : undefined,
+		t: item.title || "",
+		ts: item.lastVisitTime || 0,
+		v: item.visitCount || 0,
+	};
+}

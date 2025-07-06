@@ -3,29 +3,13 @@
 
 import { format } from "date-fns";
 import { match } from "ts-pattern";
+import {
+	loadAutoAnalysisSettings,
+	saveAutoAnalysisSettings,
+} from "./utils/ambient";
 import { loadMemory, saveMemory } from "./utils/memory";
 import type { AnalysisProgress } from "./utils/messaging";
 import { onMessage, sendMessage } from "./utils/messaging";
-
-// Settings key for auto-analysis configuration
-const AUTO_ANALYSIS_SETTINGS_KEY = "auto_analysis_settings";
-
-interface AutoAnalysisSettings {
-	enabled: boolean;
-	notifyOnSuccess: boolean;
-	notifyOnError: boolean;
-	lastRunTimestamp?: number;
-	lastRunStatus?: "success" | "error";
-	lastRunError?: string;
-	nextAlarmTime?: number; // Actual scheduled Chrome alarm time
-}
-
-// Default settings
-const defaultAutoAnalysisSettings: AutoAnalysisSettings = {
-	enabled: false,
-	notifyOnSuccess: true,
-	notifyOnError: true,
-};
 
 // Track analysis state
 let isAnalysisRunning = false;
@@ -84,24 +68,6 @@ async function _closeOffscreenDocument(): Promise<void> {
 		// Document might not exist, ignore error
 		console.debug("[Background] Error closing offscreen document:", error);
 	}
-}
-
-// Load auto-analysis settings
-async function loadAutoAnalysisSettings(): Promise<AutoAnalysisSettings> {
-	const result = await chrome.storage.local.get(AUTO_ANALYSIS_SETTINGS_KEY);
-	return {
-		...defaultAutoAnalysisSettings,
-		...(result[AUTO_ANALYSIS_SETTINGS_KEY] || {}),
-	};
-}
-
-// Save auto-analysis settings
-async function saveAutoAnalysisSettings(
-	settings: AutoAnalysisSettings,
-): Promise<void> {
-	await chrome.storage.local.set({
-		[AUTO_ANALYSIS_SETTINGS_KEY]: settings,
-	});
 }
 
 // Create notification

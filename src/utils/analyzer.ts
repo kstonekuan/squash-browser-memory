@@ -29,13 +29,11 @@ import {
 	calculateOptimalChunkSize,
 	extractJSONFromResponse,
 	getMostRecentTimestamp,
+	parseHistoryItemUrl,
 } from "./shared-utils";
 
 // Re-export clearMemory for use in UI
 export { clearMemory } from "./memory";
-
-// Export for testing
-export { hideTrackingParams };
 
 // Calculate statistics from Chrome history items
 export function calculateStats(items: chrome.history.HistoryItem[]): {
@@ -91,11 +89,16 @@ export function calculateStats(items: chrome.history.HistoryItem[]): {
 
 // Progress callback type with more detailed information
 export type ProgressCallback = (info: {
-	phase: "calculating" | "chunking" | "analyzing";
+	phase: "calculating" | "chunking" | "analyzing" | "complete" | "error";
 	currentChunk?: number;
 	totalChunks?: number;
 	chunkDescription?: string;
 	subPhase?: "sending-analysis" | "sending-merge" | "processing";
+	chunkProgress?: {
+		current: number;
+		total: number;
+		description: string;
+	};
 }) => void;
 
 // Custom prompts interface
@@ -110,6 +113,7 @@ export async function analyzeHistoryItems(
 	items: chrome.history.HistoryItem[],
 	customPrompts?: CustomPrompts,
 	onProgress?: ProgressCallback,
+	_trigger: "manual" | "alarm" = "manual",
 	abortSignal?: AbortSignal,
 ): Promise<FullAnalysisResult> {
 	const analysisStartTime = performance.now();
@@ -124,7 +128,11 @@ export async function analyzeHistoryItems(
 	if (onProgress)
 		onProgress({
 			phase: "calculating",
-			chunkDescription: `Processing ${items.length} history items`,
+			chunkProgress: {
+				current: 0,
+				total: 0,
+				description: `Processing ${items.length} history items`,
+			},
 		});
 	const stats = calculateStats(items);
 
@@ -146,7 +154,11 @@ export async function analyzeHistoryItems(
 		console.log("[Analyzer] Reporting chunking phase start");
 		onProgress({
 			phase: "chunking",
-			chunkDescription: `Analyzing ${items.length} items for time patterns`,
+			chunkProgress: {
+				current: 0,
+				total: 0,
+				description: `Analyzing ${items.length} items for time patterns`,
+			},
 		});
 	}
 	const chunkingResult = await identifyChunks(
@@ -172,7 +184,11 @@ export async function analyzeHistoryItems(
 		);
 		onProgress({
 			phase: "chunking",
-			chunkDescription: `Identified ${chunks.length} browsing sessions`,
+			chunkProgress: {
+				current: 0,
+				total: chunks.length,
+				description: `Identified ${chunks.length} browsing sessions`,
+			},
 		});
 	}
 
@@ -231,9 +247,11 @@ export async function analyzeHistoryItems(
 			);
 			onProgress({
 				phase: "analyzing",
-				currentChunk: processedChunks,
-				totalChunks,
-				chunkDescription: `${chunk.items.length} items from ${format(chunk.startTime, "PP")} - ${format(chunk.endTime, "PP")}`,
+				chunkProgress: {
+					current: processedChunks,
+					total: totalChunks,
+					description: `${chunk.items.length} items from ${new Date(chunk.startTime).toLocaleDateString()} - ${new Date(chunk.endTime).toLocaleDateString()}`,
+				},
 			});
 		}
 
@@ -339,81 +357,6 @@ export async function analyzeHistoryItems(
 			chunkingError: chunkingResult.error,
 		},
 	};
-}
-
-// Hide tracking URL parameters to reduce token usage and protect privacy
-function hideTrackingParams(
-	params: Record<string, string>,
-): Record<string, string> {
-	const filtered: Record<string, string> = {};
-
-	// Known tracking/analytics parameters that don't help with browsing pattern analysis
-	const trackingParams = new Set([
-		// Google Analytics & Ads
-		"utm_source",
-		"utm_medium",
-		"utm_campaign",
-		"utm_term",
-		"utm_content",
-		"gclid",
-		"gbraid",
-		"wbraid",
-		"ga_",
-		"gad_source",
-		// Facebook
-		"fbclid",
-		"fb_action_ids",
-		"fb_action_types",
-		// Microsoft/Bing
-		"msclkid",
-		// Yahoo
-		"yclid",
-		// Google Search specific
-		"ei",
-		"sei",
-		"ved",
-		"uact",
-		"sca_esv",
-		"gs_lp",
-		"gs_lcrp",
-		"sclient",
-		"iflsig",
-		"aqs",
-		"sourceid",
-		"ie",
-		"oe",
-		// Session/tracking IDs
-		"sid",
-		"sessionid",
-		"vid",
-		"cid",
-		"client_id",
-		// Adobe Analytics
-		"s_kwcid",
-		"ef_id",
-		// Other common tracking
-		"ref",
-		"referer",
-		"referrer",
-		"source",
-	]);
-
-	for (const [key, value] of Object.entries(params)) {
-		const lowerKey = key.toLowerCase();
-
-		// Check if it's a tracking parameter
-		const isTrackingParam =
-			trackingParams.has(lowerKey) || /^(utm_|ga_|fb_|__)/i.test(key);
-
-		if (isTrackingParam) {
-			filtered[key] = "<hidden>"; // Make it clear the value was hidden
-		} else {
-			// Keep all non-tracking parameters intact - they may contain meaningful data
-			filtered[key] = value;
-		}
-	}
-
-	return filtered;
 }
 
 // Merge new analysis results with existing results using LLM
@@ -577,42 +520,7 @@ async function analyzeChunkWithSubdivision(
 			customPrompts?.systemPrompt || ANALYSIS_SYSTEM_PROMPT;
 
 		// Build a test prompt to check token count
-		const testHistoryData = items.map((item) => {
-			const urlParts: {
-				domain: string;
-				path: string;
-				params: Record<string, string>;
-			} = { domain: "", path: "", params: {} };
-
-			try {
-				if (item.url) {
-					const url = new URL(item.url);
-					urlParts.domain = url.hostname;
-					urlParts.path = url.pathname;
-
-					const params: Record<string, string> = {};
-					url.searchParams.forEach((value, key) => {
-						params[key] = value;
-					});
-					urlParts.params = hideTrackingParams(params);
-				}
-			} catch {
-				const match = item.url?.match(/^https?:\/\/([^/]+)/);
-				if (match) {
-					urlParts.domain = match[1];
-				}
-			}
-
-			return {
-				d: urlParts.domain,
-				p: urlParts.path || "",
-				q:
-					Object.keys(urlParts.params).length > 0 ? urlParts.params : undefined,
-				t: item.title || "",
-				ts: item.lastVisitTime || 0,
-				v: item.visitCount || 0,
-			};
-		});
+		const testHistoryData = items.map(parseHistoryItemUrl);
 
 		// First, try to analyze the entire chunk
 		try {
@@ -732,9 +640,11 @@ async function analyzeChunkWithSubdivision(
 						: "";
 				onProgress({
 					phase: "analyzing",
-					currentChunk: chunkNumber || subChunkNum,
-					totalChunks: totalChunks || totalSubChunks,
-					chunkDescription: `${mainChunkInfo}Processing ${subItems.length} items (sub-chunk ${subChunkNum}/${totalSubChunks})`,
+					chunkProgress: {
+						current: chunkNumber || subChunkNum,
+						total: totalChunks || totalSubChunks,
+						description: `${mainChunkInfo}Processing ${subItems.length} items (sub-chunk ${subChunkNum}/${totalSubChunks})`,
+					},
 				});
 			}
 
@@ -800,44 +710,7 @@ async function analyzeChunk(
 	abortSignal?: AbortSignal,
 ): Promise<{ userProfile: UserProfile; patterns: WorkflowPattern[] }> {
 	// Parse URLs for all items
-	const historyData = items.map((item) => {
-		const urlParts: {
-			domain: string;
-			path: string;
-			params: Record<string, string>;
-		} = { domain: "", path: "", params: {} };
-
-		try {
-			if (item.url) {
-				const url = new URL(item.url);
-				urlParts.domain = url.hostname;
-				urlParts.path = url.pathname;
-
-				// Extract parameters and shorten long values
-				const params: Record<string, string> = {};
-				url.searchParams.forEach((value, key) => {
-					params[key] = value;
-				});
-				urlParts.params = hideTrackingParams(params);
-			}
-		} catch {
-			// Invalid URL - try to extract domain from URL string
-			const match = item.url?.match(/^https?:\/\/([^/]+)/);
-			if (match) {
-				urlParts.domain = match[1];
-			}
-		}
-
-		// Return structured data with ALL information preserved
-		return {
-			d: urlParts.domain, // domain
-			p: urlParts.path || "", // full path
-			q: Object.keys(urlParts.params).length > 0 ? urlParts.params : undefined, // all query params
-			t: item.title || "", // full title
-			ts: item.lastVisitTime || 0, // timestamp
-			v: item.visitCount || 0, // visit count
-		};
-	});
+	const historyData = items.map(parseHistoryItemUrl);
 
 	// Build the analysis prompt
 	const prompt = buildAnalysisPrompt(items, historyData);
