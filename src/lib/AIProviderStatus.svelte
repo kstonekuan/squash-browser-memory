@@ -6,14 +6,12 @@ let {
 	providerType = "chrome",
 	needsDownload = false,
 	isDownloading = false,
-	downloadProgress = 0,
 	onDownloadClick,
 } = $props<{
 	status?: AIProviderStatus;
 	providerType?: AIProviderType;
 	needsDownload?: boolean;
 	isDownloading?: boolean;
-	downloadProgress?: number;
 	onDownloadClick?: () => void;
 }>();
 
@@ -69,14 +67,8 @@ function getStatusMessage(status: AIProviderStatus): string {
 			<div class="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
 			<span>Downloading Chrome AI model...</span>
 		</div>
-		<div class="w-full bg-gray-200 rounded-full h-2">
-			<div 
-				class="bg-blue-600 h-2 rounded-full transition-all duration-300"
-				style="width: {downloadProgress}%"
-			></div>
-		</div>
-		<p class="text-xs text-gray-600">
-			{Math.round(downloadProgress)}% complete - This is a one-time download of approximately 22GB
+		<p class="text-xs text-gray-600 mt-2">
+			This is a one-time download of approximately 22GB. The download will continue even if you close this panel.
 		</p>
 	</div>
 {:else}

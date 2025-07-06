@@ -119,6 +119,21 @@ interface ProtocolMap {
 
 	// AI config management
 	"offscreen:get-ai-config": () => AIProviderConfig;
+
+	// Chrome AI initialization (from sidepanel to background)
+	"chrome-ai:initialize": () => void;
+
+	"chrome-ai:trigger-download": () => void;
+
+	// Chrome AI initialization (from background to offscreen)
+	"offscreen:initialize-chrome-ai": () => void;
+
+	"offscreen:trigger-chrome-ai-download": () => void;
+
+	"offscreen:chrome-ai-status": (data: {
+		status: "initializing" | "downloading" | "available" | "error";
+		error?: string;
+	}) => void;
 }
 
 // Export the typed messaging functions

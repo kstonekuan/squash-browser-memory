@@ -1,6 +1,8 @@
 /// <reference types="@types/dom-chromium-ai" />
 
 import { loadAIConfigFromServiceWorker } from "./utils/ai-config";
+import type { AIProvider } from "./utils/ai-interface";
+import { getProvider, setChromeProvider } from "./utils/ai-provider-factory";
 import { analyzeHistoryItems, type ProgressCallback } from "./utils/analyzer";
 import {
 	loadMemoryFromServiceWorker,
@@ -19,6 +21,10 @@ import { onMessage, sendMessage } from "./utils/messaging";
 // Track active analyses
 const activeAnalyses = new Map<string, AbortController>();
 let currentAnalysisId: string | null = null;
+
+// Chrome AI provider instance
+let chromeAIProvider: AIProvider | null = null;
+let isInitializingChromeAI = false;
 
 // Keepalive interval
 let keepaliveInterval: number | null = null;
@@ -83,6 +89,12 @@ onMessage("offscreen:start-analysis", async (message) => {
 		// Load memory and AI config before analysis
 		const memory = await loadMemoryFromServiceWorker();
 		const aiConfig = await loadAIConfigFromServiceWorker();
+
+		// If using Chrome AI and we have an initialized instance, update the factory
+		if (aiConfig.provider === "chrome" && chromeAIProvider) {
+			// Use our already initialized Chrome AI provider
+			setChromeProvider(chromeAIProvider);
+		}
 
 		const result = await analyzeHistoryItems(
 			historyItems,
@@ -165,6 +177,100 @@ onMessage("offscreen:write-memory", async (message) => {
 onMessage("offscreen:keepalive", async () => {
 	// Just acknowledge keepalive
 	return { success: true };
+});
+
+// Handle Chrome AI initialization
+onMessage("offscreen:initialize-chrome-ai", async () => {
+	if (isInitializingChromeAI || chromeAIProvider) {
+		console.log("[Offscreen] Chrome AI already initialized or initializing");
+		return;
+	}
+
+	isInitializingChromeAI = true;
+
+	try {
+		await sendMessage("offscreen:chrome-ai-status", {
+			status: "initializing",
+		});
+
+		const config = await loadAIConfigFromServiceWorker();
+		if (config.provider !== "chrome") {
+			throw new Error("Not using Chrome AI provider");
+		}
+
+		chromeAIProvider = getProvider(config);
+
+		// Check if Chrome AI is already downloading
+		if (typeof LanguageModel !== "undefined") {
+			const availability = await LanguageModel.availability();
+			if (availability === "downloading") {
+				// Already downloading, just wait for it to complete
+				await sendMessage("offscreen:chrome-ai-status", {
+					status: "downloading",
+				});
+
+				// Initialize to wait for download to complete
+				await chromeAIProvider.initialize();
+
+				// Download should be complete now
+				await sendMessage("offscreen:chrome-ai-status", {
+					status: "available",
+				});
+				return;
+			}
+		}
+
+		// Initialize without progress callback
+		await chromeAIProvider.initialize();
+
+		// Check if it needs download
+		if (chromeAIProvider.needsDownload?.()) {
+			// Model needs to be downloaded, send error status with needs-download message
+			await sendMessage("offscreen:chrome-ai-status", {
+				status: "error",
+				error: "needs-download",
+			});
+		} else {
+			await sendMessage("offscreen:chrome-ai-status", {
+				status: "available",
+			});
+		}
+	} catch (error) {
+		console.error("[Offscreen] Failed to initialize Chrome AI:", error);
+		await sendMessage("offscreen:chrome-ai-status", {
+			status: "error",
+			error: error instanceof Error ? error.message : "Unknown error",
+		});
+		chromeAIProvider = null;
+	} finally {
+		isInitializingChromeAI = false;
+	}
+});
+
+// Handle Chrome AI download trigger
+onMessage("offscreen:trigger-chrome-ai-download", async () => {
+	if (!chromeAIProvider || !chromeAIProvider.triggerModelDownload) {
+		console.error("[Offscreen] No Chrome AI provider or download trigger");
+		return;
+	}
+
+	try {
+		await sendMessage("offscreen:chrome-ai-status", {
+			status: "downloading",
+		});
+
+		await chromeAIProvider.triggerModelDownload();
+
+		await sendMessage("offscreen:chrome-ai-status", {
+			status: "available",
+		});
+	} catch (error) {
+		console.error("[Offscreen] Failed to download Chrome AI model:", error);
+		await sendMessage("offscreen:chrome-ai-status", {
+			status: "error",
+			error: error instanceof Error ? error.message : "Download failed",
+		});
+	}
 });
 
 console.log("[Offscreen] Document initialized");

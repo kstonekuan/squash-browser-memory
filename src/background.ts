@@ -3,6 +3,7 @@
 
 import { format } from "date-fns";
 import { match } from "ts-pattern";
+import type { AIProviderConfig } from "./utils/ai-interface";
 import {
 	loadAutoAnalysisSettings,
 	saveAutoAnalysisSettings,
@@ -578,9 +579,52 @@ onMessage("offscreen:keepalive", async () => {
 });
 
 onMessage("offscreen:get-ai-config", async () => {
-	const { loadAIConfigFromStorage } = await import("./utils/ai-config");
-	const config = await loadAIConfigFromStorage();
-	return config;
+	// Directly load config here to avoid import issues
+	try {
+		const AI_CONFIG_KEY = "ai_provider_config";
+		const result = await chrome.storage.local.get(AI_CONFIG_KEY);
+		const stored = result[AI_CONFIG_KEY];
+
+		if (stored?.provider && ["chrome", "claude"].includes(stored.provider)) {
+			console.log("[Background] Loaded AI config for offscreen:", {
+				provider: stored.provider,
+			});
+			return stored as AIProviderConfig;
+		}
+
+		console.log("[Background] No valid AI config found, using default");
+		return { provider: "chrome" } as AIProviderConfig;
+	} catch (error) {
+		console.error("[Background] Failed to load AI config:", error);
+		return { provider: "chrome" } as AIProviderConfig;
+	}
+});
+
+onMessage("offscreen:chrome-ai-status", async (message) => {
+	// Forward Chrome AI status updates to sidepanel
+	try {
+		await sendMessage("offscreen:chrome-ai-status", message.data);
+		console.log(
+			"[Background] Forwarded Chrome AI status to side panel:",
+			message.data.status,
+		);
+	} catch (err) {
+		// Side panel might be closed
+		console.debug("[Background] Failed to forward Chrome AI status:", err);
+	}
+});
+
+// Handle Chrome AI initialization requests from sidepanel
+onMessage("chrome-ai:initialize", async () => {
+	await ensureOffscreenDocument();
+	// Forward the message to the offscreen document
+	await sendMessage("offscreen:initialize-chrome-ai");
+});
+
+onMessage("chrome-ai:trigger-download", async () => {
+	await ensureOffscreenDocument();
+	// Forward the message to the offscreen document
+	await sendMessage("offscreen:trigger-chrome-ai-download");
 });
 
 // Handle errors
