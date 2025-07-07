@@ -93,3 +93,5 @@ See [ARCHITECTURE.md](./ARCHITECTURE.md) for technical details.
 
 - [Simple Chromium AI](https://github.com/kstonekuan/simple-chromium-ai) - Our open source library for Chrome's built-in AI capabilities
 - [Mem0 Chrome Extension](https://github.com/mem0ai/mem0-chrome-extension/) - Inspiration for context injection UX
+- [Chrome AI Prompt API](https://developer.chrome.com/docs/ai/prompt-api) - Official documentation for Chrome's built-in AI
+- [Anthropic TypeScript SDK](https://docs.anthropic.com/en/api/client-sdks#typescript) - Official SDK for Claude API integration
