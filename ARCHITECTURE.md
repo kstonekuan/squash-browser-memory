@@ -74,7 +74,7 @@ The extension follows Chrome's Manifest V3 specification:
 
 **Key Permissions:**
 - `history`: Access to Chrome browsing history
-- `storage` & `unlimitedStorage`: Local data persistence for settings and memory.
+- `storage`: Local data persistence for settings and memory.
 - `sidePanel`: Side panel UI integration.
 - `activeTab`: For context injection on supported sites.
 - `alarms` & `notifications`: For ambient background analysis.
