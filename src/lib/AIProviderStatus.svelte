@@ -1,9 +1,14 @@
 <script lang="ts">
 import type { AIProviderStatus, AIProviderType } from "../utils/ai-interface";
 
-let { status = "unavailable", providerType = "chrome" } = $props<{
+let {
+	status = "unavailable",
+	providerType = "chrome",
+	onRefresh,
+} = $props<{
 	status?: AIProviderStatus;
 	providerType?: AIProviderType;
+	onRefresh?: () => void;
 }>();
 
 let providerName = $derived(providerType === "chrome" ? "Chrome AI" : "Claude");
@@ -71,6 +76,14 @@ function getStatusMessage(status: AIProviderStatus): string {
 			<li>Enable "Prompt API for Gemini Nano" in chrome://flags</li>
 			<li>Update "Optimization Guide On Device Model" in chrome://components</li>
 		</ul>
+		{#if onRefresh}
+			<button
+				onclick={onRefresh}
+				class="mt-3 px-3 py-1.5 bg-blue-600 text-white text-xs font-medium rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+			>
+				Check Status Again
+			</button>
+		{/if}
 	</div>
 {:else if status === 'unavailable'}
 	<div class="mt-2 text-xs text-gray-600">

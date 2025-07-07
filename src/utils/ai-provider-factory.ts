@@ -58,14 +58,6 @@ export function getProviderDisplayName(type: AIProviderType): string {
 }
 
 /**
- * Reset Chrome AI provider instance
- * Used when side panel is reopened to ensure proper initialization flow
- */
-export function resetChromeProvider(): void {
-	chromeProvider = null;
-}
-
-/**
  * Set Chrome AI provider instance
  * Used by offscreen document to set the initialized provider
  */

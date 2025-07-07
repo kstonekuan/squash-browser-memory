@@ -607,6 +607,21 @@ onMessage("chrome-ai:initialize", async () => {
 	await sendMessage("offscreen:initialize-chrome-ai");
 });
 
+// Forward Chrome AI status updates from offscreen to sidepanel
+onMessage("offscreen:chrome-ai-status", async (message) => {
+	try {
+		// Forward to sidepanel
+		await sendMessage("offscreen:chrome-ai-status", message.data);
+		console.log(
+			"[Background] Forwarded Chrome AI status to sidepanel:",
+			message.data.status,
+		);
+	} catch (err) {
+		// Sidepanel might be closed
+		console.debug("[Background] Failed to forward Chrome AI status:", err);
+	}
+});
+
 // Handle errors
 self.addEventListener("error", (event) => {
 	console.error("Background script error:", event.error);
