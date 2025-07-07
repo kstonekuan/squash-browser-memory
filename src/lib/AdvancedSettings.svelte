@@ -379,7 +379,7 @@ function formatLastRunTime(): string {
 								Enable Hourly Analysis
 							</label>
 							<p class="text-xs text-gray-500 mt-1">
-								Automatically analyze new browsing history every hour ambiently
+								Automatically analyze new browsing events every hour ambiently
 							</p>
 						</div>
 						<div class="ml-4">

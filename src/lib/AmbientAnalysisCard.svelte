@@ -165,7 +165,7 @@ function getNextAnalysisTime(): string {
 			</div>
 			
 			<p class="text-xs text-gray-600 mb-2">
-				Automatically analyze browsing history every hour to discover patterns.
+				Automatically analyze browsing events every hour to discover patterns.
 			</p>
 
 			{#if settings.lastRunTimestamp}

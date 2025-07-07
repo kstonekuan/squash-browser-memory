@@ -1598,8 +1598,8 @@ class ContextButtonInjector {
 			// Clear the element first
 			element.innerHTML = "";
 
-			// Split text by newlines and create text nodes with <div> or <br> elements
-			const lines = text.split("\n");
+			// Split text by newlines (handle both \r\n and \n) and create text nodes with <div> or <br> elements
+			const lines = text.split(/\r?\n/);
 			lines.forEach((line, index) => {
 				if (line.trim() === "") {
 					// Empty line - add a <br> for spacing
@@ -1648,8 +1648,9 @@ class ContextButtonInjector {
 			const formattedProfile = this.formatStructuredProfile(matchingContexts);
 
 			const currentText = this.chatInput.getCurrentText();
+			const crlf = String.fromCharCode(0x0d, 0x0a); // CR LF (0x0D 0x0A)
 			const newText = currentText
-				? `${currentText}\n\n-- Context --\n${formattedProfile}`
+				? `${currentText}${crlf}${crlf}-- Context --${crlf}${formattedProfile}`
 				: formattedProfile;
 
 			// Use direct replacement to avoid double-insertion
@@ -1723,13 +1724,14 @@ class ContextButtonInjector {
 				sections.push(` - Description: ${pattern.description}`);
 				sections.push(` - Frequency: ${pattern.frequency}x`);
 				sections.push(` - URLs: ${pattern.urls.join(", ")}`);
-				sections.push(` - Suggestion: ${pattern.suggestion}`);
+				// Removed: ` - Suggestion: ${pattern.suggestion}` to exclude suggestions
 				sections.push(""); // Add spacing between patterns
 			}
 		}
 
-		// Add a clean separator and join with single newlines
-		return sections.join("\n");
+		// Add a clean separator and join with actual CRLF characters for ChatGPT compatibility
+		const crlf = String.fromCharCode(0x0d, 0x0a); // CR LF (0x0D 0x0A)
+		return sections.join(crlf);
 	}
 
 	private positionDropdown() {
