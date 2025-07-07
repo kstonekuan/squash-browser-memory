@@ -1675,57 +1675,40 @@ class ContextButtonInjector {
 	): string {
 		const sections: string[] = [];
 
-		// Background section
-		const profession = contexts.find((c) => c.category === "profession")?.text;
+		// Core identities section
+		const identities = contexts.filter((c) => c.category === "identities");
+		if (identities.length > 0) {
+			const identityList = identities.map((i) => i.text).join(", ");
+			sections.push(`Core identities: ${identityList}`);
+		}
+
+		// Summary section (if available)
 		const summary = contexts.find((c) => c.category === "summary")?.text;
-
-		if (profession || summary) {
-			let background = "Background: ";
-			if (profession) {
-				background += `I'm a ${profession.toLowerCase()}`;
-			}
-			if (summary && summary !== profession) {
-				background += profession ? `. ${summary}` : summary;
-			} else if (!summary && profession) {
-				background += ".";
-			}
-			sections.push(background);
+		if (summary) {
+			sections.push(`Background: ${summary}`);
 		}
 
-		// Technical skills section
-		const tech = contexts.filter((c) => c.category === "technology");
-		if (tech.length > 0) {
-			const skills = tech.map((t) => t.text).join(", ");
-			sections.push(`Technical skills: ${skills}`);
-		}
-
-		// Current focus section
-		const goals = contexts.filter((c) => c.category === "goals");
-		const obsessions = contexts.filter((c) => c.category === "obsessions");
-		const currentFocus = [...goals, ...obsessions];
-
-		if (currentFocus.length > 0) {
-			const focus = currentFocus.map((f) => f.text.toLowerCase()).join(", ");
-			sections.push(`Current focus: ${focus}`);
-		}
-
-		// Working style section
-		const traits = contexts.filter((c) => c.category === "traits");
+		// Personal preferences section
 		const preferences = contexts.filter((c) => c.category === "preferences");
-		const workingStyle = [...traits, ...preferences];
-
-		if (workingStyle.length > 0) {
-			const style = workingStyle.map((w) => w.text.toLowerCase()).join(", ");
-			sections.push(`Working style: ${style}`);
+		if (preferences.length > 0) {
+			sections.push("Personal preferences:");
+			preferences.forEach((pref) => {
+				sections.push(`  - ${pref.text}`);
+			});
 		}
 
-		// Interests section
+		// Current tasks section
+		const tasks = contexts.filter((c) => c.category === "tasks");
+		if (tasks.length > 0) {
+			const taskList = tasks.map((t) => t.text).join(", ");
+			sections.push(`Current tasks: ${taskList}`);
+		}
+
+		// Current interests section
 		const interests = contexts.filter((c) => c.category === "interests");
 		if (interests.length > 0) {
-			const interestList = interests
-				.map((i) => i.text.toLowerCase())
-				.join(", ");
-			sections.push(`Interests: ${interestList}`);
+			const interestList = interests.map((i) => i.text).join(", ");
+			sections.push(`Current interests: ${interestList}`);
 		}
 
 		// Workflow patterns section
