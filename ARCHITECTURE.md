@@ -119,32 +119,36 @@ graph TD
 
 ### 4. AI Integration Architecture
 
-The extension supports two types of AI providers, configured via a factory pattern (`ai-provider-factory.ts`). The AI analysis is performed within the offscreen document, which communicates with the selected AI provider.
+The extension supports two types of AI providers through a unified architecture, configured via a factory pattern (`ai-provider-factory.ts`). The AI analysis is performed within the offscreen document, which communicates with the selected AI provider.
+
+#### 4.1. Unified Provider Architecture
+- **Factory Pattern**: All AI providers are managed through `ai-provider-factory.ts` with singleton instances
+- **Consistent Interface**: Both Chrome AI and Claude implement the same `AIProvider` interface
+- **Unified Message Flow**: 
+  1. Side panel sends `ai:initialize` to background service worker
+  2. Background forwards to offscreen document as `offscreen:initialize-ai`
+  3. Offscreen document uses factory to get/create provider instance
+  4. Provider initialization and status updates flow back through `offscreen:ai-status`
+- **No Special Cases**: Chrome AI and Claude follow identical initialization and communication patterns
 
 **Provider Selection Flow:**
 1. User selects AI provider in Advanced Settings (side panel)
 2. Configuration is saved to Chrome storage
 3. When analysis starts, the offscreen document loads the configuration
-4. For Chrome AI: Uses the pre-initialized instance in the offscreen document
-5. For Claude: Creates a new Claude provider instance with the stored API key
+4. The factory provides the appropriate provider instance (creating if needed)
+5. Both providers persist as singletons in the offscreen document
 
-#### 4.1. Chrome AI (Local)
-- **Local Processing**: Uses Chrome's built-in Language Model API (no external API calls). The offscreen document creates a session with the local model.
-- **Privacy-First**: All data processing happens locally in the browser.
-- **Token Management**: Automatic chunking to stay within Chrome AI's token limits.
-- **Retry Logic**: Exponential backoff for quota-exceeded scenarios.
-- **Model Requirements**: Chrome AI requires the Gemini Nano model (~22GB) to be downloaded via Chrome's components page (chrome://components).
-- **Initialization Flow**: 
-  1. Side panel checks Chrome AI availability on mount
-  2. Sends initialization request to background service worker
-  3. Background ensures offscreen document exists
-  4. Offscreen document checks Chrome AI status
-  5. If unavailable, side panel shows setup instructions
+#### 4.2. Chrome AI (Local)
+- **Local Processing**: Uses Chrome's built-in Language Model API (no external API calls)
+- **Privacy-First**: All data processing happens locally in the browser
+- **Token Management**: Automatic chunking to stay within Chrome AI's token limits
+- **Retry Logic**: Exponential backoff for quota-exceeded scenarios
+- **Model Requirements**: Chrome AI requires the Gemini Nano model (~22GB) to be downloaded via Chrome's components page (chrome://components)
 
-#### 4.2. Remote AI (e.g., Anthropic Claude)
-- **Remote Processing**: The offscreen document sends browsing history to a third-party API.
-- **User Consent**: Requires explicit user configuration and API key entry.
-- **Flexibility**: Allows for more powerful models at the cost of privacy.
+#### 4.3. Remote AI (e.g., Anthropic Claude)
+- **Remote Processing**: The offscreen document sends browsing history to a third-party API
+- **User Consent**: Requires explicit user configuration and API key entry
+- **Flexibility**: Allows for more powerful models at the cost of privacy
 
 ### 5. Memory and Persistence
 
@@ -167,8 +171,6 @@ A key feature of the extension is its ability to inject context into popular AI 
 - **Memory Access**: Retrieves the user's profile and workflow patterns from `chrome.storage.local`.
 - **String Similarity**: As the user types, it uses a simple string similarity algorithm (Dice's Coefficient) to find relevant context from memory.
 - **Suggestion UI**: Displays relevant suggestions in a dropdown panel, allowing the user to insert them into their prompt.
-
-
 
 ### 7. Error Handling and Resilience
 

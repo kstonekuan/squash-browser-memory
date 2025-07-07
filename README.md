@@ -1,128 +1,95 @@
-# Squash History Workflow Analyzer
+# Squash - Browser Memory Layer for AI
 
-Squash adds an invisible memory layer to your browser, compressing every click into portable context for any AI agent
+Squash adds an invisible memory layer to your browser, compressing every click into portable context for any AI agent.
 
-## Overview
+## What it does
 
-Squash is an ambient agent that watches high-level browser signals as you browse, learning how you think, decide, and work. It compresses those traces into portable, inspectable, and revocable on-device memory packs. When you use ChatGPT, Claude, or any other agent, Squash supplies the right context so the tool behaves like a teammate who already knows your style. We target AI power-users and prosumers who juggle many tools and hate re-explaining themselves.
+Squash studies your browsing patterns, learns how you work, and automatically provides relevant context when you use AI tools like ChatGPT or Claude. No more re-explaining yourself to every new AI conversation.
 
-## Prerequisites
+<p align="center">
+  <img src="./images/sidepanel_memory.png" alt="Memory Viewer in Side Panel" width="600">
+</p>
 
-- Node.js
-- pnpm or npm
-- Chrome 138+ (for local LLM)
+## Quick Start
 
-## Installation
+1. Clone and build:
+   ```bash
+   git clone https://github.com/kstonekuan/squash-browser-memory.git
+   cd squash-browser-memory
+   pnpm install
+   pnpm build
+   ```
 
-1.  Clone the repository.
-2.  Install dependencies: `pnpm install`
-3.  Build the extension: `pnpm build`
-4.  Load the extension in Chrome:
-    - Open `chrome://extensions/`.
-    - Enable "Developer mode".
-    - Click "Load unpacked" and select the `dist` folder.
+2. Install in Chrome:
+   - Open `chrome://extensions/`
+   - Enable "Developer mode"
+   - Click "Load unpacked" → select the `dist` folder
 
-## AI Providers
+3. Choose your AI provider (in extension settings):
+   - **Chrome AI (Local)**: Private, on-device analysis
+   - **Claude API**: More powerful, requires API key
 
-### 1. Chrome AI (Local)
+## Key Features
 
-- **How it works**: Uses Chrome's built-in AI (Gemini Nano). Your browsing history **never leaves your device**.
-- **Requirements**: Chrome version 138 or later with Chrome AI setup:
-  1. Enable "Prompt API for Gemini Nano" in chrome://flags
-  2. Update "Optimization Guide On Device Model" in chrome://components
-     - **⚠️ Warning**: This will download a model that is ~22GB
-- **Model Size**: The Chrome AI model is ~22GB and must be downloaded through Chrome's components page.
-- **Best for**: Users who prioritize privacy and want to perform analysis without an internet connection.
+- **Ambient Analysis**: Runs in the background, building understanding over time
+- **Smart Memory**: Learns and refines patterns across sessions
+- **Privacy First**: Local analysis by default, explicit consent for remote services
+- **Context Injection**: Adds a "Context" button to ChatGPT and Claude that inserts relevant info from your browsing history
 
-### 2. Anthropic Claude (Remote)
+## AI Provider Setup
 
-- **How it works**: Uses the Anthropic Claude API. This sends your browsing history to Anthropic's servers.
-- **Requirements**: A Claude API key from the [Anthropic Console](https://console.anthropic.com/).
-- **Best for**: Users who want potentially more powerful analysis and are comfortable with their data being processed by a remote service.
+### Chrome AI (100% Local)
+- Chrome 138+ required
+- Enable in `chrome://flags` → "Prompt API for Gemini Nano"
+- Update in `chrome://components` → "Optimization Guide On Device Model" (~22GB download)
 
+### Claude API (Remote)
+- Get API key from [Anthropic Console](https://console.anthropic.com/)
+- Enter in extension's Advanced Settings
 
-## Features
+## Usage
 
-- **Dual AI Providers**: Choose between Chrome's built-in AI (Gemini Nano) for 100% local, private analysis or a remote provider (Anthropic's Claude) for more powerful insights.
-- **Context Injection on AI Chat Platforms**: Injects a "Context" button on supported platforms (ChatGPT, Claude) to provide relevant, personalized context from your browsing history directly in your conversations.
-- **Ambient Background Analysis**: Enable hourly, automatic analysis of your recent browsing history. The extension works quietly in the background to find patterns without interrupting you.
-- **Incremental Learning with Memory**: The extension remembers past analyses and builds a long-term understanding of your habits, leading to smarter, more refined suggestions over time.
-- **Advanced Settings**:
-    - Switch between AI providers.
-    - Customize the AI prompts used for analysis, data chunking, and memory integration.
-    - Configure API keys for remote providers.
-    - Manage ambient analysis settings and notifications.
-- **Robust & Resilient**: Designed with intelligent error handling, including automatic retries, fallbacks, and a keepalive mechanism to ensure the analysis process is not interrupted.
-- **Privacy-First Design**: Your data stays on your device by default. The extension provides clear warnings and requires explicit consent before using any remote service.
-- **Side Panel UI**: A clean and intuitive interface that works alongside your browsing without needing a full tab.
+1. **Ambient Mode**: Enable in Advanced Settings for automatic hourly analysis
+2. **Manual Analysis**: Click "Analyze History" in the side panel
+3. **Context Injection**: Type in ChatGPT/Claude → click "Context" → select relevant suggestions
 
-## How It Works
+<p align="center">
+  <img src="./images/sidepanel_ambient_analysis.png" alt="Ambient Analysis in Side Panel" width="600">
+  <img src="./images/context_injection_chatgpt.png" alt="Context injection in ChatGPT" width="600">
+  <img src="./images/context_injection_claude.png" alt="Context injection in Claude" width="600">
+</p>
 
-The extension analyzes your history in the background using a multi-stage pipeline that runs in a dedicated offscreen document for stability.
+## Planned Features
 
-1.  **Fetch & Chunk**: Browsing history is collected and intelligently grouped into browsing sessions using AI.
-2.  **Analyze & Learn**: Each session is analyzed to identify patterns. These findings are integrated with a long-term memory to build a profile of your habits over time.
-3.  **Inject & Display**: The discovered patterns and profile are used to provide contextual suggestions on AI chat platforms and are displayed in the extension's side panel.
+- **MCP Server Integration**: Expose your browsing patterns and profile as an MCP (Model Context Protocol) server for other AI tools
+- **More AI Providers**: Support for additional LLM providers beyond Chrome AI and Claude
+- **Enhanced Context Matching**: Smarter relevance algorithms for context suggestions
+- **Workflow Automation**: Detect and suggest automation for repetitive tasks
 
-## Context Injection on AI Chat Platforms
+## For Developers
 
-This extension enhances your experience on supported AI chat platforms (currently ChatGPT and Claude) by adding a "Context" button to the chat interface. This button allows you to seamlessly inject relevant information from your analyzed browsing history and user profile into your conversations.
+```bash
+pnpm dev     # Development with hot reload
+pnpm build   # Build extension
+pnpm check   # Run all quality checks
+pnpm test    # Run tests
+```
 
-### How it Works
+See [ARCHITECTURE.md](./ARCHITECTURE.md) for technical details.
 
-1.  **Button Injection**: The extension's content script identifies the chat input area on supported sites and injects a "Context" button nearby.
-2.  **Contextual Suggestions**: As you type a prompt, the extension analyzes your input and suggests relevant pieces of context from your memory, such as your profession, interests, or previously identified workflow patterns.
-3.  **One-Click Insertion**: You can click a suggestion to insert it directly into the chat input. You can also shift-click the main button to insert a structured summary of your user profile.
+## Privacy
 
-This feature helps you provide better, more personalized context to AI assistants without having to manually copy and paste information.
+- Local mode: Your data never leaves your device
+- Remote mode: Data sent to API provider (requires explicit setup)
+- All data stored locally in Chrome storage
 
-## Ambient Analysis
+## Requirements
 
-You can enable **Ambient Analysis** in the "Advanced Settings" section. When enabled, the extension will automatically:
+- Chrome 138+
+- Node.js & pnpm
+- ~22GB free space (for Chrome AI model)
 
-- Run an analysis every hour on new browsing data.
-- Use the same privacy-first principles as manual analysis.
-- Send notifications (if enabled) on success or failure.
+## Resources
 
-This feature allows the extension to proactively discover patterns without requiring you to perform manual analysis.
-
-## MCP Server Integration (Coming Soon)
-
-Soon, you'll be able to expose your browsing patterns and profile as an MCP (Model Context Protocol) server. This exciting feature will allow other AI tools and applications to understand your work patterns, preferences, and habits.
-
-### Planned Features:
-- **Expose User Profile**: Share your profession, interests, and work patterns with authorized tools
-- **Pattern API**: Allow other tools to query your repetitive workflows and habits
-- **Privacy Controls**: Fine-grained control over what data is exposed
-- **Integration Examples**: Use your browsing patterns to enhance coding assistants, productivity tools, and more
-
-This feature will enable a new level of personalization across your AI-powered tools, all while maintaining your privacy and control over your data.
-
-## Development
-
-For a detailed technical overview, please see [ARCHITECTURE.md](./ARCHITECTURE.md).
-
-### Commands
-
-- `pnpm dev`: Start development server with hot reload.
-- `pnpm build`: Run checks and build the extension.
-- `pnpm check`: Run all quality checks (Biome, TypeScript, Svelte, tests).
-- `pnpm test`: Run tests in watch mode.
-- `pnpm test:ui`: Run tests with the Vitest UI.
-
-## Privacy Notice
-
-Your privacy is paramount. Please review the "AI Providers" section to understand how your data is handled. When using the local Chrome AI, your history never leaves your device. When using a remote provider, your data is sent to that provider's servers.
-
-## Manifest Permissions
-
-The extension requires the following permissions:
-- `history`: To read browsing history for analysis.
-- `storage`: To save user settings (e.g., API keys, provider choice).
-- `sidePanel`: To show the extension UI in the browser side panel.
-- `alarms`: To schedule the hourly ambient analysis.
-- `notifications`: To show the status of background analysis.
-- `unlimitedStorage`: To store a larger amount of browsing history data and analysis results locally on your device.
-- `activeTab`: Used by the content script to interact with the chat interface on supported websites.
-- `offscreen`: To run the AI analysis in a separate, non-visible document.
-
+- [Simple Chromium AI](https://github.com/kstonekuan/simple-chromium-ai) - Our open source library for Chrome's built-in AI capabilities
+- [Mem0 Chrome Extension](https://github.com/mem0ai/mem0-chrome-extension/) - Inspiration for context injection UX
