@@ -1,6 +1,6 @@
 {
 	"manifest_version": 3,
-	"name": "Squash History Workflow Analyzer",
+	"name": "Squash",
 	"version": "1.0.0",
 	"description": "Squash adds an invisible memory layer to your browser, compressing every click into portable context for any AI agent",
 	"minimum_chrome_version": "138",
@@ -22,7 +22,7 @@
 		"default_path": "sidepanel.html"
 	},
 	"action": {
-		"default_title": "Open History Analyzer in side panel"
+		"default_title": "Open Squash in side panel"
 	},
 	"content_scripts": [
 		{

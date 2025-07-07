@@ -1,0 +1,5 @@
+<svg width="32" height="32" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+  <!-- Minimalist squash fruit -->
+  <path d="M12 5c-.5-1.5-2-2.5-2-2.5s-1.5 1-2 2.5c-.2 1 .2 2 1 2.5.5.4 1 .5 1.5.5s1-.1 1.5-.5c.8-.5 1.2-1.5 1-2.5z" fill="#EFBE7D" />
+  <path d="M14 8.5c-1.5-1.5-4-1.5-5.5 0-3 3-3 8 0 11s8 3 11 0-2.5-8-5.5-11z" fill="#EFBE7D" />
+</svg>

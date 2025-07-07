@@ -494,7 +494,7 @@ onMount(() => {
 
 <main class="p-4 max-w-full">
 	<div class="max-w-4xl mx-auto">
-		<h1 class="text-2xl font-bold mb-6">History Workflow Analyzer</h1>
+		<h3 class="text-lg font-semibold mb-6">Memory Inspector</h3>
 
 		<!-- AI Provider Status and History Fetcher together -->
 		<div class="bg-white rounded-lg shadow-sm p-4 mb-4">
