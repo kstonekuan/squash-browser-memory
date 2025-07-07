@@ -509,14 +509,140 @@ function compareTwoStrings(str1: string, str2: string): number {
 	return (2.0 * intersection) / union;
 }
 
-// Simple context matcher using string similarity only
+// Domain-specific keyword mappings for enhanced matching
+interface DomainKeywords {
+	travel: string[];
+	tech: string[];
+	food: string[];
+	work: string[];
+}
+
+const domainKeywords: DomainKeywords = {
+	travel: [
+		"trip",
+		"travel",
+		"vacation",
+		"visit",
+		"destination",
+		"journey",
+		"flight",
+		"hotel",
+		"explore",
+		"adventure",
+		"tourism",
+		"country",
+		"city",
+		"abroad",
+		"international",
+		"itinerary",
+		"booking",
+		"passport",
+		"visa",
+		"luggage",
+		"sightseeing",
+		"culture",
+		"local",
+		"guide",
+		"map",
+		"transportation",
+		"airport",
+		"train",
+		"bus",
+		"car rental",
+	],
+	tech: [
+		"code",
+		"develop",
+		"build",
+		"program",
+		"system",
+		"software",
+		"app",
+		"website",
+		"ai",
+		"machine learning",
+		"algorithm",
+		"data",
+		"database",
+		"api",
+		"framework",
+		"library",
+		"javascript",
+		"python",
+		"react",
+		"typescript",
+		"automation",
+		"workflow",
+		"optimization",
+		"performance",
+		"debug",
+		"deploy",
+		"server",
+		"cloud",
+		"architecture",
+	],
+	food: [
+		"eat",
+		"food",
+		"restaurant",
+		"diet",
+		"meal",
+		"cuisine",
+		"cooking",
+		"recipe",
+		"vegan",
+		"vegetarian",
+		"organic",
+		"healthy",
+		"nutrition",
+		"ingredients",
+		"dining",
+		"cafe",
+		"bar",
+		"kitchen",
+		"chef",
+		"taste",
+		"flavor",
+		"local food",
+		"street food",
+	],
+	work: [
+		"project",
+		"task",
+		"deadline",
+		"meeting",
+		"team",
+		"collaborate",
+		"productivity",
+		"efficiency",
+		"strategy",
+		"planning",
+		"research",
+		"analysis",
+		"report",
+		"presentation",
+		"goal",
+		"objective",
+		"milestone",
+		"progress",
+		"workflow",
+		"process",
+		"management",
+	],
+};
+
+// Enhanced context with domain tags
+interface EnhancedContext {
+	text: string;
+	category: string;
+	workflowPattern?: WorkflowPattern;
+	domains: string[]; // Which domains this context belongs to
+}
+
+// Simple context matcher using string similarity with domain expansion
 class SimpleContextMatcher {
 	private memory: AnalysisMemory | null = null;
-	private preGeneratedContexts: Array<{
-		text: string;
-		category: string;
-		workflowPattern?: WorkflowPattern;
-	}> = [];
+	private preGeneratedContexts: EnhancedContext[] = [];
 
 	async initialize(): Promise<void> {
 		try {
@@ -583,6 +709,10 @@ class SimpleContextMatcher {
 		const suggestions: ContextSuggestion[] = [];
 		const inputLower = input.toLowerCase();
 
+		// Detect which domains the input relates to
+		const inputDomains = this.detectInputDomains(inputLower);
+		console.log("Detected domains for input:", inputDomains);
+
 		// Use pre-generated contexts instead of extracting each time
 		const contexts = this.preGeneratedContexts;
 
@@ -594,18 +724,53 @@ class SimpleContextMatcher {
 					continue;
 				}
 
-				const similarity = compareTwoStrings(
-					inputLower,
-					context.text.toLowerCase(),
+				// Calculate string similarity - special handling for workflow patterns
+				let stringSimilarity: number;
+				if (context.category === "workflow" && context.workflowPattern) {
+					// For workflow patterns, check both title and description, use the higher score
+					const titleSimilarity = compareTwoStrings(
+						inputLower,
+						context.workflowPattern.pattern.toLowerCase(),
+					);
+					const descriptionSimilarity = compareTwoStrings(
+						inputLower,
+						context.text.toLowerCase(), // This is the description
+					);
+					stringSimilarity = Math.max(titleSimilarity, descriptionSimilarity);
+				} else {
+					stringSimilarity = compareTwoStrings(
+						inputLower,
+						context.text.toLowerCase(),
+					);
+				}
+
+				// Calculate domain relevance
+				const domainRelevance = this.calculateDomainRelevance(
+					inputDomains,
+					context.domains,
 				);
 
-				if (similarity >= 0.2) {
-					// 20% threshold (lowered for better matching)
+				// Combine scores (string similarity 60%, domain relevance 40%)
+				let finalScore = stringSimilarity * 0.6 + domainRelevance * 0.4;
+
+				// Apply identity boost - core identities get lower threshold and score boost
+				const isIdentity = context.category === "identities";
+				if (isIdentity) {
+					finalScore = finalScore * 1.3; // 30% boost for identities
+				}
+
+				// Dynamic threshold based on category
+				const threshold = isIdentity ? 0.08 : 0.15; // Lower threshold for identities
+				const stringThreshold = isIdentity ? 0.12 : 0.2; // Lower string threshold for identities
+
+				if (finalScore >= threshold || stringSimilarity >= stringThreshold) {
+					const matchType = domainRelevance > 0.5 ? "semantic" : "string";
+
 					suggestions.push({
 						text: context.text,
 						category: context.category,
-						relevanceScore: similarity,
-						matchType: "string",
+						relevanceScore: finalScore,
+						matchType: matchType,
 						workflowPattern: context.workflowPattern,
 					});
 				}
@@ -614,10 +779,11 @@ class SimpleContextMatcher {
 			}
 		}
 
-		// Sort by relevance and limit to 5
+		// Filter out suggestions below 20% relevance and sort by relevance, limit to 8
 		return suggestions
+			.filter((suggestion) => suggestion.relevanceScore >= 0.2) // Minimum 20% match
 			.sort((a, b) => b.relevanceScore - a.relevanceScore)
-			.slice(0, 5);
+			.slice(0, 8); // Increased from 5 to 8
 	}
 
 	private matchSampleContexts(
@@ -649,29 +815,131 @@ class SimpleContextMatcher {
 			.slice(0, 5);
 	}
 
-	private extractContexts(): Array<{
-		text: string;
-		category: string;
-		workflowPattern?: WorkflowPattern;
-	}> {
-		const contexts: Array<{
-			text: string;
-			category: string;
-			workflowPattern?: WorkflowPattern;
-		}> = [];
+	private detectInputDomains(inputLower: string): string[] {
+		const detectedDomains: string[] = [];
+
+		for (const [domain, keywords] of Object.entries(domainKeywords)) {
+			for (const keyword of keywords) {
+				if (inputLower.includes(keyword.toLowerCase())) {
+					if (!detectedDomains.includes(domain)) {
+						detectedDomains.push(domain);
+					}
+				}
+			}
+		}
+
+		return detectedDomains;
+	}
+
+	private calculateDomainRelevance(
+		inputDomains: string[],
+		contextDomains: string[],
+	): number {
+		if (inputDomains.length === 0 || contextDomains.length === 0) {
+			return 0;
+		}
+
+		// Calculate overlap between input domains and context domains
+		const overlap = inputDomains.filter((domain) =>
+			contextDomains.includes(domain),
+		);
+		return (
+			overlap.length / Math.max(inputDomains.length, contextDomains.length)
+		);
+	}
+
+	private assignDomainsToContext(text: string, category: string): string[] {
+		const domains: string[] = [];
+		const textLower = text.toLowerCase();
+
+		// Check each domain's keywords against the context text
+		for (const [domain, keywords] of Object.entries(domainKeywords)) {
+			for (const keyword of keywords) {
+				if (textLower.includes(keyword.toLowerCase())) {
+					if (!domains.includes(domain)) {
+						domains.push(domain);
+					}
+				}
+			}
+		}
+
+		// Add domain based on category-specific rules
+		switch (category) {
+			case "identities":
+				if (textLower.includes("traveler") || textLower.includes("travel")) {
+					domains.push("travel");
+				}
+				if (
+					textLower.includes("professional") ||
+					textLower.includes("engineer") ||
+					textLower.includes("tech")
+				) {
+					domains.push("tech");
+				}
+				break;
+			case "preferences":
+				if (
+					textLower.includes("vegan") ||
+					textLower.includes("vegetarian") ||
+					textLower.includes("diet")
+				) {
+					domains.push("food");
+				}
+				if (
+					textLower.includes("workflow") ||
+					textLower.includes("automation") ||
+					textLower.includes("systematic")
+				) {
+					domains.push("tech", "work");
+				}
+				break;
+			case "tasks":
+				if (
+					textLower.includes("plan") &&
+					(textLower.includes("tokyo") ||
+						textLower.includes("paris") ||
+						textLower.includes("trip"))
+				) {
+					domains.push("travel");
+				}
+				if (textLower.includes("research") && textLower.includes("ai")) {
+					domains.push("tech");
+				}
+				break;
+			case "interests":
+				if (textLower.includes("travel")) {
+					domains.push("travel");
+				}
+				if (
+					textLower.includes("ai") ||
+					textLower.includes("automation") ||
+					textLower.includes("engineering")
+				) {
+					domains.push("tech");
+				}
+				break;
+		}
+
+		return [...new Set(domains)]; // Remove duplicates
+	}
+
+	private extractContexts(): EnhancedContext[] {
+		const contexts: EnhancedContext[] = [];
 
 		if (!this.memory?.userProfile) return contexts;
 
 		const profile = this.memory.userProfile;
 
-		// Helper function to safely add context
+		// Helper function to safely add context with domain assignment
 		const addContext = (
 			value: unknown,
 			category: string,
 			workflowPattern?: WorkflowPattern,
 		) => {
 			if (value && typeof value === "string" && value.trim()) {
-				contexts.push({ text: value.trim(), category, workflowPattern });
+				const text = value.trim();
+				const domains = this.assignDomainsToContext(text, category);
+				contexts.push({ text, category, domains, workflowPattern });
 			}
 		};
 
@@ -727,9 +995,14 @@ class SimpleContextMatcher {
 			console.log("Processing workflow patterns:", this.memory.patterns.length);
 			for (const pattern of this.memory.patterns) {
 				if (pattern && typeof pattern === "object" && pattern.description) {
+					const domains = this.assignDomainsToContext(
+						pattern.description,
+						"workflow",
+					);
 					contexts.push({
 						text: pattern.description,
 						category: "workflow",
+						domains,
 						workflowPattern: pattern,
 					});
 				}
