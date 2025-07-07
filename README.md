@@ -6,6 +6,41 @@ Squash adds an invisible memory layer to your browser, compressing every click i
 
 Squash is an ambient agent that watches high-level browser signals as you browse, learning how you think, decide, and work. It compresses those traces into portable, inspectable, and revocable on-device memory packs. When you use ChatGPT, Claude, or any other agent, Squash supplies the right context so the tool behaves like a teammate who already knows your style. We target AI power-users and prosumers who juggle many tools and hate re-explaining themselves.
 
+## Prerequisites
+
+- Node.js
+- pnpm or npm
+- Chrome 138+ (for local LLM)
+
+## Installation
+
+1.  Clone the repository.
+2.  Install dependencies: `pnpm install`
+3.  Build the extension: `pnpm build`
+4.  Load the extension in Chrome:
+    - Open `chrome://extensions/`.
+    - Enable "Developer mode".
+    - Click "Load unpacked" and select the `dist` folder.
+
+## AI Providers
+
+### 1. Chrome AI (Local)
+
+- **How it works**: Uses Chrome's built-in AI (Gemini Nano). Your browsing history **never leaves your device**.
+- **Requirements**: Chrome version 138 or later with Chrome AI setup:
+  1. Enable "Prompt API for Gemini Nano" in chrome://flags
+  2. Update "Optimization Guide On Device Model" in chrome://components
+     - **⚠️ Warning**: This will download a model that is ~22GB
+- **Model Size**: The Chrome AI model is ~22GB and must be downloaded through Chrome's components page.
+- **Best for**: Users who prioritize privacy and want to perform analysis without an internet connection.
+
+### 2. Anthropic Claude (Remote)
+
+- **How it works**: Uses the Anthropic Claude API. This sends your browsing history to Anthropic's servers.
+- **Requirements**: A Claude API key from the [Anthropic Console](https://console.anthropic.com/).
+- **Best for**: Users who want potentially more powerful analysis and are comfortable with their data being processed by a remote service.
+
+
 ## Features
 
 - **Dual AI Providers**: Choose between Chrome's built-in AI (Gemini Nano) for 100% local, private analysis or a remote provider (Anthropic's Claude) for more powerful insights.
@@ -63,43 +98,9 @@ Soon, you'll be able to expose your browsing patterns and profile as an MCP (Mod
 
 This feature will enable a new level of personalization across your AI-powered tools, all while maintaining your privacy and control over your data.
 
-## Installation
-
-1.  Clone the repository.
-2.  Install dependencies: `pnpm install`
-3.  Build the extension: `pnpm build`
-4.  Load the extension in Chrome:
-    - Open `chrome://extensions/`.
-    - Enable "Developer mode".
-    - Click "Load unpacked" and select the `dist` folder.
-
-## AI Providers
-
-### 1. Chrome AI (Local)
-
-- **How it works**: Uses Chrome's built-in AI (Gemini Nano). Your browsing history **never leaves your device**.
-- **Requirements**: Chrome version 138 or later with Chrome AI setup:
-  1. Enable "Prompt API for Gemini Nano" in chrome://flags
-  2. Update "Optimization Guide On Device Model" in chrome://components
-     - **⚠️ Warning**: This will download a model that is ~22GB
-- **Model Size**: The Chrome AI model is ~22GB and must be downloaded through Chrome's components page.
-- **Best for**: Users who prioritize privacy and want to perform analysis without an internet connection.
-
-### 2. Anthropic Claude (Remote)
-
-- **How it works**: Uses the Anthropic Claude API. This sends your browsing history to Anthropic's servers.
-- **Requirements**: A Claude API key from the [Anthropic Console](https://console.anthropic.com/).
-- **Best for**: Users who want potentially more powerful analysis and are comfortable with their data being processed by a remote service.
-
 ## Development
 
 For a detailed technical overview, please see [ARCHITECTURE.md](./ARCHITECTURE.md).
-
-### Prerequisites
-
-- Node.js
-- pnpm
-- Chrome 138+
 
 ### Commands
 
@@ -113,12 +114,8 @@ For a detailed technical overview, please see [ARCHITECTURE.md](./ARCHITECTURE.m
 
 Your privacy is paramount. Please review the "AI Providers" section to understand how your data is handled. When using the local Chrome AI, your history never leaves your device. When using a remote provider, your data is sent to that provider's servers.
 
-## Requirements & Permissions
+## Manifest Permissions
 
-**Requirements**
-- Chrome 138 or later (for local AI features).
-
-**Permissions**
 The extension requires the following permissions:
 - `history`: To read browsing history for analysis.
 - `storage`: To save user settings (e.g., API keys, provider choice).
