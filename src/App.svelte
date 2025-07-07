@@ -496,8 +496,8 @@ onMount(() => {
 	<div class="max-w-4xl mx-auto">
 		<h3 class="text-lg font-semibold mb-6">Memory Inspector</h3>
 
-		<!-- AI Provider Status and History Fetcher together -->
-		<div class="bg-white rounded-lg shadow-sm p-4 mb-4">
+		<!-- AI Provider Status -->
+		<div class="bg-white rounded-lg shadow-sm p-3 mb-4">
 			<AIProviderStatusComponent 
 				status={currentAIStatus}
 				providerType={currentProvider}
@@ -505,20 +505,21 @@ onMount(() => {
 				isDownloading={aiIsDownloading}
 				onDownloadClick={handleAIDownload}
 			/>
-
-			<div class="mt-4 pt-4 border-t border-gray-200">
-				<HistoryFetcher 
-					onAnalysisRequest={handleAnalysis} 
-					{isAnalyzing}
-					isAmbientAnalysisRunning={isAnyAnalysisRunning}
-					aiStatus={currentAIStatus}
-					provider={currentProvider}
-				/>
-			</div>
 		</div>
 
 		<!-- Ambient Analysis Card - Prominent position -->
 		<AmbientAnalysisCard {analysisStatus} aiStatus={currentAIStatus} />
+
+		<!-- History Fetcher - Collapsible Section -->
+		<CollapsibleSection title="Manual History Analysis" class="mt-4">
+			<HistoryFetcher 
+				onAnalysisRequest={handleAnalysis} 
+				{isAnalyzing}
+				isAmbientAnalysisRunning={isAnyAnalysisRunning}
+				aiStatus={currentAIStatus}
+				provider={currentProvider}
+			/>
+		</CollapsibleSection>
 
 		<AnalysisProgress 
 			phase={analysisPhase} 
@@ -529,7 +530,9 @@ onMount(() => {
 		/>
 
 		<!-- Memory Viewer -->
-		<MemoryViewer autoExpand={memoryAutoExpand} />
+		<div class="mt-4">
+			<MemoryViewer autoExpand={memoryAutoExpand} />
+		</div>
 
 		<!-- Memory Management -->
 		<CollapsibleSection title="Memory Management" class="mt-4">
