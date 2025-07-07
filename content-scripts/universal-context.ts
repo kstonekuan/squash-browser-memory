@@ -673,37 +673,10 @@ class SimpleContextMatcher {
 	async getSuggestions(input: string): Promise<ContextSuggestion[]> {
 		if (!input || input.trim().length < 3) return [];
 
-		// Add some sample data if no memory exists (for testing)
+		// Return empty array if no user profile exists yet
 		if (!this.memory?.userProfile) {
-			console.log("No user profile found, using sample data for demo");
-			const sampleContexts = [
-				{
-					text: "Software engineer passionate about AI and web development",
-					category: "profession",
-				},
-				{
-					text: "Building Chrome extensions and browser automation tools",
-					category: "interests",
-				},
-				{
-					text: "Learning about React, TypeScript, and machine learning",
-					category: "goals",
-				},
-				{
-					text: "Enjoys clean code, good UX design, and efficient workflows",
-					category: "preferences",
-				},
-				{
-					text: "Problem-solver who likes optimizing developer experience",
-					category: "traits",
-				},
-				{
-					text: "Currently exploring LLM integration and semantic search",
-					category: "obsessions",
-				},
-			];
-
-			return this.matchSampleContexts(input, sampleContexts);
+			console.log("No user profile found, returning empty suggestions");
+			return [];
 		}
 
 		const suggestions: ContextSuggestion[] = [];
@@ -784,35 +757,6 @@ class SimpleContextMatcher {
 			.filter((suggestion) => suggestion.relevanceScore >= 0.2) // Minimum 20% match
 			.sort((a, b) => b.relevanceScore - a.relevanceScore)
 			.slice(0, 8); // Increased from 5 to 8
-	}
-
-	private matchSampleContexts(
-		input: string,
-		contexts: Array<{ text: string; category: string }>,
-	): ContextSuggestion[] {
-		const suggestions: ContextSuggestion[] = [];
-		const inputLower = input.toLowerCase();
-
-		for (const context of contexts) {
-			const similarity = compareTwoStrings(
-				inputLower,
-				context.text.toLowerCase(),
-			);
-
-			if (similarity >= 0.1) {
-				// Even lower threshold for demo
-				suggestions.push({
-					text: context.text,
-					category: context.category,
-					relevanceScore: similarity,
-					matchType: "string",
-				});
-			}
-		}
-
-		return suggestions
-			.sort((a, b) => b.relevanceScore - a.relevanceScore)
-			.slice(0, 5);
 	}
 
 	private detectInputDomains(inputLower: string): string[] {
