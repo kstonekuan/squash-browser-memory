@@ -1,9 +1,7 @@
 /// <reference types="@types/dom-chromium-ai" />
 
-import { match } from "ts-pattern";
 import { loadAIConfigFromServiceWorker } from "./utils/ai-config";
-import type { AIProvider } from "./utils/ai-interface";
-import { getProvider, setChromeProvider } from "./utils/ai-provider-factory";
+import { getProvider } from "./utils/ai-provider-factory";
 import { analyzeHistoryItems, type ProgressCallback } from "./utils/analyzer";
 import {
 	loadMemoryFromServiceWorker,
@@ -22,10 +20,6 @@ import { onMessage, sendMessage } from "./utils/messaging";
 // Track active analyses
 const activeAnalyses = new Map<string, AbortController>();
 let currentAnalysisId: string | null = null;
-
-// Chrome AI provider instance
-let chromeAIProvider: AIProvider | null = null;
-let isInitializingChromeAI = false;
 
 // Keepalive interval
 let keepaliveInterval: number | null = null;
@@ -90,18 +84,6 @@ onMessage("offscreen:start-analysis", async (message) => {
 		// Load memory and AI config before analysis
 		const memory = await loadMemoryFromServiceWorker();
 		const aiConfig = await loadAIConfigFromServiceWorker();
-
-		// If using Chrome AI and we have an initialized instance, update the factory
-		match(aiConfig.provider)
-			.with("chrome", () => {
-				if (chromeAIProvider) {
-					// Use our already initialized Chrome AI provider
-					setChromeProvider(chromeAIProvider);
-				}
-			})
-			.otherwise(() => {
-				// Claude or other providers will create their own instances
-			});
 
 		const result = await analyzeHistoryItems(
 			historyItems,
@@ -186,104 +168,42 @@ onMessage("offscreen:keepalive", async () => {
 	return { success: true };
 });
 
-// Handle Chrome AI initialization
-onMessage("offscreen:initialize-chrome-ai", async () => {
-	// If already initialized, check and report current status
-	if (chromeAIProvider) {
-		console.log("[Offscreen] Chrome AI already initialized, checking status");
-
-		// Check current Chrome AI availability
-		if (typeof LanguageModel !== "undefined") {
-			const availability = await LanguageModel.availability();
-			console.log("[Offscreen] Current Chrome AI availability:", availability);
-
-			await match(availability)
-				.with("downloading", async () => {
-					// Chrome AI is downloading, just report status
-					await sendMessage("offscreen:chrome-ai-status", {
-						status: "error",
-						error: "Chrome AI is downloading. Please wait for it to complete.",
-					});
-				})
-				.with("available", async () => {
-					await sendMessage("offscreen:chrome-ai-status", {
-						status: "available",
-					});
-				})
-				.with("downloadable", async () => {
-					// Chrome AI is downloadable but user needs to manually enable it
-					await sendMessage("offscreen:chrome-ai-status", {
-						status: "error",
-						error: "Chrome AI not available",
-					});
-				})
-				.otherwise(async () => {
-					await sendMessage("offscreen:chrome-ai-status", {
-						status: "error",
-						error: "Chrome AI not available",
-					});
-				});
-		}
-		return;
-	}
-
-	if (isInitializingChromeAI) {
-		console.log("[Offscreen] Chrome AI initialization already in progress");
-		return;
-	}
-
-	isInitializingChromeAI = true;
-
+// Handle AI initialization for any provider
+onMessage("offscreen:initialize-ai", async () => {
 	try {
-		await sendMessage("offscreen:chrome-ai-status", {
+		// Load the AI config to determine which provider to use
+		const config = await loadAIConfigFromServiceWorker();
+		console.log("[Offscreen] Initializing AI provider:", config.provider);
+
+		// Report initializing status
+		await sendMessage("offscreen:ai-status", {
 			status: "initializing",
 		});
 
-		const config = await loadAIConfigFromServiceWorker();
-		if (config.provider !== "chrome") {
-			throw new Error("Not using Chrome AI provider");
-		}
+		// Get the provider from the factory
+		const provider = getProvider(config);
 
-		chromeAIProvider = getProvider(config);
-
-		// Check if Chrome AI is already downloading
-		if (typeof LanguageModel !== "undefined") {
-			const availability = await LanguageModel.availability();
-
-			if (availability === "downloading") {
-				// Chrome AI is downloading, just report status
-				await sendMessage("offscreen:chrome-ai-status", {
-					status: "error",
-					error: "Chrome AI is downloading. Please wait for it to complete.",
-				});
-				return;
-			}
-		}
-
-		// Initialize Chrome AI
-		await chromeAIProvider.initialize();
+		// Initialize the provider
+		await provider.initialize();
 
 		// Check status after initialization
-		const status = await chromeAIProvider.getStatus();
+		const status = await provider.getStatus();
 		if (status === "available") {
-			await sendMessage("offscreen:chrome-ai-status", {
+			await sendMessage("offscreen:ai-status", {
 				status: "available",
 			});
 		} else {
-			await sendMessage("offscreen:chrome-ai-status", {
+			await sendMessage("offscreen:ai-status", {
 				status: "error",
-				error: "Chrome AI not available",
+				error: `${provider.getProviderName()} not available`,
 			});
 		}
 	} catch (error) {
-		console.error("[Offscreen] Failed to initialize Chrome AI:", error);
-		await sendMessage("offscreen:chrome-ai-status", {
+		console.error("[Offscreen] Failed to initialize AI:", error);
+		await sendMessage("offscreen:ai-status", {
 			status: "error",
 			error: error instanceof Error ? error.message : "Unknown error",
 		});
-		chromeAIProvider = null;
-	} finally {
-		isInitializingChromeAI = false;
 	}
 });
 

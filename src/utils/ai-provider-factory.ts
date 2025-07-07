@@ -56,11 +56,3 @@ export function getProviderDisplayName(type: AIProviderType): string {
 		.with("claude", () => "Claude API (Remote)")
 		.exhaustive();
 }
-
-/**
- * Set Chrome AI provider instance
- * Used by offscreen document to set the initialized provider
- */
-export function setChromeProvider(provider: AIProvider): void {
-	chromeProvider = provider as ChromeAIProvider;
-}

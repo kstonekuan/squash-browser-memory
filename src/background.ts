@@ -601,24 +601,24 @@ onMessage("offscreen:get-ai-config", async () => {
 });
 
 // Handle Chrome AI initialization requests from sidepanel
-onMessage("chrome-ai:initialize", async () => {
+onMessage("ai:initialize", async () => {
 	await ensureOffscreenDocument();
 	// Forward the message to the offscreen document
-	await sendMessage("offscreen:initialize-chrome-ai");
+	await sendMessage("offscreen:initialize-ai");
 });
 
-// Forward Chrome AI status updates from offscreen to sidepanel
-onMessage("offscreen:chrome-ai-status", async (message) => {
+// Forward AI status updates from offscreen to sidepanel
+onMessage("offscreen:ai-status", async (message) => {
 	try {
 		// Forward to sidepanel
-		await sendMessage("offscreen:chrome-ai-status", message.data);
+		await sendMessage("offscreen:ai-status", message.data);
 		console.log(
-			"[Background] Forwarded Chrome AI status to sidepanel:",
+			"[Background] Forwarded AI status to sidepanel:",
 			message.data.status,
 		);
 	} catch (err) {
 		// Sidepanel might be closed
-		console.debug("[Background] Failed to forward Chrome AI status:", err);
+		console.debug("[Background] Failed to forward AI status:", err);
 	}
 });
 

@@ -13,12 +13,7 @@ import MemoryViewer from "./lib/MemoryViewer.svelte";
 import { disableAmbientAnalysis } from "./stores/ambient-store";
 import type { FullAnalysisResult } from "./types";
 import { loadAIConfigFromStorage } from "./utils/ai-config";
-import type {
-	AIProvider,
-	AIProviderStatus,
-	AIProviderType,
-} from "./utils/ai-interface";
-import { getProvider } from "./utils/ai-provider-factory";
+import type { AIProviderStatus, AIProviderType } from "./utils/ai-interface";
 import { clearMemory } from "./utils/analyzer";
 import { onMessage, sendMessage } from "./utils/messaging";
 
@@ -32,7 +27,6 @@ let customPrompts = $state<{
 }>({});
 let currentAIStatus = $state<AIProviderStatus>("unavailable");
 let currentProvider = $state<AIProviderType>("chrome");
-let currentAIProvider = $state<AIProvider | null>(null);
 
 // Unified analysis state
 type AnalysisType = "manual" | "ambient" | null;
@@ -194,20 +188,11 @@ async function checkInitialAIStatus() {
 		const config = await loadAIConfigFromStorage();
 		currentProvider = config.provider;
 
-		if (config.provider === "chrome") {
-			// For Chrome AI, always rely on offscreen document for status
-			// The status will be updated via message handler
-			currentAIStatus = "unavailable"; // Default until we hear from offscreen
-			await sendMessage("chrome-ai:initialize").catch((error) => {
-				console.log("[App] Error initializing Chrome AI:", error);
-			});
-		} else {
-			// Non-Chrome AI provider, use local provider for status check
-			const provider = getProvider(config);
-			currentAIProvider = provider;
-			const status = await provider.getStatus();
-			currentAIStatus = status;
-		}
+		// Always rely on offscreen document for AI status, regardless of provider
+		currentAIStatus = "unavailable"; // Default until we hear from offscreen
+		await sendMessage("ai:initialize").catch((error) => {
+			console.log("[App] Error initializing AI:", error);
+		});
 	} catch (error) {
 		console.error("Error checking initial AI status:", error);
 		currentAIStatus = "unavailable";
@@ -219,7 +204,7 @@ async function handleChromeAIRefresh() {
 
 	console.log("[App] Refreshing Chrome AI status...");
 	// Send initialize message to trigger status check in offscreen
-	await sendMessage("chrome-ai:initialize").catch((error) => {
+	await sendMessage("ai:initialize").catch((error) => {
 		console.log("[App] Error refreshing Chrome AI status:", error);
 	});
 }
@@ -414,18 +399,18 @@ onMount(() => {
 		}
 	});
 
-	// Listen for Chrome AI status updates from offscreen
-	onMessage("offscreen:chrome-ai-status", async (message) => {
+	// Listen for AI status updates from offscreen
+	onMessage("offscreen:ai-status", async (message) => {
 		const { status, error } = message.data;
-		console.log("[App] Chrome AI status update:", status, error);
-
-		if (currentProvider !== "chrome") return;
+		console.log("[App] AI status update:", status, error);
 
 		// Map status to AIProviderStatus
 		if (status === "available") {
 			currentAIStatus = "available";
+		} else if (status === "initializing") {
+			// Keep current status while initializing
 		} else {
-			// All other statuses (error, initializing) map to unavailable
+			// All other statuses (error) map to unavailable
 			currentAIStatus = "unavailable";
 		}
 	});

@@ -120,13 +120,14 @@ interface ProtocolMap {
 	// AI config management
 	"offscreen:get-ai-config": () => AIProviderConfig;
 
-	// Chrome AI initialization (from sidepanel to background)
-	"chrome-ai:initialize": () => void;
+	// AI initialization (from sidepanel to background)
+	"ai:initialize": () => void;
 
-	// Chrome AI initialization (from background to offscreen)
-	"offscreen:initialize-chrome-ai": () => void;
+	// AI initialization (from background to offscreen)
+	"offscreen:initialize-ai": () => void;
 
-	"offscreen:chrome-ai-status": (data: {
+	// AI status updates (from offscreen to background to sidepanel)
+	"offscreen:ai-status": (data: {
 		status: "initializing" | "available" | "error";
 		error?: string;
 	}) => void;
