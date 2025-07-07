@@ -14,10 +14,10 @@
 		"@anthropic-ai/sdk": "0.56.0",
 		"@webext-core/messaging": "2.3.0",
 		"date-fns": "4.1.0",
-		"jsonrepair": "^3.12.0",
-		"simple-chromium-ai": "0.1.0",
+		"jsonrepair": "3.12.0",
+		"simple-chromium-ai": "0.1.1",
 		"ts-pattern": "5.7.1",
-		"zod": "3.25.74"
+		"zod": "3.25.75"
 	},
 	"devDependencies": {
 		"@biomejs/biome": "2.0.6",

@@ -18,17 +18,17 @@ importers:
         specifier: 4.1.0
         version: 4.1.0
       jsonrepair:
-        specifier: ^3.12.0
+        specifier: 3.12.0
         version: 3.12.0
       simple-chromium-ai:
-        specifier: 0.1.0
-        version: 0.1.0
+        specifier: 0.1.1
+        version: 0.1.1
       ts-pattern:
         specifier: 5.7.1
         version: 5.7.1
       zod:
-        specifier: 3.25.74
-        version: 3.25.74
+        specifier: 3.25.75
+        version: 3.25.75
     devDependencies:
       '@biomejs/biome':
         specifier: 2.0.6
@@ -1308,8 +1308,8 @@ packages:
   siginfo@2.0.0:
     resolution: {integrity: sha512-ybx0WO1/8bSBLEWXZvEd7gMW3Sn3JFlW3TvX1nREbDLRNQNaeNN8WK0meBwPdAaOI7TtRRRJn/Es1zhrrCHu7g==}
 
-  simple-chromium-ai@0.1.0:
-    resolution: {integrity: sha512-zSU9p6R+H0UsvUR0Hhr/q7vRh9zZ3MGaOEIpD1NOf9QQT+7mSZtdGsu4POSI3W9OCP0SgecLfDtZRUOjFqmrUg==}
+  simple-chromium-ai@0.1.1:
+    resolution: {integrity: sha512-WsHWvXugfhkPGCiWiRJcNlO8vVug5uPkspzuxxTkDZ/9FZpj8OuCPMCqMhSSODYTMeH898EUJJ9gdFE1tp42iQ==}
     engines: {node: '>=14.0.0'}
 
   sirv@3.0.1:
@@ -1591,8 +1591,8 @@ packages:
     peerDependencies:
       zod: ^3.25.0
 
-  zod@3.25.74:
-    resolution: {integrity: sha512-J8poo92VuhKjNknViHRAIuuN6li/EwFbAC8OedzI8uxpEPGiXHGQu9wemIAioIpqgfB4SySaJhdk0mH5Y4ICBg==}
+  zod@3.25.75:
+    resolution: {integrity: sha512-OhpzAmVzabPOL6C3A3gpAifqr9MqihV/Msx3gor2b2kviCgcb+HM9SEOpMWwwNp9MRunWnhtAKUoo0AHhjyPPg==}
 
 snapshots:
 
@@ -2491,8 +2491,8 @@ snapshots:
       smol-toml: 1.4.1
       strip-json-comments: 5.0.2
       typescript: 5.8.3
-      zod: 3.25.74
-      zod-validation-error: 3.5.2(zod@3.25.74)
+      zod: 3.25.75
+      zod-validation-error: 3.5.2(zod@3.25.75)
 
   lightningcss-darwin-arm64@1.30.1:
     optional: true
@@ -2706,7 +2706,7 @@ snapshots:
 
   siginfo@2.0.0: {}
 
-  simple-chromium-ai@0.1.0:
+  simple-chromium-ai@0.1.1:
     dependencies:
       '@types/dom-chromium-ai': 0.0.9
       neverthrow: 8.2.0
@@ -2954,8 +2954,8 @@ snapshots:
 
   zimmerframe@1.1.2: {}
 
-  zod-validation-error@3.5.2(zod@3.25.74):
+  zod-validation-error@3.5.2(zod@3.25.75):
     dependencies:
-      zod: 3.25.74
+      zod: 3.25.75
 
-  zod@3.25.74: {}
+  zod@3.25.75: {}

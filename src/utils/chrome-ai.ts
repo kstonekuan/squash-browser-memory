@@ -1,7 +1,6 @@
 /// <reference types="@types/dom-chromium-ai" />
 
 import ChromiumAI, { type ChromiumAIInstance } from "simple-chromium-ai";
-import { match } from "ts-pattern";
 import type {
 	AIProvider,
 	AIProviderCapabilities,
@@ -27,24 +26,17 @@ export class ChromeAIProvider implements AIProvider {
 		// Initialize with the system prompt
 		const result = await ChromiumAI.Safe.initialize(systemPrompt);
 
-		if (result.isErr()) {
-			console.error("Error initializing Chrome AI:", result.error);
-			throw result.error;
-		}
-
-		const value = result.value;
-
-		// Use ts-pattern to match on the tagged union
-		match(value)
-			.with({ type: "initialized" }, ({ instance }) => {
-				// We got an instance - model is ready
+		await result.match(
+			(instance) => {
+				// Success: The result.value is now a ChromiumAIInstance directly
 				this.aiInstance = instance;
-			})
-			.with({ type: "needs-download" }, () => {
-				// Chrome AI needs to be downloaded - user must do this manually
-				// Don't throw - let the UI handle showing instructions
-			})
-			.exhaustive();
+			},
+			(error) => {
+				// Error: Log and throw
+				console.error("Error initializing Chrome AI:", error);
+				throw error;
+			},
+		);
 	}
 
 	async prompt(
@@ -63,12 +55,13 @@ export class ChromeAIProvider implements AIProvider {
 			undefined, // no additional session options
 		);
 
-		if (result.isErr()) {
-			console.error("Chrome AI Error:", result.error);
-			throw result.error;
-		}
-
-		return result.value;
+		return result.match(
+			(response) => response,
+			(error) => {
+				console.error("Chrome AI Error:", error);
+				throw error;
+			},
+		);
 	}
 
 	async measureInputUsage(
@@ -83,11 +76,13 @@ export class ChromeAIProvider implements AIProvider {
 			this.aiInstance,
 			prompt,
 		);
-		if (result.isErr()) {
-			throw result.error;
-		}
 
-		return result.value.promptTokens;
+		return result.match(
+			(usage) => usage.promptTokens,
+			(error) => {
+				throw error;
+			},
+		);
 	}
 
 	getProviderName(): string {
