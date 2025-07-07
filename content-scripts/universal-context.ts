@@ -100,11 +100,16 @@ class SimplePlatformAdapter {
 			},
 			claude: {
 				composerActions: [
+					// New Claude.ai interface - target the container with buttons
+					".relative.flex-1.flex.items-center.gap-2.shrink.min-w-0",
+					".flex.flex-row.items-center.gap-2.min-w-0",
+					// Fallback selectors for older versions
 					'[data-testid="composer-actions"]',
 					'div[class*="composer"] div[class*="actions"]',
 					'div[class*="input"] div[class*="toolbar"]',
 				],
 				chatInput: [
+					// Look for textarea first, then contenteditable
 					"textarea",
 					'[contenteditable="true"]',
 					'input[type="text"]',
@@ -112,8 +117,7 @@ class SimplePlatformAdapter {
 				buttonClass: "context-btn",
 				insertionMethod: "append",
 				styling: {
-					buttonStyles:
-						"inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 hover:bg-accent hover:text-accent-foreground h-9 w-9",
+					buttonStyles: "context-btn-claude",
 					iconSize: "16",
 					textClass: "sr-only",
 				},
@@ -190,6 +194,27 @@ class SimplePlatformAdapter {
 			if (trailingActions) {
 				console.log("Found composer-trailing-actions, will inject inside it");
 				return trailingActions;
+			}
+		}
+
+		// For Claude.ai, look for the specific button container
+		if (this.currentPlatform === "claude") {
+			// Look for the container that has the plus and tools buttons
+			const buttonContainer = document.querySelector(
+				".relative.flex-1.flex.items-center.gap-2.shrink.min-w-0",
+			) as HTMLElement;
+			if (buttonContainer) {
+				console.log("Found Claude button container");
+				return buttonContainer;
+			}
+
+			// Fallback: look for the gap container
+			const gapContainer = document.querySelector(
+				".flex.flex-row.items-center.gap-2.min-w-0",
+			) as HTMLElement;
+			if (gapContainer) {
+				console.log("Found Claude gap container");
+				return gapContainer;
 			}
 		}
 
@@ -313,7 +338,7 @@ class SimplePlatformAdapter {
 		);
 		button.setAttribute("data-testid", "context-selection-button");
 
-		// ChatGPT specific styling
+		// Platform-specific styling
 		if (this.currentPlatform === "chatgpt") {
 			button.style.cssText = `
 				display: flex;
@@ -345,6 +370,64 @@ class SimplePlatformAdapter {
 				if (!button.classList.contains("active")) {
 					button.style.backgroundColor = "transparent";
 				}
+			});
+		} else if (this.currentPlatform === "claude") {
+			// Claude.ai specific styling to match their button design
+			button.style.cssText = `
+				display: inline-flex;
+				align-items: center;
+				justify-content: center;
+				position: relative;
+				flex-shrink: 0;
+				border: 0.5px solid;
+				transition: all 0.2s;
+				height: 32px;
+				min-width: 32px;
+				border-radius: 8px;
+				padding: 0 7.5px;
+				color: hsl(var(--text-300) / 1) !important;
+				border-color: rgb(var(--border-300));
+				background: transparent !important;
+				cursor: pointer;
+				outline-offset: 1px;
+			`;
+
+			button.addEventListener("mouseenter", () => {
+				if (!button.classList.contains("active")) {
+					button.style.setProperty(
+						"color",
+						"hsl(var(--text-200) / .9)",
+						"important",
+					);
+					button.style.setProperty(
+						"background-color",
+						"hsl(var(--bg-100))",
+						"important",
+					);
+				}
+			});
+
+			button.addEventListener("mouseleave", () => {
+				if (!button.classList.contains("active")) {
+					button.style.setProperty(
+						"color",
+						"hsl(var(--text-300) / 1)",
+						"important",
+					);
+					button.style.setProperty(
+						"background-color",
+						"transparent",
+						"important",
+					);
+				}
+			});
+
+			button.addEventListener("mousedown", () => {
+				button.style.transform = "scale(0.98)";
+			});
+
+			button.addEventListener("mouseup", () => {
+				button.style.transform = "scale(1)";
 			});
 		}
 
@@ -828,9 +911,9 @@ class ContextButtonInjector {
 			// Create and inject the context button
 			this.buttonElement = this.createContextButton();
 
-			// For ChatGPT, insert as first child inside trailing actions div
+			// Platform-specific injection logic
 			if (this.platformAdapter.getPlatform() === "chatgpt") {
-				// The container is the trailing actions div itself, insert as first child
+				// For ChatGPT, insert as first child inside trailing actions div
 				const firstChild = container.firstChild;
 				if (firstChild) {
 					container.insertBefore(this.buttonElement, firstChild);
@@ -840,6 +923,19 @@ class ContextButtonInjector {
 				} else {
 					container.appendChild(this.buttonElement);
 					console.log("Context button added to trailing actions (was empty)");
+				}
+			} else if (this.platformAdapter.getPlatform() === "claude") {
+				// For Claude.ai, insert in the gap container (after existing buttons)
+				const gapContainer = container.querySelector(
+					".flex.flex-row.items-center.gap-2.min-w-0",
+				);
+				if (gapContainer) {
+					gapContainer.appendChild(this.buttonElement);
+					console.log("Context button added to Claude gap container");
+				} else {
+					// Fallback: insert at the end of the main container
+					container.appendChild(this.buttonElement);
+					console.log("Context button added to Claude main container");
 				}
 			} else {
 				container.appendChild(this.buttonElement);
@@ -933,6 +1029,22 @@ class ContextButtonInjector {
 			button.style.backgroundColor = "var(--brand-purple, #ab68ff)";
 			button.style.borderColor = "var(--brand-purple, #ab68ff)";
 			button.style.color = "white";
+		} else if (this.platformAdapter.getPlatform() === "claude") {
+			button.style.setProperty(
+				"background-color",
+				"hsl(var(--bg-100))",
+				"important",
+			);
+			button.style.setProperty(
+				"border-color",
+				"rgb(var(--border-400))",
+				"important",
+			);
+			button.style.setProperty(
+				"color",
+				"hsl(var(--text-100) / 1)",
+				"important",
+			);
 		}
 	}
 
@@ -941,6 +1053,18 @@ class ContextButtonInjector {
 			button.style.backgroundColor = "transparent";
 			button.style.borderColor = "var(--token-border-default, #d1d5db)";
 			button.style.color = "var(--token-text-secondary, #6b7280)";
+		} else if (this.platformAdapter.getPlatform() === "claude") {
+			button.style.setProperty("background-color", "transparent", "important");
+			button.style.setProperty(
+				"border-color",
+				"rgb(var(--border-300))",
+				"important",
+			);
+			button.style.setProperty(
+				"color",
+				"hsl(var(--text-300) / 1)",
+				"important",
+			);
 		}
 	}
 
