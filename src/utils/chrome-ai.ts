@@ -1,10 +1,6 @@
 /// <reference types="@types/dom-chromium-ai" />
 
-import ChromiumAI, {
-	type ChromiumAIInstance,
-	type TriggerDownload,
-} from "simple-chromium-ai";
-import { match } from "ts-pattern";
+import ChromiumAI, { type ChromiumAIInstance } from "simple-chromium-ai";
 import type {
 	AIProvider,
 	AIProviderCapabilities,
@@ -16,7 +12,6 @@ import type {
  */
 export class ChromeAIProvider implements AIProvider {
 	private aiInstance: ChromiumAIInstance | null = null;
-	private triggerDownload: TriggerDownload | null = null;
 
 	async isAvailable(): Promise<boolean> {
 		return this.aiInstance !== null;
@@ -27,55 +22,21 @@ export class ChromeAIProvider implements AIProvider {
 		return this.aiInstance ? "available" : "unavailable";
 	}
 
-	needsDownload(): boolean {
-		return this.triggerDownload !== null;
-	}
+	async initialize(systemPrompt?: string): Promise<void> {
+		// Initialize with the system prompt
+		const result = await ChromiumAI.Safe.initialize(systemPrompt);
 
-	async initialize(
-		systemPrompt?: string,
-		onDownloadProgress?: (progress: number) => void,
-	): Promise<void> {
-		// Initialize with the system prompt and progress callback
-		const result = await ChromiumAI.Safe.initialize(
-			systemPrompt,
-			onDownloadProgress,
-		);
-
-		if (result.isErr()) {
-			console.error("Error initializing Chrome AI:", result.error);
-			throw result.error;
-		}
-
-		const value = result.value;
-
-		// Use ts-pattern to match on the tagged union
-		match(value)
-			.with({ type: "initialized" }, ({ instance }) => {
-				// We got an instance - model is ready
+		await result.match(
+			(instance) => {
+				// Success: The result.value is now a ChromiumAIInstance directly
 				this.aiInstance = instance;
-				this.triggerDownload = null;
-			})
-			.with({ type: "needs-download" }, ({ trigger }) => {
-				// We got a trigger function - need user to download
-				// Store it for later use
-				this.triggerDownload = trigger;
-				// Don't throw - let the UI handle showing the button
-			})
-			.exhaustive();
-	}
-
-	async triggerModelDownload(): Promise<void> {
-		if (!this.triggerDownload) {
-			throw new Error("No download to trigger");
-		}
-
-		const result = await this.triggerDownload();
-		if (result.isErr()) {
-			throw result.error;
-		}
-
-		this.aiInstance = result.value;
-		this.triggerDownload = null;
+			},
+			(error) => {
+				// Error: Log and throw
+				console.error("Error initializing Chrome AI:", error);
+				throw error;
+			},
+		);
 	}
 
 	async prompt(
@@ -94,12 +55,13 @@ export class ChromeAIProvider implements AIProvider {
 			undefined, // no additional session options
 		);
 
-		if (result.isErr()) {
-			console.error("Chrome AI Error:", result.error);
-			throw result.error;
-		}
-
-		return result.value;
+		return result.match(
+			(response) => response,
+			(error) => {
+				console.error("Chrome AI Error:", error);
+				throw error;
+			},
+		);
 	}
 
 	async measureInputUsage(
@@ -114,11 +76,13 @@ export class ChromeAIProvider implements AIProvider {
 			this.aiInstance,
 			prompt,
 		);
-		if (result.isErr()) {
-			throw result.error;
-		}
 
-		return result.value.promptTokens;
+		return result.match(
+			(usage) => usage.promptTokens,
+			(error) => {
+				throw error;
+			},
+		);
 	}
 
 	getProviderName(): string {

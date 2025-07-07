@@ -123,15 +123,11 @@ interface ProtocolMap {
 	// Chrome AI initialization (from sidepanel to background)
 	"chrome-ai:initialize": () => void;
 
-	"chrome-ai:trigger-download": () => void;
-
 	// Chrome AI initialization (from background to offscreen)
 	"offscreen:initialize-chrome-ai": () => void;
 
-	"offscreen:trigger-chrome-ai-download": () => void;
-
 	"offscreen:chrome-ai-status": (data: {
-		status: "initializing" | "downloading" | "available" | "error";
+		status: "initializing" | "available" | "error";
 		error?: string;
 	}) => void;
 }

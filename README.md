@@ -81,7 +81,8 @@ This feature will enable a new level of personalization across your AI-powered t
 - **Requirements**: Chrome version 138 or later with Chrome AI setup:
   1. Enable "Prompt API for Gemini Nano" in chrome://flags
   2. Update "Optimization Guide On Device Model" in chrome://components
-- **Model Download**: The first time you use Chrome AI, you'll need to download the AI model (approximately 22GB). The download continues even if you close the extension.
+     - **⚠️ Warning**: This will download a model that is ~22GB
+- **Model Size**: The Chrome AI model is ~22GB and must be downloaded through Chrome's components page.
 - **Best for**: Users who prioritize privacy and want to perform analysis without an internet connection.
 
 ### 2. Anthropic Claude (Remote)

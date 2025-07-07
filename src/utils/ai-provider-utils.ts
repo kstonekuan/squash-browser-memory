@@ -14,13 +14,11 @@ let isInitialized = false;
 /**
  * Get or create an initialized AI provider using the current configuration
  * @param systemPrompt Optional system prompt to use
- * @param onDownloadProgress Optional callback for download progress
  * @param config Optional AI provider config to use instead of loading from storage
  */
 export async function getInitializedProvider(
 	config: AIProviderConfig,
 	systemPrompt?: string,
-	onDownloadProgress?: (progress: number) => void,
 ): Promise<AIProvider | null> {
 	try {
 		const provider = getProvider(config);
@@ -28,12 +26,12 @@ export async function getInitializedProvider(
 		// Check if we need to reinitialize (different provider or not initialized)
 		if (currentProvider !== provider || !isInitialized) {
 			currentProvider = provider;
-			await provider.initialize(systemPrompt, onDownloadProgress);
+			await provider.initialize(systemPrompt);
 			isInitialized = true;
 			console.log(`Initialized AI provider: ${provider.getProviderName()}`);
 		} else if (systemPrompt && currentProvider) {
 			// Reinitialize with new system prompt if provided
-			await currentProvider.initialize(systemPrompt, onDownloadProgress);
+			await currentProvider.initialize(systemPrompt);
 		}
 
 		return currentProvider;

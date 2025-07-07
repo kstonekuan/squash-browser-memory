@@ -1,6 +1,4 @@
 <script lang="ts">
-/// <reference types="@types/dom-chromium-ai" />
-
 import { onMount } from "svelte";
 import { match } from "ts-pattern";
 import AdvancedSettings from "./lib/AdvancedSettings.svelte";
@@ -20,7 +18,7 @@ import type {
 	AIProviderStatus,
 	AIProviderType,
 } from "./utils/ai-interface";
-import { getProvider, resetChromeProvider } from "./utils/ai-provider-factory";
+import { getProvider } from "./utils/ai-provider-factory";
 import { clearMemory } from "./utils/analyzer";
 import { onMessage, sendMessage } from "./utils/messaging";
 
@@ -34,8 +32,6 @@ let customPrompts = $state<{
 }>({});
 let currentAIStatus = $state<AIProviderStatus>("unavailable");
 let currentProvider = $state<AIProviderType>("chrome");
-let aiNeedsDownload = $state(false);
-let aiIsDownloading = $state(false);
 let currentAIProvider = $state<AIProvider | null>(null);
 
 // Unified analysis state
@@ -198,40 +194,13 @@ async function checkInitialAIStatus() {
 		const config = await loadAIConfigFromStorage();
 		currentProvider = config.provider;
 
-		// For Chrome AI, use offscreen document for initialization
 		if (config.provider === "chrome") {
-			// Check basic availability first
-			if (typeof LanguageModel !== "undefined") {
-				const availability = await LanguageModel.availability();
-				console.log("[App] Chrome AI availability:", availability);
-
-				if (availability === "downloading") {
-					// Chrome AI is currently downloading
-					aiIsDownloading = true;
-					currentAIStatus = "unavailable";
-					// Initialize in offscreen to track the download
-					try {
-						await sendMessage("chrome-ai:initialize");
-					} catch (error) {
-						console.log("[App] Error tracking Chrome AI download:", error);
-					}
-				} else if (availability === "available") {
-					currentAIStatus = "available";
-				} else if (availability === "downloadable") {
-					// Trigger initialization in offscreen to check if download is needed
-					currentAIStatus = "unavailable";
-					try {
-						await sendMessage("chrome-ai:initialize");
-					} catch (error) {
-						console.log("[App] Error initializing Chrome AI:", error);
-					}
-				} else {
-					// unavailable
-					currentAIStatus = "unavailable";
-				}
-			} else {
-				currentAIStatus = "unavailable";
-			}
+			// For Chrome AI, always rely on offscreen document for status
+			// The status will be updated via message handler
+			currentAIStatus = "unavailable"; // Default until we hear from offscreen
+			await sendMessage("chrome-ai:initialize").catch((error) => {
+				console.log("[App] Error initializing Chrome AI:", error);
+			});
 		} else {
 			// Non-Chrome AI provider, use local provider for status check
 			const provider = getProvider(config);
@@ -245,20 +214,14 @@ async function checkInitialAIStatus() {
 	}
 }
 
-async function handleAIDownload() {
+async function handleChromeAIRefresh() {
 	if (currentProvider !== "chrome") return;
 
-	aiNeedsDownload = false;
-	aiIsDownloading = true;
-
-	try {
-		// Trigger download in offscreen document
-		await sendMessage("chrome-ai:trigger-download");
-	} catch (error) {
-		console.error("Error triggering Chrome AI download:", error);
-		currentAIStatus = "unavailable";
-		aiIsDownloading = false;
-	}
+	console.log("[App] Refreshing Chrome AI status...");
+	// Send initialize message to trigger status check in offscreen
+	await sendMessage("chrome-ai:initialize").catch((error) => {
+		console.log("[App] Error refreshing Chrome AI status:", error);
+	});
 }
 
 // Query ambient analysis status on mount and listen for updates
@@ -451,38 +414,20 @@ onMount(() => {
 		}
 	});
 
-	// Listen for Chrome AI status updates
+	// Listen for Chrome AI status updates from offscreen
 	onMessage("offscreen:chrome-ai-status", async (message) => {
 		const { status, error } = message.data;
 		console.log("[App] Chrome AI status update:", status, error);
 
 		if (currentProvider !== "chrome") return;
 
-		match(status)
-			.with("initializing", () => {
-				// Keep current state
-			})
-			.with("downloading", () => {
-				aiIsDownloading = true;
-				aiNeedsDownload = false;
-				currentAIStatus = "unavailable";
-			})
-			.with("available", () => {
-				aiIsDownloading = false;
-				aiNeedsDownload = false;
-				currentAIStatus = "available";
-			})
-			.with("error", () => {
-				aiIsDownloading = false;
-				if (
-					error?.includes("needs-download") ||
-					error?.includes("needs download")
-				) {
-					aiNeedsDownload = true;
-				}
-				currentAIStatus = "unavailable";
-			})
-			.exhaustive();
+		// Map status to AIProviderStatus
+		if (status === "available") {
+			currentAIStatus = "available";
+		} else {
+			// All other statuses (error, initializing) map to unavailable
+			currentAIStatus = "unavailable";
+		}
 	});
 
 	// Cleanup
@@ -501,9 +446,7 @@ onMount(() => {
 			<AIProviderStatusComponent 
 				status={currentAIStatus}
 				providerType={currentProvider}
-				needsDownload={aiNeedsDownload}
-				isDownloading={aiIsDownloading}
-				onDownloadClick={handleAIDownload}
+				onRefresh={handleChromeAIRefresh}
 			/>
 		</div>
 
