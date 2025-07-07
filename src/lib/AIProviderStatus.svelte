@@ -100,7 +100,8 @@ function getStatusMessage(status: AIProviderStatus): string {
 			<p>Chrome AI is not available. Please ensure:</p>
 			<ul class="mt-1 ml-4 list-disc">
 				<li>You're using Chrome 138 or later</li>
-				<li>"Prompt API for Gemini Nano" is enabled in chrome://flags</li>
+				<li>Enable "Prompt API for Gemini Nano" in chrome://flags</li>
+				<li>Update "Optimization Guide On Device Model" in chrome://components</li>
 			</ul>
 		</div>
 	{:else if status === 'unavailable'}
