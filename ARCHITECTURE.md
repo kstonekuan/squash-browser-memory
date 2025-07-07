@@ -133,13 +133,13 @@ The extension supports two types of AI providers, configured via a factory patte
 - **Privacy-First**: All data processing happens locally in the browser.
 - **Token Management**: Automatic chunking to stay within Chrome AI's token limits.
 - **Retry Logic**: Exponential backoff for quota-exceeded scenarios.
-- **Model Download**: Chrome AI requires a one-time download of the Gemini Nano model (~22GB). The download is managed by the offscreen document and continues even if the side panel is closed.
+- **Model Requirements**: Chrome AI requires the Gemini Nano model (~22GB) to be downloaded via Chrome's components page (chrome://components).
 - **Initialization Flow**: 
-  1. Side panel detects Chrome AI availability
+  1. Side panel checks Chrome AI availability on mount
   2. Sends initialization request to background service worker
   3. Background ensures offscreen document exists
-  4. Offscreen document handles Chrome AI initialization and download
-  5. Status updates are sent back to the side panel
+  4. Offscreen document checks Chrome AI status
+  5. If unavailable, side panel shows setup instructions
 
 #### 4.2. Remote AI (e.g., Anthropic Claude)
 - **Remote Processing**: The offscreen document sends browsing history to a third-party API.

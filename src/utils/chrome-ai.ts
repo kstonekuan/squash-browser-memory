@@ -1,9 +1,6 @@
 /// <reference types="@types/dom-chromium-ai" />
 
-import ChromiumAI, {
-	type ChromiumAIInstance,
-	type TriggerDownload,
-} from "simple-chromium-ai";
+import ChromiumAI, { type ChromiumAIInstance } from "simple-chromium-ai";
 import { match } from "ts-pattern";
 import type {
 	AIProvider,
@@ -16,7 +13,6 @@ import type {
  */
 export class ChromeAIProvider implements AIProvider {
 	private aiInstance: ChromiumAIInstance | null = null;
-	private triggerDownload: TriggerDownload | null = null;
 
 	async isAvailable(): Promise<boolean> {
 		return this.aiInstance !== null;
@@ -27,19 +23,9 @@ export class ChromeAIProvider implements AIProvider {
 		return this.aiInstance ? "available" : "unavailable";
 	}
 
-	needsDownload(): boolean {
-		return this.triggerDownload !== null;
-	}
-
-	async initialize(
-		systemPrompt?: string,
-		onDownloadProgress?: (progress: number) => void,
-	): Promise<void> {
-		// Initialize with the system prompt and progress callback
-		const result = await ChromiumAI.Safe.initialize(
-			systemPrompt,
-			onDownloadProgress,
-		);
+	async initialize(systemPrompt?: string): Promise<void> {
+		// Initialize with the system prompt
+		const result = await ChromiumAI.Safe.initialize(systemPrompt);
 
 		if (result.isErr()) {
 			console.error("Error initializing Chrome AI:", result.error);
@@ -53,29 +39,12 @@ export class ChromeAIProvider implements AIProvider {
 			.with({ type: "initialized" }, ({ instance }) => {
 				// We got an instance - model is ready
 				this.aiInstance = instance;
-				this.triggerDownload = null;
 			})
-			.with({ type: "needs-download" }, ({ trigger }) => {
-				// We got a trigger function - need user to download
-				// Store it for later use
-				this.triggerDownload = trigger;
-				// Don't throw - let the UI handle showing the button
+			.with({ type: "needs-download" }, () => {
+				// Chrome AI needs to be downloaded - user must do this manually
+				// Don't throw - let the UI handle showing instructions
 			})
 			.exhaustive();
-	}
-
-	async triggerModelDownload(): Promise<void> {
-		if (!this.triggerDownload) {
-			throw new Error("No download to trigger");
-		}
-
-		const result = await this.triggerDownload();
-		if (result.isErr()) {
-			throw result.error;
-		}
-
-		this.aiInstance = result.value;
-		this.triggerDownload = null;
 	}
 
 	async prompt(

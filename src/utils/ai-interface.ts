@@ -19,13 +19,8 @@ export interface AIProvider {
 	/**
 	 * Initialize the provider with a system prompt
 	 * @param systemPrompt The system prompt to use
-	 * @param onDownloadProgress Optional callback for download progress (0-100)
-	 * @param triggerDownloadButton Optional button element for Chrome AI model download
 	 */
-	initialize(
-		systemPrompt?: string,
-		onDownloadProgress?: (progress: number) => void,
-	): Promise<void>;
+	initialize(systemPrompt?: string): Promise<void>;
 
 	/**
 	 * Send a prompt to the AI and get a response
@@ -59,16 +54,6 @@ export interface AIProvider {
 	 * Get provider capabilities for optimization
 	 */
 	getCapabilities(): AIProviderCapabilities;
-
-	/**
-	 * Trigger model download for Chrome AI (if available)
-	 */
-	triggerModelDownload?(): Promise<void>;
-
-	/**
-	 * Check if model needs to be downloaded
-	 */
-	needsDownload?(): boolean;
 }
 
 export interface AIProviderCapabilities {

@@ -71,10 +71,7 @@ export class ClaudeProvider implements AIProvider {
 		}
 	}
 
-	async initialize(
-		systemPrompt?: string,
-		_onDownloadProgress?: (progress: number) => void,
-	): Promise<void> {
+	async initialize(systemPrompt?: string): Promise<void> {
 		if (!this.apiKey) {
 			throw new Error("Claude API key is required");
 		}

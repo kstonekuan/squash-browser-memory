@@ -34,8 +34,6 @@ let customPrompts = $state<{
 }>({});
 let currentAIStatus = $state<AIProviderStatus>("unavailable");
 let currentProvider = $state<AIProviderType>("chrome");
-let aiNeedsDownload = $state(false);
-let aiIsDownloading = $state(false);
 let currentAIProvider = $state<AIProvider | null>(null);
 
 // Unified analysis state
@@ -207,25 +205,11 @@ async function checkInitialAIStatus() {
 
 				if (availability === "downloading") {
 					// Chrome AI is currently downloading
-					aiIsDownloading = true;
 					currentAIStatus = "unavailable";
-					// Initialize in offscreen to track the download
-					try {
-						await sendMessage("chrome-ai:initialize");
-					} catch (error) {
-						console.log("[App] Error tracking Chrome AI download:", error);
-					}
 				} else if (availability === "available") {
 					currentAIStatus = "available";
-				} else if (availability === "downloadable") {
-					// Trigger initialization in offscreen to check if download is needed
-					currentAIStatus = "unavailable";
-					try {
-						await sendMessage("chrome-ai:initialize");
-					} catch (error) {
-						console.log("[App] Error initializing Chrome AI:", error);
-					}
 				} else {
+					// unavailable or downloadable
 					// unavailable
 					currentAIStatus = "unavailable";
 				}
@@ -245,26 +229,23 @@ async function checkInitialAIStatus() {
 	}
 }
 
-async function handleAIDownload() {
-	if (currentProvider !== "chrome") return;
-
-	aiNeedsDownload = false;
-	aiIsDownloading = true;
-
-	try {
-		// Trigger download in offscreen document
-		await sendMessage("chrome-ai:trigger-download");
-	} catch (error) {
-		console.error("Error triggering Chrome AI download:", error);
-		currentAIStatus = "unavailable";
-		aiIsDownloading = false;
-	}
-}
-
 // Query ambient analysis status on mount and listen for updates
 onMount(() => {
 	// Check AI status first
 	checkInitialAIStatus();
+
+	// If using Chrome AI, trigger re-initialization in offscreen document
+	// This ensures we check the latest status when sidepanel reopens
+	loadAIConfigFromStorage().then((config) => {
+		if (config.provider === "chrome") {
+			sendMessage("chrome-ai:initialize").catch((error) => {
+				console.log(
+					"[App] Error triggering Chrome AI re-initialization:",
+					error,
+				);
+			});
+		}
+	});
 
 	// Listen for storage changes to detect provider changes
 	const storageListener = (changes: {
@@ -451,40 +432,6 @@ onMount(() => {
 		}
 	});
 
-	// Listen for Chrome AI status updates
-	onMessage("offscreen:chrome-ai-status", async (message) => {
-		const { status, error } = message.data;
-		console.log("[App] Chrome AI status update:", status, error);
-
-		if (currentProvider !== "chrome") return;
-
-		match(status)
-			.with("initializing", () => {
-				// Keep current state
-			})
-			.with("downloading", () => {
-				aiIsDownloading = true;
-				aiNeedsDownload = false;
-				currentAIStatus = "unavailable";
-			})
-			.with("available", () => {
-				aiIsDownloading = false;
-				aiNeedsDownload = false;
-				currentAIStatus = "available";
-			})
-			.with("error", () => {
-				aiIsDownloading = false;
-				if (
-					error?.includes("needs-download") ||
-					error?.includes("needs download")
-				) {
-					aiNeedsDownload = true;
-				}
-				currentAIStatus = "unavailable";
-			})
-			.exhaustive();
-	});
-
 	// Cleanup
 	return () => {
 		chrome.storage.onChanged.removeListener(storageListener);
@@ -501,9 +448,6 @@ onMount(() => {
 			<AIProviderStatusComponent 
 				status={currentAIStatus}
 				providerType={currentProvider}
-				needsDownload={aiNeedsDownload}
-				isDownloading={aiIsDownloading}
-				onDownloadClick={handleAIDownload}
 			/>
 		</div>
 

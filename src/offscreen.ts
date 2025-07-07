@@ -3,11 +3,7 @@
 import { match } from "ts-pattern";
 import { loadAIConfigFromServiceWorker } from "./utils/ai-config";
 import type { AIProvider } from "./utils/ai-interface";
-import {
-	getProvider,
-	resetChromeProvider,
-	setChromeProvider,
-} from "./utils/ai-provider-factory";
+import { getProvider, setChromeProvider } from "./utils/ai-provider-factory";
 import { analyzeHistoryItems, type ProgressCallback } from "./utils/analyzer";
 import {
 	loadMemoryFromServiceWorker,
@@ -33,21 +29,6 @@ let isInitializingChromeAI = false;
 
 // Keepalive interval
 let keepaliveInterval: number | null = null;
-
-// Create a reusable download progress callback
-function createDownloadProgressCallback(): (progress: number) => void {
-	let lastLoggedProgress = 0;
-	return (progress: number) => {
-		const roundedProgress = Math.round(progress);
-
-		if (roundedProgress % 10 === 0 && roundedProgress > lastLoggedProgress) {
-			console.log(
-				`[Offscreen] Chrome AI download progress: ${roundedProgress}% (Might be inaccurate)`,
-			);
-			lastLoggedProgress = roundedProgress;
-		}
-	};
-}
 
 // Start keepalive mechanism
 function startKeepalive() {
@@ -218,36 +199,11 @@ onMessage("offscreen:initialize-chrome-ai", async () => {
 
 			await match(availability)
 				.with("downloading", async () => {
+					// Chrome AI is downloading, just report status
 					await sendMessage("offscreen:chrome-ai-status", {
-						status: "downloading",
+						status: "error",
+						error: "Chrome AI is downloading. Please wait for it to complete.",
 					});
-
-					// Start monitoring the download
-					console.log(
-						"[Offscreen] Chrome AI is downloading, monitoring progress...",
-					);
-
-					try {
-						// Re-initialize to wait for download completion
-						await chromeAIProvider!.initialize(
-							undefined,
-							createDownloadProgressCallback(),
-						);
-
-						// Download completed
-						await sendMessage("offscreen:chrome-ai-status", {
-							status: "available",
-						});
-					} catch (error) {
-						console.error(
-							"[Offscreen] Error waiting for Chrome AI download:",
-							error,
-						);
-						await sendMessage("offscreen:chrome-ai-status", {
-							status: "error",
-							error: error instanceof Error ? error.message : "Download failed",
-						});
-					}
 				})
 				.with("available", async () => {
 					await sendMessage("offscreen:chrome-ai-status", {
@@ -255,19 +211,11 @@ onMessage("offscreen:initialize-chrome-ai", async () => {
 					});
 				})
 				.with("downloadable", async () => {
-					// Check if it needs download button
-					if (chromeAIProvider!.needsDownload?.()) {
-						await sendMessage("offscreen:chrome-ai-status", {
-							status: "error",
-							error: "needs-download",
-						});
-					} else {
-						// Downloadable but no trigger available yet
-						await sendMessage("offscreen:chrome-ai-status", {
-							status: "error",
-							error: "Chrome AI downloadable but not ready",
-						});
-					}
+					// Chrome AI is downloadable but user needs to manually enable it
+					await sendMessage("offscreen:chrome-ai-status", {
+						status: "error",
+						error: "Chrome AI not available",
+					});
 				})
 				.otherwise(async () => {
 					await sendMessage("offscreen:chrome-ai-status", {
@@ -302,46 +250,29 @@ onMessage("offscreen:initialize-chrome-ai", async () => {
 		if (typeof LanguageModel !== "undefined") {
 			const availability = await LanguageModel.availability();
 
-			const shouldWaitForDownload = await match(availability)
-				.with("downloading", async () => {
-					// Already downloading, just wait for it to complete
-					await sendMessage("offscreen:chrome-ai-status", {
-						status: "downloading",
-					});
-
-					// Initialize to wait for download to complete
-					await chromeAIProvider!.initialize(
-						undefined,
-						createDownloadProgressCallback(),
-					);
-
-					// Download should be complete now
-					await sendMessage("offscreen:chrome-ai-status", {
-						status: "available",
-					});
-					return true;
-				})
-				.otherwise(() => false);
-
-			if (shouldWaitForDownload) return;
+			if (availability === "downloading") {
+				// Chrome AI is downloading, just report status
+				await sendMessage("offscreen:chrome-ai-status", {
+					status: "error",
+					error: "Chrome AI is downloading. Please wait for it to complete.",
+				});
+				return;
+			}
 		}
 
-		// Initialize with progress callback
-		await chromeAIProvider.initialize(
-			undefined,
-			createDownloadProgressCallback(),
-		);
+		// Initialize Chrome AI
+		await chromeAIProvider.initialize();
 
-		// Check if it needs download
-		if (chromeAIProvider.needsDownload?.()) {
-			// Model needs to be downloaded, send error status with needs-download message
+		// Check status after initialization
+		const status = await chromeAIProvider.getStatus();
+		if (status === "available") {
 			await sendMessage("offscreen:chrome-ai-status", {
-				status: "error",
-				error: "needs-download",
+				status: "available",
 			});
 		} else {
 			await sendMessage("offscreen:chrome-ai-status", {
-				status: "available",
+				status: "error",
+				error: "Chrome AI not available",
 			});
 		}
 	} catch (error) {
@@ -353,109 +284,6 @@ onMessage("offscreen:initialize-chrome-ai", async () => {
 		chromeAIProvider = null;
 	} finally {
 		isInitializingChromeAI = false;
-	}
-});
-
-// Handle Chrome AI download trigger
-onMessage("offscreen:trigger-chrome-ai-download", async () => {
-	console.log("[Offscreen] Received trigger download request");
-
-	// Check current availability first
-	if (typeof LanguageModel !== "undefined") {
-		const availability = await LanguageModel.availability();
-		console.log(
-			"[Offscreen] Current availability before trigger:",
-			availability,
-		);
-	}
-
-	if (!chromeAIProvider) {
-		console.error("[Offscreen] No Chrome AI provider initialized");
-		await sendMessage("offscreen:chrome-ai-status", {
-			status: "error",
-			error: "Chrome AI not initialized",
-		});
-		return;
-	}
-
-	// Check if we have the trigger function
-	const hasTrigger =
-		chromeAIProvider.triggerModelDownload && chromeAIProvider.needsDownload?.();
-	console.log("[Offscreen] Has trigger function:", hasTrigger);
-
-	if (!hasTrigger) {
-		console.log(
-			"[Offscreen] No trigger available, creating new provider instance",
-		);
-
-		// Reset the provider to get a fresh instance with trigger
-		const config = await loadAIConfigFromServiceWorker();
-		if (config.provider !== "chrome") {
-			await sendMessage("offscreen:chrome-ai-status", {
-				status: "error",
-				error: "Not using Chrome AI provider",
-			});
-			return;
-		}
-
-		// Reset and create a fresh Chrome AI provider
-		resetChromeProvider();
-		chromeAIProvider = getProvider(config);
-
-		// Initialize to get the trigger function with progress callback
-		try {
-			await chromeAIProvider.initialize(
-				undefined,
-				createDownloadProgressCallback(),
-			);
-
-			// Check again if we need download
-			if (chromeAIProvider.needsDownload?.()) {
-				console.log("[Offscreen] Got trigger function from fresh provider");
-			} else {
-				console.log(
-					"[Offscreen] Chrome AI available after fresh initialization",
-				);
-				await sendMessage("offscreen:chrome-ai-status", {
-					status: "available",
-				});
-				return;
-			}
-		} catch (error) {
-			console.error("[Offscreen] Failed to initialize fresh provider:", error);
-			await sendMessage("offscreen:chrome-ai-status", {
-				status: "error",
-				error: error instanceof Error ? error.message : "Initialization failed",
-			});
-			return;
-		}
-	}
-
-	try {
-		console.log("[Offscreen] Triggering Chrome AI download...");
-		await sendMessage("offscreen:chrome-ai-status", {
-			status: "downloading",
-		});
-
-		await chromeAIProvider.triggerModelDownload!();
-
-		console.log("[Offscreen] Chrome AI download triggered successfully");
-
-		// Check availability after trigger
-		if (typeof LanguageModel !== "undefined") {
-			const availability = await LanguageModel.availability();
-			console.log("[Offscreen] Availability after trigger:", availability);
-		}
-
-		await sendMessage("offscreen:chrome-ai-status", {
-			status: "available",
-		});
-	} catch (error) {
-		console.error("[Offscreen] Failed to download Chrome AI model:", error);
-		await sendMessage("offscreen:chrome-ai-status", {
-			status: "error",
-			error: error instanceof Error ? error.message : "Download failed",
-		});
 	}
 });
 
