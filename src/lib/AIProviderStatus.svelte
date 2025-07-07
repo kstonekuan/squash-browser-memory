@@ -12,6 +12,19 @@ let {
 }>();
 
 let providerName = $derived(providerType === "chrome" ? "Chrome AI" : "Claude");
+let isRefreshing = $state(false);
+
+async function handleRefresh() {
+	if (!onRefresh || isRefreshing) return;
+
+	isRefreshing = true;
+	await onRefresh();
+
+	// Keep the refreshing state for a bit to show the change
+	setTimeout(() => {
+		isRefreshing = false;
+	}, 1000);
+}
 
 function getStatusColor(status: AIProviderStatus): string {
 	switch (status) {
@@ -57,9 +70,9 @@ function getStatusMessage(status: AIProviderStatus): string {
 }
 </script>
 
-<div class={`flex items-center gap-2 text-sm ${getStatusColor(status)}`}>
-	<span class="text-lg">{getStatusIcon(status)}</span>
-	<span>{getStatusMessage(status)}</span>
+<div class={`flex items-center gap-2 text-sm ${isRefreshing ? 'text-gray-500' : getStatusColor(status)}`}>
+	<span class="text-lg">{isRefreshing ? '⟳' : getStatusIcon(status)}</span>
+	<span>{isRefreshing ? 'Checking Chrome AI status...' : getStatusMessage(status)}</span>
 </div>
 
 {#if status === 'needs-configuration'}
@@ -70,19 +83,23 @@ function getStatusMessage(status: AIProviderStatus): string {
 
 {#if status === 'unavailable' && providerName === 'Chrome AI'}
 	<div class="mt-2 text-xs text-gray-600">
-		<p>Chrome AI is not available. Please ensure:</p>
-		<ul class="mt-1 ml-4 list-disc">
-			<li>You're using Chrome 138 or later</li>
-			<li>Enable "Prompt API for Gemini Nano" in chrome://flags</li>
-			<li>Update "Optimization Guide On Device Model" in chrome://components</li>
-		</ul>
-		{#if onRefresh}
-			<button
-				onclick={onRefresh}
-				class="mt-3 px-3 py-1.5 bg-blue-600 text-white text-xs font-medium rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-			>
-				Check Status Again
-			</button>
+		{#if !isRefreshing}
+			<p>Chrome AI is not available. Please ensure:</p>
+			<ul class="mt-1 ml-4 list-disc">
+				<li>You're using Chrome 138 or later</li>
+				<li>Enable "Prompt API for Gemini Nano" in chrome://flags</li>
+				<li>Update "Optimization Guide On Device Model" in chrome://components</li>
+			</ul>
+			{#if onRefresh}
+				<button
+					onclick={handleRefresh}
+					class="mt-3 px-3 py-1.5 bg-blue-600 text-white text-xs font-medium rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 cursor-pointer transition-colors duration-150"
+				>
+					Check Status Again
+				</button>
+			{/if}
+		{:else}
+			<p class="text-gray-500">Checking Chrome AI status...</p>
 		{/if}
 	</div>
 {:else if status === 'unavailable'}
