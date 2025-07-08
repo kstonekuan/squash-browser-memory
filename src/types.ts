@@ -33,6 +33,11 @@ export interface ChunkingResult {
 	isFallback: boolean;
 }
 
+// Memory management settings
+export interface MemorySettings {
+	storeWorkflowPatterns: boolean;
+}
+
 // Memory structure for accumulated analysis
 export interface AnalysisMemory {
 	userProfile: UserProfile;

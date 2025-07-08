@@ -134,6 +134,17 @@ export const ChunkSchema = z
 		"Browsing sessions grouped by natural time gaps (>30min gap = new session)",
 	);
 
+// Schema for user profile only (no patterns)
+const UserProfileOnlySchema = z.object({
+	userProfile: UserProfileSchema,
+});
+
 // Generate JSON schemas from Zod schemas for Chrome AI
 export const ANALYSIS_SCHEMA = toJSONSchema(AnalysisResultSchema);
+const ANALYSIS_SCHEMA_NO_PATTERNS = toJSONSchema(UserProfileOnlySchema);
 export const CHUNK_SCHEMA = toJSONSchema(ChunkSchema);
+
+// Function to get appropriate schema based on settings
+export function getAnalysisSchema(includePatterns: boolean) {
+	return includePatterns ? ANALYSIS_SCHEMA : ANALYSIS_SCHEMA_NO_PATTERNS;
+}

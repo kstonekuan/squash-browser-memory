@@ -143,6 +143,7 @@ async function runAnalysis(
 		mergePrompt?: string;
 	},
 	trigger: "manual" | "alarm" = "manual",
+	memorySettings?: { storeWorkflowPatterns: boolean },
 ): Promise<void> {
 	console.log(
 		`[Background] Starting analysis for ${historyItems.length} items with ID: ${analysisId} (triggered by: ${trigger})`,
@@ -185,6 +186,7 @@ async function runAnalysis(
 				customPrompts,
 				analysisId,
 				trigger,
+				memorySettings,
 			}).catch((error) => {
 				completeHandler();
 				errorHandler();
@@ -372,9 +374,27 @@ async function triggerAnalysis(trigger: "manual" | "alarm"): Promise<void> {
 		const promptsResult = await chrome.storage.local.get("custom_prompts");
 		const customPrompts = promptsResult.custom_prompts;
 
+		// Load memory settings for alarm trigger as well
+		const MEMORY_SETTINGS_KEY = "memory_settings";
+		const result = await chrome.storage.local.get(MEMORY_SETTINGS_KEY);
+		const memorySettings = {
+			storeWorkflowPatterns: true, // default
+			...(result[MEMORY_SETTINGS_KEY] || {}),
+		};
+		console.log(
+			"🔧 [Background] Loaded memory settings for alarm analysis:",
+			memorySettings,
+		);
+
 		const analysisId = `analysis-${Date.now()}`;
 		currentAnalysisId = analysisId;
-		await runAnalysis(historyItems, analysisId, customPrompts, trigger);
+		await runAnalysis(
+			historyItems,
+			analysisId,
+			customPrompts,
+			trigger,
+			memorySettings,
+		);
 	} catch (error) {
 		// Error already handled and logged by runAnalysis
 		console.error("[Analysis] Error in triggerAnalysis:", error);
@@ -469,10 +489,28 @@ onMessage("analysis:start-manual", async (message) => {
 	});
 
 	try {
+		// Load memory settings to pass to analysis
+		const MEMORY_SETTINGS_KEY = "memory_settings";
+		const result = await chrome.storage.local.get(MEMORY_SETTINGS_KEY);
+		const memorySettings = {
+			storeWorkflowPatterns: true, // default
+			...(result[MEMORY_SETTINGS_KEY] || {}),
+		};
+		console.log(
+			"🔧 [Background] Loaded memory settings for analysis:",
+			memorySettings,
+		);
+
 		console.log(
 			`[Background] Starting manual analysis with ${historyItems.length} items`,
 		);
-		await runAnalysis(historyItems, analysisId, customPrompts, "manual");
+		await runAnalysis(
+			historyItems,
+			analysisId,
+			customPrompts,
+			"manual",
+			memorySettings,
+		);
 
 		return {
 			success: true,
@@ -571,6 +609,23 @@ onMessage("offscreen:read-memory", async () => {
 onMessage("offscreen:write-memory", async (message) => {
 	await saveMemoryToStorage(message.data.memory);
 	return { success: true };
+});
+
+onMessage("memory:clear-patterns", async () => {
+	try {
+		const memory = await loadMemoryFromStorage();
+		if (memory) {
+			memory.patterns = [];
+			await saveMemoryToStorage(memory);
+		}
+		return { success: true };
+	} catch (error) {
+		console.error("Failed to clear patterns:", error);
+		return {
+			success: false,
+			error: error instanceof Error ? error.message : String(error),
+		};
+	}
 });
 
 onMessage("offscreen:keepalive", async () => {

@@ -67,7 +67,8 @@ function createProgressCallback(): ProgressCallback {
 
 // Set up message handlers
 onMessage("offscreen:start-analysis", async (message) => {
-	const { historyItems, customPrompts, analysisId, trigger } = message.data;
+	const { historyItems, customPrompts, analysisId, trigger, memorySettings } =
+		message.data;
 
 	// Cancel any existing analysis
 	prepareForNewAnalysis(currentAnalysisId, activeAnalyses);
@@ -85,6 +86,8 @@ onMessage("offscreen:start-analysis", async (message) => {
 		const memory = await loadMemoryFromServiceWorker();
 		const aiConfig = await loadAIConfigFromServiceWorker();
 
+		console.log("🔧 [Offscreen] Received memory settings:", memorySettings);
+
 		const result = await analyzeHistoryItems(
 			historyItems,
 			memory,
@@ -93,6 +96,7 @@ onMessage("offscreen:start-analysis", async (message) => {
 			createProgressCallback(),
 			trigger,
 			abortController.signal,
+			memorySettings,
 		);
 
 		// Save the updated memory

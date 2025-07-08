@@ -86,6 +86,7 @@ interface ProtocolMap {
 		customPrompts?: CustomPrompts;
 		analysisId: string;
 		trigger: "manual" | "alarm";
+		memorySettings?: { storeWorkflowPatterns: boolean };
 	}) => void;
 
 	"offscreen:cancel": (data: { analysisId: string }) => {
@@ -111,6 +112,11 @@ interface ProtocolMap {
 
 	"offscreen:write-memory": (data: { memory: AnalysisMemory }) => {
 		success: boolean;
+	};
+
+	"memory:clear-patterns": () => {
+		success: boolean;
+		error?: string;
 	};
 
 	"offscreen:keepalive": () => {
