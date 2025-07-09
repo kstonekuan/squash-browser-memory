@@ -222,6 +222,12 @@ function handleSectionToggle(isOpen: boolean) {
 function getMemoryBadge(): string {
 	if (loading) return "Loading...";
 	if (!memory) return "";
+
+	// Hide pattern count when workflow patterns are disabled
+	if (memorySettings?.storeWorkflowPatterns === false) {
+		return "Profile data";
+	}
+
 	return `${memory.patterns.length} patterns`;
 }
 </script>
