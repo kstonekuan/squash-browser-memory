@@ -47,6 +47,17 @@ type StatusUpdate = {
 
 const statusSubscribers = new Set<(update: StatusUpdate) => void>();
 
+// Progress subscribers for broadcasting
+const progressSubscribers = new Set<(update: AnalysisProgress) => void>();
+
+// AI status subscribers for broadcasting
+const aiStatusSubscribers = new Set<
+	(update: {
+		status: "initializing" | "available" | "error";
+		error?: string;
+	}) => void
+>();
+
 // Register a status subscriber
 export function subscribeToStatus(
 	callback: (update: StatusUpdate) => void,
@@ -54,6 +65,29 @@ export function subscribeToStatus(
 	statusSubscribers.add(callback);
 	return () => {
 		statusSubscribers.delete(callback);
+	};
+}
+
+// Register a progress subscriber
+export function subscribeToProgress(
+	callback: (update: AnalysisProgress) => void,
+): () => void {
+	progressSubscribers.add(callback);
+	return () => {
+		progressSubscribers.delete(callback);
+	};
+}
+
+// Register an AI status subscriber
+export function subscribeToAIStatus(
+	callback: (update: {
+		status: "initializing" | "available" | "error";
+		error?: string;
+	}) => void,
+): () => void {
+	aiStatusSubscribers.add(callback);
+	return () => {
+		aiStatusSubscribers.delete(callback);
 	};
 }
 
@@ -81,6 +115,43 @@ function broadcastAnalysisStatus(
 	});
 
 	console.log("[Background] Broadcast status:", status, details);
+}
+
+// Broadcast progress updates to all subscribers
+function broadcastProgressUpdate(progress: AnalysisProgress): void {
+	progressSubscribers.forEach((callback) => {
+		try {
+			callback(progress);
+		} catch (error) {
+			console.error("[Background] Error in progress subscriber:", error);
+		}
+	});
+
+	console.log(
+		"[Background] Broadcast progress:",
+		progress.analysisId,
+		progress.phase,
+	);
+}
+
+// Broadcast AI status updates to all subscribers
+function broadcastAIStatusUpdate(aiStatus: {
+	status: "initializing" | "available" | "error";
+	error?: string;
+}): void {
+	aiStatusSubscribers.forEach((callback) => {
+		try {
+			callback(aiStatus);
+		} catch (error) {
+			console.error("[Background] Error in AI status subscriber:", error);
+		}
+	});
+
+	console.log(
+		"[Background] Broadcast AI status:",
+		aiStatus.status,
+		aiStatus.error,
+	);
 }
 
 // Create notification using chrome-api wrapper
@@ -313,14 +384,9 @@ export async function handleProgressReport(
 		updateProgressMap(input.analysisId, input, analysisProgressMap);
 	}
 
-	// Forward to side panel
-	try {
-		// Use the analysis.onProgress subscription to notify UI
-		console.log("[Background] Progress update:", input);
-	} catch (err) {
-		// Side panel might be closed
-		console.debug("[Background] Failed to forward progress:", err);
-	}
+	// Broadcast progress to all subscribers
+	broadcastProgressUpdate(input);
+
 	return { success: true };
 }
 
@@ -365,13 +431,9 @@ export async function handleAIStatusReport(
 	},
 	_trpc?: unknown,
 ): Promise<{ success: boolean }> {
-	try {
-		// Forward to sidepanel via subscription
-		console.log("[Background] AI status update:", input.status, input.error);
-	} catch (err) {
-		// Sidepanel might be closed
-		console.debug("[Background] Failed to forward AI status:", err);
-	}
+	// Broadcast AI status to all subscribers
+	broadcastAIStatusUpdate(input);
+
 	return { success: true };
 }
 

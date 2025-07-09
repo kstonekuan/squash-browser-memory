@@ -13,12 +13,12 @@ function createContext() {
 	};
 }
 
-// Import the offscreen router directly
-import { offscreenRouter } from "./trpc/offscreen-router";
+// Import the unified router
+import { appRouter } from "./trpc/router";
 
 // Set up tRPC handler for incoming requests
 createChromeHandler({
-	router: offscreenRouter,
+	router: appRouter,
 	createContext,
 	onError: (error, operation) => {
 		console.error("[Offscreen tRPC] Error:", error, "Operation:", operation);

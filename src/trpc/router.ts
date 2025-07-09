@@ -58,13 +58,38 @@ const backgroundProcedures = t.router({
 		onProgress: t.procedure
 			.input(z.object({ analysisId: z.string() }))
 			.subscription(async function* ({ input }) {
-				// TODO: Implement progress subscription
-				yield {
-					analysisId: input.analysisId,
-					phase: "idle" as const,
-					chunkProgress: undefined,
-					subPhase: undefined,
-				} satisfies AnalysisProgress;
+				const { subscribeToProgress } = await import("../background-handlers");
+
+				const progressQueue: AnalysisProgress[] = [];
+				let resolveNext: (() => void) | null = null;
+
+				const unsubscribe = subscribeToProgress((progress) => {
+					// Only send progress for the requested analysis ID
+					if (progress.analysisId === input.analysisId) {
+						progressQueue.push(progress);
+						if (resolveNext) {
+							resolveNext();
+							resolveNext = null;
+						}
+					}
+				});
+
+				try {
+					while (true) {
+						if (progressQueue.length === 0) {
+							await new Promise<void>((resolve) => {
+								resolveNext = resolve;
+							});
+						}
+
+						while (progressQueue.length > 0) {
+							const progress = progressQueue.shift()!;
+							yield progress;
+						}
+					}
+				} finally {
+					unsubscribe();
+				}
 			}),
 
 		onStatus: t.procedure.subscription(async function* () {
@@ -145,11 +170,38 @@ const backgroundProcedures = t.router({
 		}),
 
 		onStatus: t.procedure.subscription(async function* () {
-			// TODO: Implement AI status subscription
-			yield {
-				status: "initializing" as "initializing" | "available" | "error",
-				error: undefined as string | undefined,
-			};
+			const { subscribeToAIStatus } = await import("../background-handlers");
+
+			const aiStatusQueue: {
+				status: "initializing" | "available" | "error";
+				error?: string;
+			}[] = [];
+			let resolveNext: (() => void) | null = null;
+
+			const unsubscribe = subscribeToAIStatus((aiStatus) => {
+				aiStatusQueue.push(aiStatus);
+				if (resolveNext) {
+					resolveNext();
+					resolveNext = null;
+				}
+			});
+
+			try {
+				while (true) {
+					if (aiStatusQueue.length === 0) {
+						await new Promise<void>((resolve) => {
+							resolveNext = resolve;
+						});
+					}
+
+					while (aiStatusQueue.length > 0) {
+						const aiStatus = aiStatusQueue.shift()!;
+						yield aiStatus;
+					}
+				}
+			} finally {
+				unsubscribe();
+			}
 		}),
 	}),
 
