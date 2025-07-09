@@ -511,30 +511,45 @@ onMount(() => {
 				Analysis memory helps improve results by remembering patterns from previous sessions.
 			</p>
 			
-			<!-- Workflow Patterns Toggle -->
+			<!-- Pattern Storage Settings -->
 			<div class="mb-4">
-				<label class="flex items-center space-x-2">
-					<input
-						type="checkbox"
-						checked={memorySettings.storeWorkflowPatterns}
-						onchange={handleToggleWorkflowPatterns}
-						class="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-					/>
-					<span class="text-sm text-gray-700">Store workflow patterns</span>
-				</label>
-				<p class="text-xs text-gray-500 mt-1">
-					When enabled, the system analyzes and stores workflow patterns from your browsing history. 
-					Disabling this will reduce prompt size and skip pattern analysis.
-				</p>
+				<h4 class="text-sm font-medium text-gray-900 mb-3">Pattern Storage</h4>
+				<div class="bg-gray-50 rounded-lg p-3">
+					<label class="flex items-center space-x-2">
+						<input
+							type="checkbox"
+							checked={memorySettings.storeWorkflowPatterns}
+							onchange={handleToggleWorkflowPatterns}
+							class="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+						/>
+						<span class="text-sm text-gray-700">Store workflow patterns</span>
+					</label>
+					<p class="text-xs text-gray-500 mt-2">
+						When enabled, the system analyzes and stores workflow patterns from your browsing history. 
+						Disabling this will reduce prompt size and skip pattern analysis.
+					</p>
+				</div>
 			</div>
 			
-			<button
-				type="button"
-				onclick={handleClearMemory}
-				class="px-3 py-1.5 text-xs font-medium text-red-700 bg-red-50 border border-red-200 rounded hover:bg-red-100 focus:outline-none focus:ring-2 focus:ring-offset-0 focus:ring-red-500"
-			>
-				Clear Memory
-			</button>
+			<!-- Divider -->
+			<div class="border-t border-gray-200 my-4"></div>
+			
+			<!-- Memory Actions -->
+			<div>
+				<h4 class="text-sm font-medium text-gray-900 mb-3">Memory Actions</h4>
+				<div class="bg-gray-50 rounded-lg p-3">
+					<button
+						type="button"
+						onclick={handleClearMemory}
+						class="px-3 py-1.5 text-xs font-medium text-red-700 bg-red-50 border border-red-200 rounded hover:bg-red-100 focus:outline-none focus:ring-2 focus:ring-offset-0 focus:ring-red-500"
+					>
+						Clear Memory
+					</button>
+					<p class="text-xs text-gray-500 mt-2">
+						This will permanently delete all stored analysis memory including user profile and workflow patterns.
+					</p>
+				</div>
+			</div>
 		</CollapsibleSection>
 
 		<!-- Advanced Settings -->
