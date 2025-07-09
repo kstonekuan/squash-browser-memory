@@ -77,8 +77,9 @@ export async function handleStartAnalysis(input: {
 	};
 	analysisId: string;
 	trigger: "manual" | "alarm";
+	memorySettings?: { storeWorkflowPatterns: boolean };
 }) {
-	const { historyItems, customPrompts, analysisId, trigger } = input;
+	const { historyItems, customPrompts, analysisId, trigger, memorySettings } = input;
 
 	// Cancel any existing analysis
 	prepareForNewAnalysis(currentAnalysisId, activeAnalyses);
@@ -104,6 +105,7 @@ export async function handleStartAnalysis(input: {
 			createProgressCallback(),
 			trigger,
 			abortController.signal,
+			memorySettings,
 		);
 
 		// Save the updated memory

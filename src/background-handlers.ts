@@ -143,10 +143,11 @@ export async function handleStartManualAnalysis(input: {
 		chunkPrompt?: string;
 		mergePrompt?: string;
 	};
+	memorySettings?: { storeWorkflowPatterns: boolean };
 }): Promise<
 	{ success: true; analysisId: string } | { success: false; error: string }
 > {
-	const { historyItems, customPrompts } = input;
+	const { historyItems, customPrompts, memorySettings } = input;
 
 	// Check if analysis is already running
 	const { canStart, error } = checkAnalysisRunningLogic(isAnalysisRunning);
@@ -169,7 +170,7 @@ export async function handleStartManualAnalysis(input: {
 		console.log(
 			`[Background] Starting manual analysis with ${historyItems.length} items`,
 		);
-		await runAnalysis(historyItems, analysisId, customPrompts, "manual");
+		await runAnalysis(historyItems, analysisId, customPrompts, "manual", memorySettings);
 
 		return {
 			success: true,
@@ -279,6 +280,23 @@ export async function handleWriteMemory(input: { memory: unknown }) {
 	return { success: true };
 }
 
+export async function handleClearPatterns() {
+	try {
+		const memory = await loadMemoryFromStorage();
+		if (memory) {
+			memory.patterns = [];
+			await saveMemoryToStorage(memory);
+		}
+		return { success: true };
+	} catch (error) {
+		console.error("Failed to clear patterns:", error);
+		return {
+			success: false,
+			error: error instanceof Error ? error.message : String(error),
+		};
+	}
+}
+
 // Reporting handlers (called by offscreen document)
 export async function handleProgressReport(
 	input: AnalysisProgress,
@@ -378,6 +396,7 @@ async function runAnalysis(
 			customPrompts,
 			analysisId,
 			trigger,
+			memorySettings,
 		});
 
 		console.log("[Background] Analysis started successfully:", result);

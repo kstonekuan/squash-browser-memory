@@ -6,6 +6,10 @@
 import { z } from "zod";
 
 // Base schemas
+export const memorySettingsSchema = z.object({
+	storeWorkflowPatterns: z.boolean(),
+});
+
 export const historyItemSchema = z.object({
 	id: z.string(),
 	url: z.string().optional(),
@@ -64,16 +68,19 @@ export const startAnalysisInputSchema = z.object({
 	customPrompts: customPromptsSchema.optional(),
 	analysisId: z.string(),
 	trigger: z.enum(["manual", "alarm"]),
+	memorySettings: memorySettingsSchema.optional(),
 });
 
 export const startManualAnalysisInputSchema = z.object({
 	historyItems: z.array(historyItemSchema),
 	customPrompts: customPromptsSchema.optional(),
+	memorySettings: memorySettingsSchema.optional(),
 });
 
 // Helper type exports
 export type HistoryItem = z.infer<typeof historyItemSchema>;
 export type CustomPrompts = z.infer<typeof customPromptsSchema>;
+export type MemorySettings = z.infer<typeof memorySettingsSchema>;
 export type AnalysisProgress = z.infer<typeof analysisProgressSchema>;
 export type AnalysisStatus = z.infer<typeof analysisStatusSchema>;
 export type AIStatus = z.infer<typeof aiStatusSchema>;

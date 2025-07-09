@@ -1,13 +1,14 @@
 <script lang="ts">
 import { format } from "date-fns";
-import type { FullAnalysisResult } from "../types";
+import type { FullAnalysisResult, MemorySettings } from "../types";
 import ChunkDebugInfo from "./ChunkDebugInfo.svelte";
 import ChunkDisplay from "./ChunkDisplay.svelte";
 import CollapsibleSection from "./CollapsibleSection.svelte";
 
-const { result, onDismiss } = $props<{
+const { result, onDismiss, memorySettings } = $props<{
 	result: FullAnalysisResult;
 	onDismiss: () => void;
+	memorySettings?: MemorySettings;
 }>();
 </script>
 
@@ -44,10 +45,12 @@ const { result, onDismiss } = $props<{
         </div>
       {/if}
       
-      <div class="flex items-center space-x-1">
-        <span class="text-gray-600">Patterns:</span>
-        <span class="font-medium text-gray-900">{result.analysis.patterns.length}</span>
-      </div>
+      {#if memorySettings?.storeWorkflowPatterns !== false}
+        <div class="flex items-center space-x-1">
+          <span class="text-gray-600">Patterns:</span>
+          <span class="font-medium text-gray-900">{result.analysis.patterns.length}</span>
+        </div>
+      {/if}
       
       {#if result.topDomains.length > 0}
         <div class="flex items-center space-x-1">

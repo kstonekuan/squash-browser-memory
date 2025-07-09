@@ -165,6 +165,11 @@ const backgroundProcedures = t.router({
 				const { handleWriteMemory } = await import("../background-handlers");
 				return handleWriteMemory(input);
 			}),
+
+		clearPatterns: t.procedure.mutation(async () => {
+			const { handleClearPatterns } = await import("../background-handlers");
+			return handleClearPatterns();
+		}),
 	}),
 
 	// Internal reporting (called by offscreen)

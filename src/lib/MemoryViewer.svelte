@@ -1,11 +1,14 @@
 <script lang="ts">
 import { format } from "date-fns";
 import { onMount } from "svelte";
-import type { AnalysisMemory } from "../types";
+import type { AnalysisMemory, MemorySettings } from "../types";
 import { loadMemoryFromStorage } from "../utils/memory";
 import CollapsibleSection from "./CollapsibleSection.svelte";
 
-const { autoExpand = false } = $props<{ autoExpand?: boolean }>();
+const { autoExpand = false, memorySettings } = $props<{
+	autoExpand?: boolean;
+	memorySettings?: MemorySettings;
+}>();
 
 let showMemory = $state(autoExpand);
 let sectionIsOpen = $state(autoExpand);
@@ -26,6 +29,16 @@ let memory = $state<AnalysisMemory | null>(null);
 let loading = $state(false);
 let hasAttemptedLoad = $state(false);
 let activeTab = $state<"profile" | "patterns">("profile");
+
+// Reset to profile tab if patterns are disabled and current tab is patterns
+$effect(() => {
+	if (
+		activeTab === "patterns" &&
+		memorySettings?.storeWorkflowPatterns === false
+	) {
+		activeTab = "profile";
+	}
+});
 
 // Load memory when component mounts or when section is opened
 async function loadMemoryData() {
@@ -209,6 +222,12 @@ function handleSectionToggle(isOpen: boolean) {
 function getMemoryBadge(): string {
 	if (loading) return "Loading...";
 	if (!memory) return "";
+
+	// Hide pattern count when workflow patterns are disabled
+	if (memorySettings?.storeWorkflowPatterns === false) {
+		return "Profile data";
+	}
+
 	return `${memory.patterns.length} patterns`;
 }
 </script>
@@ -282,21 +301,23 @@ function getMemoryBadge(): string {
 							>
 								User Profile
 							</button>
-							<button
-								onclick={() => activeTab = 'patterns'}
-								class={`whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm ${
-									activeTab === 'patterns'
-										? 'border-blue-500 text-blue-600'
-										: 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-								}`}
-							>
-								Workflow Patterns
-								{#if memory.patterns.length > 0}
-									<span class="ml-2 bg-gray-100 text-gray-900 py-0.5 px-2 rounded-full text-xs">
-										{memory.patterns.length}
-									</span>
-								{/if}
-							</button>
+							{#if memorySettings?.storeWorkflowPatterns !== false}
+								<button
+									onclick={() => activeTab = 'patterns'}
+									class={`whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm ${
+										activeTab === 'patterns'
+											? 'border-blue-500 text-blue-600'
+											: 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+									}`}
+								>
+									Workflow Patterns
+									{#if memory.patterns.length > 0}
+										<span class="ml-2 bg-gray-100 text-gray-900 py-0.5 px-2 rounded-full text-xs">
+											{memory.patterns.length}
+										</span>
+									{/if}
+								</button>
+							{/if}
 						</nav>
 					</div>
 
@@ -422,7 +443,7 @@ function getMemoryBadge(): string {
 
 							</div>
 						</div>
-					{:else if activeTab === 'patterns'}
+					{:else if activeTab === 'patterns' && memorySettings?.storeWorkflowPatterns !== false}
 						<!-- Workflow Patterns Tab -->
 						{#if memory.patterns.length > 0}
 							<div class="space-y-3">

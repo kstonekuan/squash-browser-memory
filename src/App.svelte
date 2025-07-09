@@ -14,14 +14,19 @@ import { disableAmbientAnalysis } from "./stores/ambient-store";
 // All messaging now handled via tRPC
 import { trpc } from "./trpc/client";
 import type { AnalysisProgress as AnalysisProgressType } from "./trpc/schemas";
-import type { FullAnalysisResult } from "./types";
+import type { FullAnalysisResult, MemorySettings } from "./types";
 import { loadAIConfigFromStorage } from "./utils/ai-config";
 import type { AIProviderStatus, AIProviderType } from "./utils/ai-interface";
 import { clearMemory } from "./utils/analyzer";
+import {
+	loadMemorySettings,
+	saveMemorySettings,
+} from "./utils/memory-settings";
 
 let analysisResult: FullAnalysisResult | null = $state(null);
 let memoryAutoExpand = $state(false);
 let rawHistoryData: chrome.history.HistoryItem[] | null = $state(null);
+let memorySettings = $state<MemorySettings>({ storeWorkflowPatterns: true });
 let customPrompts = $state<{
 	systemPrompt?: string;
 	chunkPrompt?: string;
@@ -86,6 +91,7 @@ async function handleAnalysis(data: { items: chrome.history.HistoryItem[] }) {
 		const response = await trpc.analysis.startManual.mutate({
 			historyItems: items,
 			customPrompts: customPrompts,
+			memorySettings: memorySettings,
 		});
 
 		if (!response.success) {
@@ -148,6 +154,39 @@ async function handleClearMemory() {
 		await clearMemory();
 		alert("Memory cleared. Next analysis will start fresh.");
 	}
+}
+
+async function handleToggleWorkflowPatterns(event: Event) {
+	const target = event.target as HTMLInputElement;
+	const newValue = target.checked;
+
+	// Warn user when toggling from on to off
+	if (memorySettings.storeWorkflowPatterns && !newValue) {
+		const confirmed = confirm(
+			"Warning: Disabling workflow patterns will stop analyzing, storing, and displaying workflow patterns. " +
+				"Current workflow pattern data will be cleared from memory. " +
+				"This action cannot be undone. Continue?",
+		);
+
+		if (!confirmed) {
+			// Revert the checkbox state
+			target.checked = memorySettings.storeWorkflowPatterns;
+			return;
+		}
+
+		// Clear existing pattern data from memory when disabling
+		try {
+			await trpc.memory.clearPatterns.mutate();
+		} catch (error) {
+			console.error("Failed to clear pattern data:", error);
+		}
+	}
+
+	// Update settings
+	memorySettings.storeWorkflowPatterns = newValue;
+	console.log("🔧 Saving memory settings:", memorySettings);
+	await saveMemorySettings(memorySettings);
+	console.log("🔧 Memory settings saved successfully");
 }
 
 async function handleCancelAnalysis() {
@@ -215,6 +254,11 @@ async function handleChromeAIRefresh() {
 onMount(() => {
 	// Check AI status first
 	checkInitialAIStatus();
+
+	// Load memory settings
+	loadMemorySettings().then((settings) => {
+		memorySettings = settings;
+	});
 
 	// Set up tRPC subscriptions
 	let statusUnsubscribe: { unsubscribe: () => void } | null = null;
@@ -460,7 +504,7 @@ onMount(() => {
 
 		<!-- Memory Viewer -->
 		<div class="mt-4">
-			<MemoryViewer autoExpand={memoryAutoExpand} />
+			<MemoryViewer autoExpand={memoryAutoExpand} memorySettings={memorySettings} />
 		</div>
 
 		<!-- Memory Management -->
@@ -468,13 +512,46 @@ onMount(() => {
 			<p class="text-sm text-gray-600 mb-4">
 				Analysis memory helps improve results by remembering patterns from previous sessions.
 			</p>
-			<button
-				type="button"
-				onclick={handleClearMemory}
-				class="px-3 py-1.5 text-xs font-medium text-red-700 bg-red-50 border border-red-200 rounded hover:bg-red-100 focus:outline-none focus:ring-2 focus:ring-offset-0 focus:ring-red-500"
-			>
-				Clear Memory
-			</button>
+			
+			<!-- Pattern Storage Settings -->
+			<div class="mb-4">
+				<h4 class="text-sm font-medium text-gray-900 mb-3">Pattern Storage</h4>
+				<div class="bg-gray-50 rounded-lg p-3">
+					<label class="flex items-center space-x-2">
+						<input
+							type="checkbox"
+							checked={memorySettings.storeWorkflowPatterns}
+							onchange={handleToggleWorkflowPatterns}
+							class="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+						/>
+						<span class="text-sm text-gray-700">Store workflow patterns</span>
+					</label>
+					<p class="text-xs text-gray-500 mt-2">
+						When enabled, the system analyzes and stores workflow patterns from your browsing history. 
+						Disabling this will reduce prompt size and skip pattern analysis.
+					</p>
+				</div>
+			</div>
+			
+			<!-- Divider -->
+			<div class="border-t border-gray-200 my-4"></div>
+			
+			<!-- Memory Actions -->
+			<div>
+				<h4 class="text-sm font-medium text-gray-900 mb-3">Memory Actions</h4>
+				<div class="bg-gray-50 rounded-lg p-3">
+					<button
+						type="button"
+						onclick={handleClearMemory}
+						class="px-3 py-1.5 text-xs font-medium text-red-700 bg-red-50 border border-red-200 rounded hover:bg-red-100 focus:outline-none focus:ring-2 focus:ring-offset-0 focus:ring-red-500"
+					>
+						Clear Memory
+					</button>
+					<p class="text-xs text-gray-500 mt-2">
+						This will permanently delete all stored analysis memory including user profile and workflow patterns.
+					</p>
+				</div>
+			</div>
 		</CollapsibleSection>
 
 		<!-- Advanced Settings -->
@@ -489,7 +566,7 @@ onMount(() => {
 
 		<!-- Analysis Results -->
 		{#if analysisResult}
-			<AnalysisResults result={analysisResult} onDismiss={handleDismissAnalysis} />
+			<AnalysisResults result={analysisResult} onDismiss={handleDismissAnalysis} memorySettings={memorySettings} />
 		{/if}
 	</div>
 </main>

@@ -16,12 +16,14 @@ import { getInitializedProvider, promptAI } from "./ai-provider-utils";
 import { createHistoryChunks, identifyChunks } from "./chunking";
 import {
 	ANALYSIS_SYSTEM_PROMPT,
+	ANALYSIS_SYSTEM_PROMPT_NO_PATTERNS,
 	buildAnalysisPrompt,
 	buildMergePrompt,
 	MERGE_SYSTEM_PROMPT,
 } from "./constants";
 import { createEmptyMemory } from "./memory";
-import { ANALYSIS_SCHEMA, AnalysisResultSchema } from "./schemas";
+import { loadMemorySettings } from "./memory-settings";
+import { AnalysisResultSchema, getAnalysisSchema } from "./schemas";
 import {
 	calculateOptimalChunkSize,
 	extractJSONFromResponse,
@@ -112,6 +114,7 @@ export async function analyzeHistoryItems(
 	onProgress?: ProgressCallback,
 	_trigger: "manual" | "alarm" = "manual",
 	abortSignal?: AbortSignal,
+	memorySettingsOverride?: { storeWorkflowPatterns: boolean },
 ): Promise<FullAnalysisResult> {
 	const analysisStartTime = performance.now();
 
@@ -133,9 +136,15 @@ export async function analyzeHistoryItems(
 		});
 	const stats = calculateStats(items);
 
+	// Load memory settings to check if pattern analysis is enabled
+	const memorySettings = memorySettingsOverride || (await loadMemorySettings());
+	const shouldAnalyzePatterns = memorySettings.storeWorkflowPatterns;
+
 	// Use provided memory or create empty
 	let workingMemory = memory || createEmptyMemory();
 	console.log("Memory loaded, patterns found:", workingMemory.patterns.length);
+	console.log("🔧 Pattern analysis enabled:", shouldAnalyzePatterns);
+	console.log("🔧 Memory settings:", memorySettings);
 
 	// Check if aborted before chunking
 	if (abortSignal?.aborted) {
@@ -256,6 +265,7 @@ export async function analyzeHistoryItems(
 				abortSignal,
 				processedChunks,
 				totalChunks,
+				shouldAnalyzePatterns,
 			);
 
 			// Update working memory with merged results
@@ -265,7 +275,7 @@ export async function analyzeHistoryItems(
 
 				workingMemory = {
 					userProfile: results.userProfile,
-					patterns: results.patterns,
+					patterns: shouldAnalyzePatterns ? results.patterns : [],
 					lastAnalyzedDate: new Date(),
 					lastHistoryTimestamp: Math.max(
 						workingMemory.lastHistoryTimestamp,
@@ -351,6 +361,7 @@ async function mergeAnalysisResults(
 	customSystemPrompt?: string,
 	abortSignal?: AbortSignal,
 	onProgress?: ProgressCallback,
+	shouldAnalyzePatterns: boolean = true,
 ): Promise<MemoryData> {
 	// Check if aborted
 	if (abortSignal?.aborted) {
@@ -371,6 +382,7 @@ async function mergeAnalysisResults(
 			patterns: memory.patterns,
 		},
 		newResults,
+		shouldAnalyzePatterns,
 	);
 
 	// Log merge info without full prompt
@@ -404,7 +416,7 @@ async function mergeAnalysisResults(
 
 		const startTime = performance.now();
 		const response = await promptAI(provider, mergePrompt, {
-			responseConstraint: ANALYSIS_SCHEMA,
+			responseConstraint: getAnalysisSchema(shouldAnalyzePatterns),
 			signal: abortSignal,
 		});
 		const endTime = performance.now();
@@ -433,23 +445,39 @@ async function mergeAnalysisResults(
 			const parsed = JSON.parse(cleanedResponse);
 			console.log("[Merge] Parsed object keys:", Object.keys(parsed));
 
-			// Validate with zod schema
-			const validated = AnalysisResultSchema.parse(parsed);
+			// Validate with appropriate schema based on whether patterns are enabled
+			if (shouldAnalyzePatterns) {
+				const validated = AnalysisResultSchema.parse(parsed);
 
-			// Log merge results for debugging
-			console.log("Merge operation:", {
-				beforePatterns: memory.patterns.length,
-				newPatterns: newResults.patterns.length,
-				afterPatterns: validated.patterns.length,
-				sampleBefore: memory.patterns.slice(0, 3).map((p) => p.description),
-				sampleNew: newResults.patterns.slice(0, 3).map((p) => p.description),
-				sampleAfter: validated.patterns.slice(0, 3).map((p) => p.description),
-			});
+				// Log merge results for debugging
+				console.log("Merge operation:", {
+					beforePatterns: memory.patterns.length,
+					newPatterns: newResults.patterns.length,
+					afterPatterns: validated.patterns.length,
+					sampleBefore: memory.patterns.slice(0, 3).map((p) => p.description),
+					sampleNew: newResults.patterns.slice(0, 3).map((p) => p.description),
+					sampleAfter: validated.patterns.slice(0, 3).map((p) => p.description),
+				});
 
-			return {
-				patterns: validated.patterns,
-				userProfile: validated.userProfile,
-			};
+				return {
+					patterns: validated.patterns,
+					userProfile: validated.userProfile,
+				};
+			} else {
+				// For no-patterns schema, we only expect userProfile
+				const validated = parsed as { userProfile: UserProfile };
+
+				console.log("Merge operation (no patterns):", {
+					beforePatterns: 0,
+					newPatterns: 0,
+					afterPatterns: 0,
+				});
+
+				return {
+					patterns: [],
+					userProfile: validated.userProfile,
+				};
+			}
 		} catch (parseError) {
 			console.error("Failed to parse merge response:", parseError);
 			console.error("Response length:", response.length);
@@ -496,6 +524,7 @@ async function analyzeChunkWithSubdivision(
 	abortSignal?: AbortSignal,
 	chunkNumber?: number,
 	totalChunks?: number,
+	shouldAnalyzePatterns: boolean = true,
 ): Promise<{
 	processedItems: number;
 	results: { userProfile: UserProfile; patterns: WorkflowPattern[] } | null;
@@ -518,6 +547,7 @@ async function analyzeChunkWithSubdivision(
 				customPrompts?.systemPrompt,
 				onProgress,
 				abortSignal,
+				shouldAnalyzePatterns,
 			);
 
 			// Step 2: Merge with existing memory (skip if memory is empty)
@@ -532,6 +562,7 @@ async function analyzeChunkWithSubdivision(
 							customPrompts?.mergePrompt || MERGE_SYSTEM_PROMPT,
 							abortSignal,
 							onProgress,
+							shouldAnalyzePatterns,
 						);
 
 			return { processedItems: items.length, results: mergedResults };
@@ -592,7 +623,7 @@ async function analyzeChunkWithSubdivision(
 				const testData = testHistoryData.slice(0, testItems.length);
 				const testPrompt = buildAnalysisPrompt(testItems, testData);
 				return await provider.measureInputUsage(testPrompt, {
-					responseConstraint: ANALYSIS_SCHEMA,
+					responseConstraint: getAnalysisSchema(shouldAnalyzePatterns),
 					signal: abortSignal,
 				});
 			},
@@ -642,6 +673,7 @@ async function analyzeChunkWithSubdivision(
 				analysisSystemPrompt,
 				undefined, // Don't pass onProgress to avoid duplicate updates
 				abortSignal,
+				shouldAnalyzePatterns,
 			);
 
 			// Step 2: Merge with current memory (skip if current memory is from original empty memory)
@@ -658,6 +690,7 @@ async function analyzeChunkWithSubdivision(
 							customPrompts?.mergePrompt || MERGE_SYSTEM_PROMPT,
 							abortSignal,
 							onProgress,
+							shouldAnalyzePatterns,
 						);
 
 			// Update memory with merged results
@@ -666,7 +699,7 @@ async function analyzeChunkWithSubdivision(
 
 			currentMemory = {
 				userProfile: mergedResults.userProfile,
-				patterns: mergedResults.patterns,
+				patterns: shouldAnalyzePatterns ? mergedResults.patterns : [],
 				lastAnalyzedDate: new Date(),
 				lastHistoryTimestamp: Math.max(
 					currentMemory.lastHistoryTimestamp,
@@ -682,7 +715,7 @@ async function analyzeChunkWithSubdivision(
 			processedItems: totalProcessed,
 			results: {
 				userProfile: currentMemory.userProfile,
-				patterns: currentMemory.patterns,
+				patterns: shouldAnalyzePatterns ? currentMemory.patterns : [],
 			},
 		};
 	} catch (error) {
@@ -698,6 +731,7 @@ async function analyzeChunk(
 	customSystemPrompt?: string,
 	onProgress?: ProgressCallback,
 	abortSignal?: AbortSignal,
+	shouldAnalyzePatterns: boolean = true,
 ): Promise<{ userProfile: UserProfile; patterns: WorkflowPattern[] }> {
 	// Parse URLs for all items
 	const historyData = items.map(parseHistoryItemUrl);
@@ -709,12 +743,22 @@ async function analyzeChunk(
 	console.log("Analysis details:", {
 		promptLength: prompt.length,
 		itemCount: items.length,
+		shouldAnalyzePatterns: shouldAnalyzePatterns,
 	});
 
-	const provider = await getInitializedProvider(
-		aiConfig,
-		customSystemPrompt || ANALYSIS_SYSTEM_PROMPT,
+	const systemPrompt =
+		customSystemPrompt ||
+		(shouldAnalyzePatterns
+			? ANALYSIS_SYSTEM_PROMPT
+			: ANALYSIS_SYSTEM_PROMPT_NO_PATTERNS);
+
+	console.log(
+		"Using system prompt:",
+		shouldAnalyzePatterns ? "WITH patterns" : "WITHOUT patterns",
 	);
+	console.log("Schema will include patterns:", shouldAnalyzePatterns);
+
+	const provider = await getInitializedProvider(aiConfig, systemPrompt);
 
 	if (!provider) {
 		throw new Error("AI is not available.");
@@ -740,7 +784,7 @@ async function analyzeChunk(
 
 		const startTime = performance.now();
 		const response = await promptAI(provider, prompt, {
-			responseConstraint: ANALYSIS_SCHEMA,
+			responseConstraint: getAnalysisSchema(shouldAnalyzePatterns),
 			signal: abortSignal,
 		});
 		const endTime = performance.now();
@@ -773,13 +817,21 @@ async function analyzeChunk(
 			const parsed = JSON.parse(cleanedResponse);
 			console.log("[Analyzer] Parsed object keys:", Object.keys(parsed));
 
-			// Validate with zod schema
-			const validated = AnalysisResultSchema.parse(parsed);
-
-			return {
-				patterns: validated.patterns,
-				userProfile: validated.userProfile,
-			};
+			// Validate with appropriate schema based on whether patterns are enabled
+			if (shouldAnalyzePatterns) {
+				const validated = AnalysisResultSchema.parse(parsed);
+				return {
+					patterns: validated.patterns,
+					userProfile: validated.userProfile,
+				};
+			} else {
+				// For no-patterns schema, we only expect userProfile
+				const validated = parsed as { userProfile: UserProfile };
+				return {
+					patterns: [],
+					userProfile: validated.userProfile,
+				};
+			}
 		} catch (error) {
 			// Failed to parse AI analysis response
 			console.error("Failed to parse AI response:", error);
