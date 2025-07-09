@@ -1,6 +1,6 @@
-import { format, isValid, parseISO } from "date-fns";
 import { offscreenTrpc as trpc } from "../trpc/client";
 import type { AnalysisMemory } from "../types";
+import { getStorageData, removeStorageData, setStorageData } from "./storage";
 
 // Chunk of history for processing
 export interface HistoryChunk {
@@ -38,23 +38,15 @@ export function createEmptyMemory(): AnalysisMemory {
 
 /**
  * Load memory via service worker message passing (for offscreen documents)
+ * SuperJSON automatically handles Date deserialization through tRPC
  */
 export async function loadMemoryFromServiceWorker(): Promise<AnalysisMemory | null> {
 	try {
 		const memory = await trpc.memory.read.query();
 		if (!memory) return null;
 
-		// Convert date string back to Date object if needed
-		// tRPC serializes dates as strings, so we need to parse them
-		const parsedMemory: AnalysisMemory = {
-			...memory,
-			lastAnalyzedDate:
-				typeof memory.lastAnalyzedDate === "string"
-					? parseISO(memory.lastAnalyzedDate)
-					: memory.lastAnalyzedDate,
-		};
-
-		return parsedMemory;
+		// SuperJSON via tRPC automatically handles Date deserialization
+		return memory;
 	} catch (error) {
 		console.error("[Memory] Failed to load memory via service worker:", error);
 		return null;
@@ -62,7 +54,7 @@ export async function loadMemoryFromServiceWorker(): Promise<AnalysisMemory | nu
 }
 
 /**
- * Load memory from Chrome storage
+ * Load memory from Chrome storage using SuperJSON
  */
 export async function loadMemoryFromStorage(): Promise<AnalysisMemory | null> {
 	try {
@@ -78,78 +70,41 @@ export async function loadMemoryFromStorage(): Promise<AnalysisMemory | null> {
 			return null;
 		}
 
-		const result = await chrome.storage.local.get(MEMORY_KEY);
-		const stored = result[MEMORY_KEY];
+		const stored = await getStorageData<AnalysisMemory>(MEMORY_KEY);
 
 		if (!stored) {
 			console.log("No existing memory found in chrome.storage.local");
 			return null;
 		}
 
-		// Convert date strings back to Date objects
-		const dateValue = stored.lastAnalyzedDate;
-		console.log(
-			"Raw dateValue from storage:",
-			dateValue,
-			"Type:",
-			typeof dateValue,
-		);
-
-		// Handle different possible date formats using date-fns
-		let parsedDate: Date;
-		if (dateValue instanceof Date) {
-			// Already a Date object
-			parsedDate = dateValue;
-		} else if (typeof dateValue === "string") {
-			// ISO string from JSON serialization
-			parsedDate = parseISO(dateValue);
-		} else if (typeof dateValue === "number") {
-			// Unix timestamp
-			parsedDate = new Date(dateValue);
-		} else {
-			// Fallback for any other format
-			console.warn(
-				"Unexpected date format in storage:",
-				dateValue,
-				typeof dateValue,
-			);
-			parsedDate = new Date();
-		}
-
-		// Validate the parsed date
-		if (!isValid(parsedDate)) {
-			console.warn(
-				"Invalid lastAnalyzedDate in stored memory, using epoch:",
-				dateValue,
-			);
-			parsedDate = new Date(0);
-		}
-
-		stored.lastAnalyzedDate = parsedDate;
-
 		// Handle lastHistoryTimestamp field (new in v1.0.3)
 		if (typeof stored.lastHistoryTimestamp !== "number") {
 			stored.lastHistoryTimestamp = 0;
 		}
 
-		// Handle UserProfile fields (v1.5.0 nested structure)
+		// Handle UserProfile fields (v1.5.0 nested structure) - legacy migration
+		const legacyProfile = stored.userProfile as Record<string, unknown>;
 		if (!stored.userProfile.stableTraits) {
 			stored.userProfile.stableTraits = {
-				coreIdentities: stored.userProfile.coreIdentities || [],
-				personalPreferences: stored.userProfile.personalPreferences || [],
+				coreIdentities: (legacyProfile.coreIdentities as string[]) || [],
+				personalPreferences:
+					(legacyProfile.personalPreferences as {
+						category: string;
+						preference: string;
+					}[]) || [],
 			};
 		}
 		if (!stored.userProfile.dynamicContext) {
 			stored.userProfile.dynamicContext = {
-				currentTasks: stored.userProfile.currentTasks || [],
-				currentInterests: stored.userProfile.currentInterests || [],
+				currentTasks: (legacyProfile.currentTasks as string[]) || [],
+				currentInterests: (legacyProfile.currentInterests as string[]) || [],
 			};
 		}
 		// Clean up old flat fields if they exist
-		delete stored.userProfile.coreIdentities;
-		delete stored.userProfile.personalPreferences;
-		delete stored.userProfile.currentTasks;
-		delete stored.userProfile.currentInterests;
+		delete legacyProfile.coreIdentities;
+		delete legacyProfile.personalPreferences;
+		delete legacyProfile.currentTasks;
+		delete legacyProfile.currentInterests;
 
 		// Check version compatibility
 		if (stored.version !== MEMORY_VERSION) {
@@ -187,7 +142,7 @@ export async function saveMemoryToServiceWorker(
 }
 
 /**
- * Save memory to Chrome storage
+ * Save memory to Chrome storage using SuperJSON
  */
 export async function saveMemoryToStorage(
 	memory: AnalysisMemory,
@@ -205,40 +160,14 @@ export async function saveMemoryToStorage(
 			return;
 		}
 
-		// Ensure lastAnalyzedDate is properly formatted
-		// This handles Date objects, ISO strings, timestamps, or any valid date format
-		let lastAnalyzedDate =
-			memory.lastAnalyzedDate instanceof Date
-				? memory.lastAnalyzedDate
-				: typeof memory.lastAnalyzedDate === "string"
-					? parseISO(memory.lastAnalyzedDate)
-					: new Date(memory.lastAnalyzedDate);
-
-		// Validate the date
-		if (!isValid(lastAnalyzedDate)) {
-			console.warn(
-				"[Memory] Invalid lastAnalyzedDate, using current date:",
-				memory.lastAnalyzedDate,
-			);
-			lastAnalyzedDate = new Date();
-		}
-
-		// Normalize the date to an ISO string before saving to prevent serialization issues
-		const memoryToSave = {
-			...memory,
-			lastAnalyzedDate: format(
-				lastAnalyzedDate,
-				"yyyy-MM-dd'T'HH:mm:ss.SSS'Z'",
-			),
-			lastHistoryTimestamp: memory.lastHistoryTimestamp,
-		};
-
-		await chrome.storage.local.set({ [MEMORY_KEY]: memoryToSave });
+		// SuperJSON handles Date serialization automatically
+		await setStorageData(MEMORY_KEY, memory);
 		console.log("[Memory] Saved to chrome.storage.local:", {
 			key: MEMORY_KEY,
 			patterns: memory.patterns.length,
-			lastAnalyzedDate: lastAnalyzedDate,
-			lastAnalyzedDateISO: memoryToSave.lastAnalyzedDate,
+			lastAnalyzedDate: memory.lastAnalyzedDate,
+			lastAnalyzedType: typeof memory.lastAnalyzedDate,
+			lastAnalyzedIsDate: memory.lastAnalyzedDate instanceof Date,
 			lastHistoryTimestamp: memory.lastHistoryTimestamp,
 			userProfile: {
 				coreIdentities:
@@ -254,7 +183,7 @@ export async function saveMemoryToStorage(
 }
 
 /**
- * Clear memory from Chrome storage
+ * Clear memory from Chrome storage using SuperJSON storage utilities
  */
 export async function clearMemoryFromStorage(): Promise<void> {
 	// Check if we're in an environment with chrome.storage access
@@ -269,6 +198,6 @@ export async function clearMemoryFromStorage(): Promise<void> {
 		return;
 	}
 
-	await chrome.storage.local.remove(MEMORY_KEY);
+	await removeStorageData(MEMORY_KEY);
 	console.log("Analysis memory cleared from chrome.storage.local");
 }

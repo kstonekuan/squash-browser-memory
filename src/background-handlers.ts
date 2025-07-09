@@ -216,7 +216,7 @@ export async function handleCancelAnalysis(input: {
 			});
 
 			if (contexts.length > 0) {
-				await offscreenClient.cancelAnalysis.mutate({
+				await offscreenClient.offscreen.cancelAnalysis.mutate({
 					analysisId: input.analysisId,
 				});
 			}
@@ -251,7 +251,7 @@ export async function handleQueryNextAlarm() {
 export async function handleInitializeAI() {
 	await ensureOffscreenDocument();
 	// Forward the message to the offscreen document
-	await offscreenClient.initializeAI.mutate();
+	await offscreenClient.offscreen.initializeAI.mutate();
 }
 
 export async function handleGetAIConfig(): Promise<AIProviderConfig> {
@@ -398,7 +398,7 @@ async function runAnalysis(
 		await ensureOffscreenDocument();
 
 		// Send analysis request to offscreen document
-		const result = await offscreenClient.startAnalysis.mutate({
+		const result = await offscreenClient.offscreen.startAnalysis.mutate({
 			historyItems,
 			customPrompts,
 			analysisId,

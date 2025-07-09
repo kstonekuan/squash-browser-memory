@@ -28,6 +28,8 @@ const customPromptsSchema = z.object({
 // Analysis schemas
 export const analysisProgressSchema = z.object({
 	analysisId: z.string(),
+	timestamp: z.date().optional(),
+	startTime: z.date().optional(),
 	phase: z.enum([
 		"calculating",
 		"chunking",

@@ -4,6 +4,7 @@
  */
 
 import { initTRPC } from "@trpc/server";
+import superjson from "superjson";
 import { z } from "zod";
 import type { AnalysisMemory } from "../types";
 import type { AIProviderConfig } from "../utils/ai-interface";
@@ -21,10 +22,11 @@ interface Context {
 	sender?: chrome.runtime.MessageSender;
 }
 
-// Initialize tRPC once
+// Initialize tRPC with SuperJSON transformer
 const t = initTRPC.context<Context>().create({
 	isServer: false,
 	allowOutsideOfServer: true,
+	transformer: superjson,
 });
 
 // Background procedures (implemented by background service worker)
