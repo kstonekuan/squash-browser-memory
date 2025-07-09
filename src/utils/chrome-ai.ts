@@ -27,9 +27,15 @@ export class ChromeAIProvider implements AIProvider {
 		const result = await ChromiumAI.Safe.initialize(systemPrompt);
 
 		await result.match(
-			(instance) => {
-				// Success: The result.value is now a ChromiumAIInstance directly
-				this.aiInstance = instance;
+			(initResult) => {
+				// Success: Check if this is an initialized result and extract the instance
+				if (initResult.type === "initialized") {
+					this.aiInstance = initResult.instance;
+				} else {
+					throw new Error(
+						`Chrome AI initialization failed: ${initResult.type}`,
+					);
+				}
 			},
 			(error) => {
 				// Error: Log and throw

@@ -7,6 +7,12 @@ Rules:
 - Be specific and use actual evidence from browsing history
 - Return empty arrays/strings rather than guess or make assumptions`;
 
+export const ANALYSIS_SYSTEM_PROMPT_NO_PATTERNS = `Analyze browsing behavior to build detailed user profiles with evidence-based analysis.
+Rules:
+- Use different evidence thresholds: stable traits require 2+ distinct signals, dynamic context updates frequently
+- Be specific and use actual evidence from browsing history
+- Return empty arrays/strings rather than guess or make assumptions`;
+
 export const MERGE_SYSTEM_PROMPT = `Merge browsing analysis results using evidence-based evolution.
 
 Merge rules:
@@ -67,10 +73,21 @@ ${JSON.stringify(historyData)}`;
 export function buildMergePrompt(
 	existingMemory: MemoryData,
 	newResults: MemoryData,
+	includePatterns: boolean = true,
 ): string {
+	// Create copies of the data to avoid mutating the original
+	const existingData = { ...existingMemory };
+	const newData = { ...newResults };
+
+	// Remove patterns if not including them
+	if (!includePatterns) {
+		existingData.patterns = [];
+		newData.patterns = [];
+	}
+
 	return `EXISTING MEMORY:
-${JSON.stringify(existingMemory)}
+${JSON.stringify(existingData)}
 
 NEW MEMORY:
-${JSON.stringify(newResults)}`;
+${JSON.stringify(newData)}`;
 }

@@ -4,7 +4,7 @@
  */
 
 import { defineExtensionMessaging } from "@webext-core/messaging";
-import type { AnalysisMemory, FullAnalysisResult } from "../types";
+import type { AnalysisMemory, FullAnalysisResult, MemorySettings } from "../types";
 import type { AIProviderConfig } from "./ai-interface";
 import type { CustomPrompts } from "./analyzer";
 
@@ -86,6 +86,7 @@ interface ProtocolMap {
 		customPrompts?: CustomPrompts;
 		analysisId: string;
 		trigger: "manual" | "alarm";
+		memorySettings?: MemorySettings;
 	}) => void;
 
 	"offscreen:cancel": (data: { analysisId: string }) => {
@@ -111,6 +112,11 @@ interface ProtocolMap {
 
 	"offscreen:write-memory": (data: { memory: AnalysisMemory }) => {
 		success: boolean;
+	};
+
+	"memory:clear-patterns": () => {
+		success: boolean;
+		error?: string;
 	};
 
 	"offscreen:keepalive": () => {
