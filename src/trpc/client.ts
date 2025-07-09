@@ -4,7 +4,7 @@
  */
 
 import { createTRPCClient, createTRPCProxyClient } from "@trpc/client";
-import { chromePortLink } from "../utils/trpc-chrome";
+import { chromePortLink } from "./chrome-adapter";
 import type { offscreenRouter } from "./offscreen-router";
 import type { AppRouter } from "./router";
 

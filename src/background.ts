@@ -5,8 +5,8 @@ import {
 	handleStartupAlarmCheck,
 	triggerAnalysis,
 } from "./background-handlers";
+import { createChromeHandler } from "./trpc/chrome-adapter";
 import { appRouter } from "./trpc/router";
-import { createChromeHandler } from "./utils/trpc-chrome";
 
 const ALARM_NAME = "hourly-analysis";
 

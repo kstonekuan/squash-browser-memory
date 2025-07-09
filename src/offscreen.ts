@@ -1,6 +1,6 @@
 /// <reference types="@types/dom-chromium-ai" />
 
-import { createChromeHandler } from "./utils/trpc-chrome";
+import { createChromeHandler } from "./trpc/chrome-adapter";
 
 // ============================================
 // tRPC Handler Setup
