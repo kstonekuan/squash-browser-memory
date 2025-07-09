@@ -99,7 +99,7 @@ export type ProgressCallback = (info: {
 }) => void;
 
 // Custom prompts interface
-export interface CustomPrompts {
+interface CustomPrompts {
 	systemPrompt?: string;
 	chunkPrompt?: string;
 	mergePrompt?: string;

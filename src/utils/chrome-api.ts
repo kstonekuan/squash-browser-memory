@@ -57,19 +57,6 @@ export async function clearAlarm(name: string): Promise<boolean> {
 	return chrome.alarms.clear(name);
 }
 
-// Storage utilities
-export async function getStorageData<T>(
-	key: string,
-	defaultValue: T,
-): Promise<T> {
-	const result = await chrome.storage.local.get(key);
-	return result[key] ?? defaultValue;
-}
-
-export async function setStorageData<T>(key: string, value: T): Promise<void> {
-	await chrome.storage.local.set({ [key]: value });
-}
-
 // History API
 export async function searchHistory(
 	query: chrome.history.HistoryQuery,
@@ -89,21 +76,6 @@ export async function createNotification(
 	return new Promise((resolve) => {
 		chrome.notifications.create(notificationId, options, (id) => {
 			resolve(id);
-		});
-	});
-}
-
-// Context menus
-export async function createContextMenu(
-	createProperties: chrome.contextMenus.CreateProperties,
-): Promise<void> {
-	chrome.contextMenus.create(createProperties);
-}
-
-export async function removeAllContextMenus(): Promise<void> {
-	return new Promise((resolve) => {
-		chrome.contextMenus.removeAll(() => {
-			resolve();
 		});
 	});
 }

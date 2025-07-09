@@ -39,5 +39,3 @@ export const offscreenRouter = t.router({
 		return handleInitializeAI();
 	}),
 });
-
-export type OffscreenRouter = typeof offscreenRouter;

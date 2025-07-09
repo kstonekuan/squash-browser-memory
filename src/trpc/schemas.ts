@@ -6,11 +6,11 @@
 import { z } from "zod";
 
 // Base schemas
-export const memorySettingsSchema = z.object({
+const memorySettingsSchema = z.object({
 	storeWorkflowPatterns: z.boolean(),
 });
 
-export const historyItemSchema = z.object({
+const historyItemSchema = z.object({
 	id: z.string(),
 	url: z.string().optional(),
 	title: z.string().optional(),
@@ -19,7 +19,7 @@ export const historyItemSchema = z.object({
 	typedCount: z.number().optional(),
 });
 
-export const customPromptsSchema = z.object({
+const customPromptsSchema = z.object({
 	systemPrompt: z.string().optional(),
 	chunkPrompt: z.string().optional(),
 	mergePrompt: z.string().optional(),
@@ -48,14 +48,6 @@ export const analysisProgressSchema = z.object({
 		.optional(),
 });
 
-export const analysisStatusSchema = z.object({
-	status: z.enum(["started", "completed", "error", "skipped"]),
-	message: z.string().optional(),
-	itemCount: z.number().optional(),
-	reason: z.string().optional(),
-	error: z.string().optional(),
-});
-
 // AI schemas
 export const aiStatusSchema = z.object({
 	status: z.enum(["initializing", "available", "error"]),
@@ -78,9 +70,4 @@ export const startManualAnalysisInputSchema = z.object({
 });
 
 // Helper type exports
-export type HistoryItem = z.infer<typeof historyItemSchema>;
-export type CustomPrompts = z.infer<typeof customPromptsSchema>;
-export type MemorySettings = z.infer<typeof memorySettingsSchema>;
 export type AnalysisProgress = z.infer<typeof analysisProgressSchema>;
-export type AnalysisStatus = z.infer<typeof analysisStatusSchema>;
-export type AIStatus = z.infer<typeof aiStatusSchema>;

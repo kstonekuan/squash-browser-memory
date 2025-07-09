@@ -5,7 +5,8 @@
 
 import { createTRPCClient, createTRPCProxyClient } from "@trpc/client";
 import { chromePortLink } from "../utils/trpc-chrome";
-import type { AppRouter, OffscreenRouter } from "./router";
+import type { offscreenRouter } from "./offscreen-router";
+import type { AppRouter } from "./router";
 
 // Client for UI -> Background communication (used in sidepanel/popup)
 // Uses proxy client for cleaner syntax in UI components
@@ -14,7 +15,7 @@ export const trpc = createTRPCProxyClient<AppRouter>({
 });
 
 // Client for Background -> Offscreen communication
-export const offscreenClient = createTRPCClient<OffscreenRouter>({
+export const offscreenClient = createTRPCClient<typeof offscreenRouter>({
 	links: [
 		chromePortLink({
 			portName: "background-to-offscreen",
@@ -31,16 +32,3 @@ export const offscreenTrpc = createTRPCClient<AppRouter>({
 		}),
 	],
 });
-
-// Helper function to create a client with custom port name
-export function createClient(portName: string) {
-	return createTRPCClient<AppRouter>({
-		links: [chromePortLink({ portName })],
-	});
-}
-
-// Re-export types for convenience
-export type { AppRouter } from "./router";
-export type UIClient = typeof trpc;
-export type BackgroundClient = typeof offscreenClient;
-export type OffscreenClient = typeof offscreenTrpc;

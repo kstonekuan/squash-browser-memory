@@ -252,9 +252,3 @@ export const appRouter = t.mergeRouters(
 
 // Types
 export type AppRouter = typeof appRouter;
-export type BackgroundRouter = typeof backgroundProcedures;
-export type OffscreenRouter = typeof offscreenProcedures;
-
-// Export for creating routers in other files if needed
-export const createRouter = t.router;
-export const publicProcedure = t.procedure;
