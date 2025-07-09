@@ -1,6 +1,6 @@
 import { format, isValid, parseISO } from "date-fns";
+import { offscreenTrpc as trpc } from "../trpc/client";
 import type { AnalysisMemory } from "../types";
-import { sendMessage } from "./messaging";
 
 // Chunk of history for processing
 export interface HistoryChunk {
@@ -41,8 +41,20 @@ export function createEmptyMemory(): AnalysisMemory {
  */
 export async function loadMemoryFromServiceWorker(): Promise<AnalysisMemory | null> {
 	try {
-		const response = await sendMessage("offscreen:read-memory", undefined);
-		return response.memory;
+		const memory = await trpc.memory.read.query();
+		if (!memory) return null;
+
+		// Convert date string back to Date object if needed
+		// tRPC serializes dates as strings, so we need to parse them
+		const parsedMemory: AnalysisMemory = {
+			...memory,
+			lastAnalyzedDate:
+				typeof memory.lastAnalyzedDate === "string"
+					? parseISO(memory.lastAnalyzedDate)
+					: memory.lastAnalyzedDate,
+		};
+
+		return parsedMemory;
 	} catch (error) {
 		console.error("[Memory] Failed to load memory via service worker:", error);
 		return null;
@@ -168,7 +180,7 @@ export async function saveMemoryToServiceWorker(
 	memory: AnalysisMemory,
 ): Promise<void> {
 	try {
-		await sendMessage("offscreen:write-memory", { memory });
+		await trpc.memory.write.mutate({ memory });
 	} catch (error) {
 		console.error("[Memory] Failed to save memory via service worker:", error);
 	}

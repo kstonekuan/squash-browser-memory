@@ -4,8 +4,8 @@
  */
 
 import { format } from "date-fns";
+import type { AnalysisProgress } from "../trpc/schemas";
 import { loadAutoAnalysisSettings } from "./ambient";
-import type { AnalysisProgress } from "./messaging";
 
 // Types for our handler functions
 export interface AlarmAPI {

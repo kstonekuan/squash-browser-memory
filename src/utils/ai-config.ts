@@ -15,9 +15,9 @@ const DEFAULT_CONFIG: AIProviderConfig = {
  */
 export async function loadAIConfigFromServiceWorker(): Promise<AIProviderConfig> {
 	try {
-		// Import messaging only when needed to avoid circular dependencies
-		const { sendMessage } = await import("./messaging");
-		const config = await sendMessage("offscreen:get-ai-config", undefined);
+		// Import tRPC client only when needed to avoid circular dependencies
+		const { trpc } = await import("../trpc/client");
+		const config = await trpc.ai.getConfig.query();
 		console.log("Loaded AI config from service worker:", {
 			provider: config.provider,
 		});

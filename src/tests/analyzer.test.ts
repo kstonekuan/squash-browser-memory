@@ -1,12 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-// Mock @webext-core/messaging to prevent loading webextension-polyfill
-vi.mock("@webext-core/messaging", () => ({
-	defineExtensionMessaging: () => ({
-		sendMessage: vi.fn(),
-		onMessage: vi.fn(),
-	}),
-}));
+// No messaging mocks needed - using tRPC now
 
 // Mock memory operations
 vi.mock("../utils/memory", () => ({

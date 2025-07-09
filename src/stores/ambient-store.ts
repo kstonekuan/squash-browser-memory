@@ -1,11 +1,11 @@
 import { writable } from "svelte/store";
+import { trpc } from "../trpc/client";
 import type { AutoAnalysisSettings } from "../utils/ambient";
 import {
 	AUTO_ANALYSIS_SETTINGS_KEY,
 	loadAutoAnalysisSettings,
 	saveAutoAnalysisSettings,
 } from "../utils/ambient";
-import { sendMessage } from "../utils/messaging";
 
 // Default settings
 const defaultSettings: AutoAnalysisSettings = {
@@ -68,7 +68,7 @@ export async function toggleAmbientAnalysis(): Promise<void> {
 
 	// Send message to background script
 	try {
-		const response = await sendMessage("settings:toggle-auto-analysis", {
+		const response = await trpc.settings.toggleAutoAnalysis.mutate({
 			enabled: newEnabled,
 		});
 
@@ -133,7 +133,7 @@ export async function disableAmbientAnalysis(): Promise<void> {
 
 	// Send message to background script to clear alarms
 	try {
-		const response = await sendMessage("settings:toggle-auto-analysis", {
+		const response = await trpc.settings.toggleAutoAnalysis.mutate({
 			enabled: false,
 		});
 

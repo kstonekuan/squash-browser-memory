@@ -3,6 +3,7 @@
  */
 
 import { describe, expect, it, vi } from "vitest";
+import type { AnalysisProgress } from "../trpc/schemas";
 import {
 	cancelAnalysisLogic,
 	checkAnalysisRunningLogic,
@@ -17,7 +18,6 @@ import {
 	shouldStopKeepalive,
 	updateProgressMap,
 } from "../utils/message-handlers";
-import type { AnalysisProgress } from "../utils/messaging";
 
 describe("Message Handler Business Logic", () => {
 	describe("handleAutoAnalysisToggleLogic", () => {

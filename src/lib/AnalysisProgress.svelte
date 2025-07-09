@@ -1,7 +1,7 @@
 <script lang="ts">
 // Import from the centralized type definition
 import { match } from "ts-pattern";
-import type { AnalysisProgress } from "../utils/messaging";
+import type { AnalysisProgress } from "../trpc/schemas";
 
 export type AnalysisPhase = AnalysisProgress["phase"];
 

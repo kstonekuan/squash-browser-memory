@@ -4,8 +4,8 @@ import {
 	ambientSettings,
 	toggleAmbientAnalysis as toggleAmbient,
 } from "../stores/ambient-store";
+import { trpc } from "../trpc/client";
 import type { AutoAnalysisSettings } from "../utils/ambient";
-import { sendMessage } from "../utils/messaging";
 
 let { analysisStatus = { status: "idle" }, aiStatus = "unavailable" } = $props<{
 	analysisStatus?: {
@@ -44,7 +44,8 @@ let lastQueriedEnabled = false;
 $effect(() => {
 	// Only query if we're transitioning from disabled to enabled or on first mount
 	if (settings.enabled && !lastQueriedEnabled) {
-		sendMessage("ambient:query-next-alarm")
+		trpc.ambient.queryNextAlarm
+			.query()
 			.then((response) => {
 				if (response?.nextRunTime) {
 					ambientSettings.update((s) => ({
