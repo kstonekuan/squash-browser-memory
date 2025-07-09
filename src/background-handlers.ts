@@ -170,7 +170,13 @@ export async function handleStartManualAnalysis(input: {
 		console.log(
 			`[Background] Starting manual analysis with ${historyItems.length} items`,
 		);
-		await runAnalysis(historyItems, analysisId, customPrompts, "manual", memorySettings);
+		await runAnalysis(
+			historyItems,
+			analysisId,
+			customPrompts,
+			"manual",
+			memorySettings,
+		);
 
 		return {
 			success: true,
@@ -379,6 +385,7 @@ async function runAnalysis(
 		mergePrompt?: string;
 	},
 	trigger: "manual" | "alarm" = "manual",
+	memorySettings?: { storeWorkflowPatterns: boolean },
 ): Promise<void> {
 	console.log(
 		`[Background] Starting analysis for ${historyItems.length} items with ID: ${analysisId} (triggered by: ${trigger})`,
@@ -578,9 +585,23 @@ export async function triggerAnalysis(trigger: "manual" | "alarm") {
 		const promptsResult = await chrome.storage.local.get("custom_prompts");
 		const customPrompts = promptsResult.custom_prompts;
 
+		// Load memory settings for alarm trigger as well
+		const MEMORY_SETTINGS_KEY = "memory_settings";
+		const memoryResult = await chrome.storage.local.get(MEMORY_SETTINGS_KEY);
+		const memorySettings = {
+			storeWorkflowPatterns: true, // default
+			...(memoryResult[MEMORY_SETTINGS_KEY] || {}),
+		};
+
 		const analysisId = `analysis-${Date.now()}`;
 		currentAnalysisId = analysisId;
-		await runAnalysis(historyItems, analysisId, customPrompts, trigger);
+		await runAnalysis(
+			historyItems,
+			analysisId,
+			customPrompts,
+			trigger,
+			memorySettings,
+		);
 	} catch (error) {
 		// Error already handled and logged by runAnalysis
 		console.error("[Analysis] Error in triggerAnalysis:", error);
