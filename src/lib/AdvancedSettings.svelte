@@ -14,7 +14,6 @@ import {
 import type { AIProviderType } from "../utils/ai-interface";
 import {
 	getAvailableProviders,
-	getProvider,
 	getProviderDisplayName,
 } from "../utils/ai-provider-factory";
 import type { AutoAnalysisSettings } from "../utils/ambient";

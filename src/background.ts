@@ -1,12 +1,9 @@
 // Background service worker for the History Workflow Analyzer extension
 /// <reference types="@types/dom-chromium-ai" />
 
-import {
-	handleStartupAlarmCheck,
-	triggerAnalysis,
-} from "./background-handlers";
+import { backgroundRouter } from "./trpc/background-router";
 import { createChromeHandler } from "./trpc/chrome-adapter";
-import { appRouter } from "./trpc/router";
+import { ensureOffscreenDocument } from "./utils/chrome-api";
 
 const ALARM_NAME = "hourly-analysis";
 
@@ -23,6 +20,10 @@ chrome.sidePanel
 // Listen for installation
 chrome.runtime.onInstalled.addListener(async () => {
 	console.log("History Workflow Analyzer extension installed");
+
+	// Create offscreen document on install
+	await ensureOffscreenDocument();
+	console.log("Offscreen document created");
 
 	const { loadAutoAnalysisSettings } = await import("./utils/ambient");
 	const settings = await loadAutoAnalysisSettings();
@@ -45,6 +46,7 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
 	if (alarm.name === ALARM_NAME) {
 		console.log("[Analysis] Alarm triggered");
 		try {
+			const { triggerAnalysis } = await import("./background-handlers");
 			await triggerAnalysis("alarm");
 		} catch (error) {
 			console.error("Failed to run analysis from alarm:", error);
@@ -54,6 +56,11 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
 
 // Check alarm status on startup
 chrome.runtime.onStartup.addListener(async () => {
+	// Create offscreen document on startup
+	await ensureOffscreenDocument();
+	console.log("Offscreen document created on startup");
+
+	const { handleStartupAlarmCheck } = await import("./background-handlers");
 	await handleStartupAlarmCheck();
 });
 
@@ -70,13 +77,21 @@ self.addEventListener("error", (event) => {
 
 // Set up tRPC handler for all incoming requests
 createChromeHandler({
-	router: appRouter,
+	router: backgroundRouter,
 	createContext: () => ({
 		timestamp: Date.now(),
 	}),
 	onError: (error, operation) => {
-		console.error("[tRPC] Error:", error, "Operation:", operation);
+		console.error("[background tRPC] Error:", error, "Operation:", operation);
 	},
 });
 
 console.log("[Background] tRPC handler initialized");
+
+// Initialize offscreen document immediately on service worker start
+// This ensures it's available for all operations
+ensureOffscreenDocument()
+	.then(() => console.log("[Background] Offscreen document ready"))
+	.catch((error) =>
+		console.error("[Background] Failed to create offscreen document:", error),
+	);

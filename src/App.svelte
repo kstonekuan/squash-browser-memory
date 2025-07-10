@@ -25,7 +25,6 @@ import {
 
 let analysisResult: FullAnalysisResult | null = $state(null);
 let memoryAutoExpand = $state(false);
-let rawHistoryData: chrome.history.HistoryItem[] | null = $state(null);
 let memorySettings = $state<MemorySettings>({ storeWorkflowPatterns: true });
 let customPrompts = $state<{
 	systemPrompt?: string;
@@ -72,7 +71,6 @@ async function handleAnalysis(data: { items: chrome.history.HistoryItem[] }) {
 	console.log("[App] Starting manual analysis for", items.length, "items");
 
 	analysisResult = null;
-	rawHistoryData = items;
 
 	// Set analysis type and generate ID
 	currentAnalysisType = "manual";
@@ -414,22 +412,19 @@ onMount(() => {
 	// Set up progress subscription when we have an analysis ID
 	$effect(() => {
 		if (currentAnalysisId && !progressUnsubscribe) {
-			progressUnsubscribe = trpc.analysis.onProgress.subscribe(
-				{ analysisId: currentAnalysisId },
-				{
-					onData: (data: AnalysisProgressType) => {
-						console.log("[App] tRPC progress update:", data);
-						analysisPhase = data.phase;
-						subPhase = data.subPhase;
-						if (data.chunkProgress) {
-							chunkProgress = data.chunkProgress;
-						}
-					},
-					onError: (error) => {
-						console.error("Progress subscription error:", error);
-					},
+			progressUnsubscribe = trpc.analysis.onProgress.subscribe(undefined, {
+				onData: (data: AnalysisProgressType) => {
+					console.log("[App] tRPC progress update:", data);
+					analysisPhase = data.phase;
+					subPhase = data.subPhase;
+					if (data.chunkProgress) {
+						chunkProgress = data.chunkProgress;
+					}
 				},
-			);
+				onError: (error) => {
+					console.error("Progress subscription error:", error);
+				},
+			});
 		} else if (!currentAnalysisId && progressUnsubscribe) {
 			// Clean up subscription when analysis is done
 			progressUnsubscribe.unsubscribe();

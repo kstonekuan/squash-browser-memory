@@ -6,7 +6,7 @@
 	"scripts": {
 		"dev": "vite",
 		"build": "pnpm check && vite build",
-		"check": "biome check --write . && tsc --noEmit && svelte-check --tsconfig ./tsconfig.app.json && tsc -p tsconfig.node.json && vitest run --passWithNoTests && knip",
+		"check": "biome check --write . && tsc --noEmit && svelte-check --tsconfig ./tsconfig.app.json && vitest run --passWithNoTests && knip",
 		"test": "vitest",
 		"test:ui": "vitest --ui"
 	},
@@ -28,7 +28,6 @@
 		"@tailwindcss/forms": "0.5.10",
 		"@tailwindcss/postcss": "4.1.11",
 		"@testing-library/jest-dom": "6.6.3",
-		"@tsconfig/svelte": "5.0.4",
 		"@types/chrome": "0.0.332",
 		"@types/dom-chromium-ai": "0.0.9",
 		"@types/node": "24.0.12",

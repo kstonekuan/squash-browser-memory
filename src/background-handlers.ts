@@ -193,11 +193,6 @@ const chromeAlarmAPI: AlarmAPI = {
 	get: (name: string) => chromeAPI.getAlarm(name),
 };
 
-async function ensureOffscreenDocument(): Promise<void> {
-	// Use the chrome-api wrapper which handles the state management
-	await chromeAPI.ensureOffscreenDocument();
-}
-
 // Handler functions for tRPC procedures
 export async function handleToggleAutoAnalysis(input: { enabled: boolean }) {
 	return handleAutoAnalysisToggleLogic(
@@ -320,7 +315,8 @@ export async function handleQueryNextAlarm() {
 }
 
 export async function handleInitializeAI() {
-	await ensureOffscreenDocument();
+	console.log("[Background] Initializing AI provider");
+	await chromeAPI.ensureOffscreenDocument();
 	// Forward the message to the offscreen document
 	await offscreenClient.offscreen.initializeAI.mutate();
 }
@@ -457,7 +453,7 @@ async function runAnalysis(
 
 	try {
 		// Ensure offscreen document exists
-		await ensureOffscreenDocument();
+		await chromeAPI.ensureOffscreenDocument();
 
 		// Send analysis request to offscreen document
 		const result = await offscreenClient.offscreen.startAnalysis.mutate({

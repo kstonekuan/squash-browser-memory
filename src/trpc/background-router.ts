@@ -1,6 +1,6 @@
 /**
- * Unified tRPC router definition for the entire extension
- * This is the single source of truth for all RPC communication
+ * Background service worker specific router
+ * Only includes procedures that should be available in the background context
  */
 
 import { initTRPC } from "@trpc/server";
@@ -9,7 +9,6 @@ import { z } from "zod";
 import type { AnalysisMemory } from "../types";
 import type { AIProviderConfig } from "../utils/ai-interface";
 import {
-	type AnalysisProgress,
 	aiStatusSchema,
 	analysisProgressSchema,
 	startAnalysisInputSchema,
@@ -29,9 +28,42 @@ const t = initTRPC.context<Context>().create({
 	transformer: superjson,
 });
 
-// Background procedures (implemented by background service worker)
-const backgroundProcedures = t.router({
-	// Analysis management
+// Create subscriptions helper
+async function* createSubscription<T>(
+	subscribeFn: (callback: (update: T) => void) => () => void,
+): AsyncGenerator<T> {
+	const queue: T[] = [];
+	let resolveNext: (() => void) | null = null;
+
+	const unsubscribe = subscribeFn((update) => {
+		queue.push(update);
+		if (resolveNext) {
+			resolveNext();
+			resolveNext = null;
+		}
+	});
+
+	try {
+		while (true) {
+			if (queue.length === 0) {
+				await new Promise<void>((resolve) => {
+					resolveNext = resolve;
+				});
+			}
+
+			while (queue.length > 0) {
+				const update = queue.shift()!;
+				yield update;
+			}
+		}
+	} finally {
+		unsubscribe();
+	}
+}
+
+// Background procedures
+export const backgroundRouter = t.router({
+	// Analysis procedures
 	analysis: t.router({
 		startManual: t.procedure
 			.input(startManualAnalysisInputSchema)
@@ -54,81 +86,14 @@ const backgroundProcedures = t.router({
 			return handleGetAnalysisState();
 		}),
 
-		// Subscriptions
-		onProgress: t.procedure
-			.input(z.object({ analysisId: z.string() }))
-			.subscription(async function* ({ input }) {
-				const { subscribeToProgress } = await import("../background-handlers");
-
-				const progressQueue: AnalysisProgress[] = [];
-				let resolveNext: (() => void) | null = null;
-
-				const unsubscribe = subscribeToProgress((progress) => {
-					// Only send progress for the requested analysis ID
-					if (progress.analysisId === input.analysisId) {
-						progressQueue.push(progress);
-						if (resolveNext) {
-							resolveNext();
-							resolveNext = null;
-						}
-					}
-				});
-
-				try {
-					while (true) {
-						if (progressQueue.length === 0) {
-							await new Promise<void>((resolve) => {
-								resolveNext = resolve;
-							});
-						}
-
-						while (progressQueue.length > 0) {
-							const progress = progressQueue.shift()!;
-							yield progress;
-						}
-					}
-				} finally {
-					unsubscribe();
-				}
-			}),
+		onProgress: t.procedure.subscription(async function* () {
+			const { subscribeToProgress } = await import("../background-handlers");
+			yield* createSubscription(subscribeToProgress);
+		}),
 
 		onStatus: t.procedure.subscription(async function* () {
 			const { subscribeToStatus } = await import("../background-handlers");
-
-			const statusQueue: Array<{
-				status: "started" | "completed" | "skipped" | "error";
-				message?: string;
-				itemCount?: number;
-				reason?: string;
-				error?: string;
-			}> = [];
-
-			let resolveNext: (() => void) | null = null;
-
-			const unsubscribe = subscribeToStatus((update) => {
-				statusQueue.push(update);
-				if (resolveNext) {
-					resolveNext();
-					resolveNext = null;
-				}
-			});
-
-			try {
-				while (true) {
-					if (statusQueue.length === 0) {
-						await new Promise<void>((resolve) => {
-							resolveNext = resolve;
-						});
-					}
-
-					while (statusQueue.length > 0) {
-						const update = statusQueue.shift()!;
-						yield update;
-					}
-				}
-			} finally {
-				unsubscribe();
-			}
+			yield* createSubscription(subscribeToStatus);
 		}),
 	}),
 
@@ -171,37 +136,7 @@ const backgroundProcedures = t.router({
 
 		onStatus: t.procedure.subscription(async function* () {
 			const { subscribeToAIStatus } = await import("../background-handlers");
-
-			const aiStatusQueue: {
-				status: "initializing" | "available" | "error";
-				error?: string;
-			}[] = [];
-			let resolveNext: (() => void) | null = null;
-
-			const unsubscribe = subscribeToAIStatus((aiStatus) => {
-				aiStatusQueue.push(aiStatus);
-				if (resolveNext) {
-					resolveNext();
-					resolveNext = null;
-				}
-			});
-
-			try {
-				while (true) {
-					if (aiStatusQueue.length === 0) {
-						await new Promise<void>((resolve) => {
-							resolveNext = resolve;
-						});
-					}
-
-					while (aiStatusQueue.length > 0) {
-						const aiStatus = aiStatusQueue.shift()!;
-						yield aiStatus;
-					}
-				}
-			} finally {
-				unsubscribe();
-			}
+			yield* createSubscription(subscribeToAIStatus);
 		}),
 	}),
 
@@ -272,37 +207,35 @@ const backgroundProcedures = t.router({
 			return { success: true };
 		}),
 	}),
-});
 
-// Offscreen procedures (implemented by offscreen document)
-const offscreenProcedures = t.router({
-	startAnalysis: t.procedure
-		.input(startAnalysisInputSchema)
-		.mutation(async ({ input }) => {
-			const { handleStartAnalysis } = await import("../offscreen-handlers");
-			return handleStartAnalysis(input);
+	// Offscreen procedures (proxied to offscreen document)
+	offscreen: t.router({
+		startAnalysis: t.procedure
+			.input(startAnalysisInputSchema)
+			.mutation(async () => {
+				// This is handled by forwarding to the offscreen document
+				// The actual implementation is in offscreen-handlers
+				throw new Error(
+					"This procedure should be called on the offscreen document",
+				);
+			}),
+
+		cancelAnalysis: t.procedure
+			.input(z.object({ analysisId: z.string() }))
+			.mutation(async () => {
+				// This is handled by forwarding to the offscreen document
+				throw new Error(
+					"This procedure should be called on the offscreen document",
+				);
+			}),
+
+		initializeAI: t.procedure.mutation(async () => {
+			// This is handled by forwarding to the offscreen document
+			throw new Error(
+				"This procedure should be called on the offscreen document",
+			);
 		}),
-
-	cancelAnalysis: t.procedure
-		.input(z.object({ analysisId: z.string() }))
-		.mutation(async ({ input }) => {
-			const { handleCancelAnalysis } = await import("../offscreen-handlers");
-			return handleCancelAnalysis(input);
-		}),
-
-	initializeAI: t.procedure.mutation(async () => {
-		const { handleInitializeAI } = await import("../offscreen-handlers");
-		return handleInitializeAI();
 	}),
 });
 
-// Unified app router combining all procedures
-export const appRouter = t.mergeRouters(
-	backgroundProcedures,
-	t.router({
-		offscreen: offscreenProcedures,
-	}),
-);
-
-// Types
-export type AppRouter = typeof appRouter;
+export type BackgroundRouter = typeof backgroundRouter;

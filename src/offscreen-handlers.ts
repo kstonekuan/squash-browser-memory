@@ -31,11 +31,11 @@ let keepaliveInterval: number | null = null;
 function startKeepalive() {
 	if (keepaliveInterval !== null) return;
 
-	keepaliveInterval = window.setInterval(() => {
+	keepaliveInterval = setInterval(() => {
 		trpc._internal.keepalive.mutate().catch(() => {
 			// Service worker might be inactive, ignore error
 		});
-	}, 20000); // Every 20 seconds
+	}, 20000) as unknown as number; // Every 20 seconds
 }
 
 // Stop keepalive mechanism

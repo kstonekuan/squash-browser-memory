@@ -1,5 +1,5 @@
 <script lang="ts">
-import { addMinutes, format, formatDistanceToNow, isAfter } from "date-fns";
+import { format, formatDistanceToNow } from "date-fns";
 import {
 	ambientSettings,
 	toggleAmbientAnalysis as toggleAmbient,
