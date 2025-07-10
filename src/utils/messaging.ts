@@ -4,7 +4,11 @@
  */
 
 import { defineExtensionMessaging } from "@webext-core/messaging";
-import type { AnalysisMemory, FullAnalysisResult, MemorySettings } from "../types";
+import type {
+	AnalysisMemory,
+	FullAnalysisResult,
+	MemorySettings,
+} from "../types";
 import type { AIProviderConfig } from "./ai-interface";
 import type { CustomPrompts } from "./analyzer";
 
