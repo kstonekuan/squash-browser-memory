@@ -41,7 +41,7 @@ Squash studies your browsing patterns, learns how you work, and automatically pr
 ### Chrome AI (100% Local)
 - Chrome 138+ required
 - Enable in `chrome://flags` → "Prompt API for Gemini Nano"
-- Update in `chrome://components` → "Optimization Guide On Device Model" (~22GB download)
+- Update in `chrome://components` → "Optimization Guide On Device Model" [(~4GB download)](https://github.com/kstonekuan/simple-chromium-ai/pull/6)
 
 ### Claude API (Remote)
 - Get API key from [Anthropic Console](https://console.anthropic.com/)
@@ -82,12 +82,6 @@ See [ARCHITECTURE.md](./ARCHITECTURE.md) for technical details.
 - Local mode: Your data never leaves your device
 - Remote mode: Data sent to API provider (requires explicit setup)
 - All data stored locally in Chrome storage
-
-## Requirements
-
-- Chrome 138+
-- Node.js & pnpm
-- ~22GB free space (for Chrome AI model)
 
 ## Resources
 

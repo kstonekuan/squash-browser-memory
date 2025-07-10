@@ -8,42 +8,42 @@ The **History Workflow Analyzer** is a Chrome browser extension that analyzes br
 
 ```text
 +---------------------------------------------------------------------------------+
-|                                  User Interface                                 |
-|---------------------------------------------------------------------------------|
-|      Side Panel UI (Svelte)      |      Content Script (on AI Chat sites)       |
-| (Initiates analysis, displays    | (Injects context button, reads user input)   |
-|  results, manages settings)      |                                              |
-+-----------------|--------------------------------------|------------------------+
-                  | (User Actions)                       | (Context Request)
+| User Interface                |
+| ----------------------------- |
+| Side Panel UI (Svelte)        | Content Script (on AI Chat sites)          |
+| (Initiates analysis, displays | (Injects context button, reads user input) |
+| results, manages settings)    |                                            |
+| +-----------------            | --------------------------------------     | ------------------------+ |
+| (User Actions)                | (Context Request)                          |
                   v                                      v
 +---------------------------------------------------------------------------------+
-|                             Service Worker (background.ts)                      |
-|---------------------------------------------------------------------------------|
-| - Manages extension lifecycle & UI events.                                      |
-| - Handles alarms for ambient analysis.                                          |
-| - Launches and communicates with the Offscreen Document.                        |
-| - Relays progress and results to the UI.                                        |
-| - Acts as a proxy for Chrome Storage access.                                    |
-+-----------------|--------------------------^-----------|------------------------+
-                  | (Start Analysis)         | (R/W Memory) | (Read Memory)
-                  v                          |           v
-+----------------------------------+         |  +---------------------------------------+
-|    Offscreen Document            |         |  |      Chrome Storage API               |
-|    (offscreen.ts)                |---------+  |---------------------------------------|
-|----------------------------------|            | - Stores analysis memory (patterns,   |
-| - Performs heavy lifting:        |            |   user profile).                      |
-|   - Fetches history              |            | - Persists user settings.             |
-|   - Chunks data                  |            +---------------------------------------+
-|   - Manages AI sessions          |
-|   - Merges results into memory   |
-+----------------|-----------------+
-                 | (AI API Calls)
+| Service Worker (background.ts)                           |
+| -------------------------------------------------------- |
+| - Manages extension lifecycle & UI events.               |
+| - Handles alarms for ambient analysis.                   |
+| - Launches and communicates with the Offscreen Document. |
+| - Relays progress and results to the UI.                 |
+| - Acts as a proxy for Chrome Storage access.             |
+| +-----------------                                       | --------------------------^-----------    | ------------------------+               |
+| (Start Analysis)                                         | (R/W Memory)                              | (Read Memory)                           |
+| v                                                        | v                                         |
+| +----------------------------------+                     | +---------------------------------------+ |
+| Offscreen Document                                       |                                           |                                         | Chrome Storage API |
+| (offscreen.ts)                                           | ---------+                                | --------------------------------------- |
+| ----------------------------------                       |                                           | - Stores analysis memory (patterns,     |
+| - Performs heavy lifting:                                |                                           | user profile).                          |
+| - Fetches history                                        |                                           | - Persists user settings.               |
+| - Chunks data                                            | +---------------------------------------+ |
+| - Manages AI sessions                                    |
+| - Merges results into memory                             |
+| +----------------                                        | -----------------+                        |
+| (AI API Calls)                                           |
                  v
 +----------------------------------+
-|    AI Providers                  |
-|----------------------------------|
-| - Chrome AI (Local, on-device)   |
-| - Claude API (Remote)            |
+| AI Providers                   |
+| ------------------------------ |
+| - Chrome AI (Local, on-device) |
+| - Claude API (Remote)          |
 +----------------------------------+
 ```
 
@@ -143,7 +143,7 @@ The extension supports two types of AI providers through a unified architecture,
 - **Privacy-First**: All data processing happens locally in the browser
 - **Token Management**: Automatic chunking to stay within Chrome AI's token limits
 - **Retry Logic**: Exponential backoff for quota-exceeded scenarios
-- **Model Requirements**: Chrome AI requires the Gemini Nano model (~22GB) to be downloaded via Chrome's components page (chrome://components)
+- **Model Requirements**: Chrome AI requires the Gemini Nano model (~4GB) to be downloaded via Chrome's components page (chrome://components)
 
 #### 4.3. Remote AI (e.g., Anthropic Claude)
 - **Remote Processing**: The offscreen document sends browsing history to a third-party API
