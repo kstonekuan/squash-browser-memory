@@ -140,6 +140,7 @@ interface HandlerOptions<TRouter extends AnyRouter> {
 	router: TRouter;
 	createContext?: () => unknown | Promise<unknown>;
 	onError?: (error: Error, operation: Operation) => void;
+	acceptPort?: (port: chrome.runtime.Port) => boolean;
 }
 
 /**
@@ -148,10 +149,15 @@ interface HandlerOptions<TRouter extends AnyRouter> {
 export function createChromeHandler<TRouter extends AnyRouter>(
 	options: HandlerOptions<TRouter>,
 ) {
-	const { router, createContext, onError } = options;
+	const { router, createContext, onError, acceptPort } = options;
 
 	// Handle port connections only
 	chrome.runtime.onConnect.addListener((port) => {
+		// Filter connections if acceptPort is provided
+		if (acceptPort && !acceptPort(port)) {
+			return; // Ignore this connection
+		}
+
 		const subscriptions = new Map<string, () => void>();
 
 		port.onMessage.addListener(async (message: unknown) => {

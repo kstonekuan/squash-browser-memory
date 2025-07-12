@@ -3,7 +3,7 @@
  * Separated to avoid circular dependencies
  */
 
-import { offscreenTrpc as trpc } from "./trpc/client";
+import { offscreenToBackgroundClient } from "./trpc/client";
 import type { AnalysisProgress } from "./trpc/schemas";
 import { loadAIConfigFromServiceWorker } from "./utils/ai-config";
 import { getProvider } from "./utils/ai-provider-factory";
@@ -32,7 +32,7 @@ function startKeepalive() {
 	if (keepaliveInterval !== null) return;
 
 	keepaliveInterval = setInterval(() => {
-		trpc._internal.keepalive.mutate().catch(() => {
+		offscreenToBackgroundClient._internal.keepalive.mutate().catch(() => {
 			// Service worker might be inactive, ignore error
 		});
 	}, 20000) as unknown as number; // Every 20 seconds
@@ -51,7 +51,7 @@ async function sendProgress(progress: Omit<AnalysisProgress, "analysisId">) {
 	if (!currentAnalysisId) return;
 
 	try {
-		await trpc._internal.reportProgress.mutate({
+		await offscreenToBackgroundClient._internal.reportProgress.mutate({
 			...progress,
 			analysisId: currentAnalysisId,
 		});
@@ -115,7 +115,7 @@ export async function handleStartAnalysis(input: {
 		await sendProgress({ phase: "complete" });
 
 		// Send completion message
-		await trpc._internal.reportComplete.mutate({
+		await offscreenToBackgroundClient._internal.reportComplete.mutate({
 			analysisId,
 			result: result,
 		});
@@ -130,7 +130,7 @@ export async function handleStartAnalysis(input: {
 		});
 
 		// Send error message
-		await trpc._internal.reportError.mutate({
+		await offscreenToBackgroundClient._internal.reportError.mutate({
 			analysisId,
 			error: errorMessage,
 		});
@@ -175,7 +175,7 @@ export async function handleInitializeAI() {
 		console.log("[Offscreen] Initializing AI provider:", config.provider);
 
 		// Report initializing status
-		await trpc._internal.reportAIStatus.mutate({
+		await offscreenToBackgroundClient._internal.reportAIStatus.mutate({
 			status: "initializing",
 		});
 
@@ -188,11 +188,11 @@ export async function handleInitializeAI() {
 		// Check status after initialization
 		const status = await provider.getStatus();
 		if (status === "available") {
-			await trpc._internal.reportAIStatus.mutate({
+			await offscreenToBackgroundClient._internal.reportAIStatus.mutate({
 				status: "available",
 			});
 		} else {
-			await trpc._internal.reportAIStatus.mutate({
+			await offscreenToBackgroundClient._internal.reportAIStatus.mutate({
 				status: "error",
 				error: `${provider.getProviderName()} not available`,
 			});
@@ -201,7 +201,7 @@ export async function handleInitializeAI() {
 		return { success: true };
 	} catch (error) {
 		console.error("[Offscreen] Failed to initialize AI:", error);
-		await trpc._internal.reportAIStatus.mutate({
+		await offscreenToBackgroundClient._internal.reportAIStatus.mutate({
 			status: "error",
 			error: error instanceof Error ? error.message : "Unknown error",
 		});

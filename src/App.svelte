@@ -12,7 +12,7 @@ import HistoryFetcher from "./lib/HistoryFetcher.svelte";
 import MemoryViewer from "./lib/MemoryViewer.svelte";
 import { disableAmbientAnalysis } from "./stores/ambient-store";
 // All messaging now handled via tRPC
-import { trpc } from "./trpc/client";
+import { uiToBackgroundClient } from "./trpc/client";
 import type { AnalysisProgress as AnalysisProgressType } from "./trpc/schemas";
 import type { FullAnalysisResult, MemorySettings } from "./types";
 import { loadAIConfigFromStorage } from "./utils/ai-config";
@@ -86,7 +86,7 @@ async function handleAnalysis(data: { items: chrome.history.HistoryItem[] }) {
 
 	try {
 		// Send analysis request to background script
-		const response = await trpc.analysis.startManual.mutate({
+		const response = await uiToBackgroundClient.analysis.startManual.mutate({
 			historyItems: items,
 			customPrompts: customPrompts,
 			memorySettings: memorySettings,
@@ -174,7 +174,7 @@ async function handleToggleWorkflowPatterns(event: Event) {
 
 		// Clear existing pattern data from memory when disabling
 		try {
-			await trpc.memory.clearPatterns.mutate();
+			await uiToBackgroundClient.memory.clearPatterns.mutate();
 		} catch (error) {
 			console.error("Failed to clear pattern data:", error);
 		}
@@ -194,7 +194,7 @@ async function handleCancelAnalysis() {
 	}
 
 	try {
-		const response = await trpc.analysis.cancel.mutate({
+		const response = await uiToBackgroundClient.analysis.cancel.mutate({
 			analysisId: currentAnalysisId,
 		});
 
@@ -229,7 +229,7 @@ async function checkInitialAIStatus() {
 
 		// Always rely on offscreen document for AI status, regardless of provider
 		currentAIStatus = "unavailable"; // Default until we hear from offscreen
-		await trpc.ai.initialize.mutate().catch((error) => {
+		await uiToBackgroundClient.ai.initialize.mutate().catch((error) => {
 			console.log("[App] Error initializing AI:", error);
 		});
 	} catch (error) {
@@ -243,7 +243,7 @@ async function handleChromeAIRefresh() {
 
 	console.log("[App] Refreshing Chrome AI status...");
 	// Send initialize message to trigger status check in offscreen
-	await trpc.ai.initialize.mutate().catch((error) => {
+	await uiToBackgroundClient.ai.initialize.mutate().catch((error) => {
 		console.log("[App] Error refreshing Chrome AI status:", error);
 	});
 }
@@ -275,7 +275,7 @@ onMount(() => {
 	chrome.storage.onChanged.addListener(storageListener);
 
 	// Query current status from background
-	trpc.ambient.queryStatus
+	uiToBackgroundClient.ambient.queryStatus
 		.query()
 		.then((response) => {
 			if (response?.isRunning) {
@@ -291,7 +291,7 @@ onMount(() => {
 		});
 
 	// Also query current analysis state
-	trpc.analysis.getState
+	uiToBackgroundClient.analysis.getState
 		.query()
 		.then((response) => {
 			if (response?.isRunning) {
@@ -322,88 +322,91 @@ onMount(() => {
 		});
 
 	// Set up tRPC status subscription
-	statusUnsubscribe = trpc.analysis.onStatus.subscribe(undefined, {
-		onData: (data) => {
-			// Handle status updates the same way as onMessage
-			match(data.status as "started" | "completed" | "skipped" | "error")
-				.with("started", () => {
-					// Determine type from message or current state
-					if (!currentAnalysisType) {
-						currentAnalysisType = data.message?.includes("manual")
-							? "manual"
-							: "ambient";
-					}
-					analysisStatus = {
-						status: "running",
-						message: data.message || "Starting analysis...",
-					};
-				})
-				.with("completed", () => {
-					analysisStatus = {
-						status: "completed",
-						message: data.message || "Analysis completed",
-						itemCount: data.itemCount,
-					};
-
-					// Update UI state
-					if (currentAnalysisType === "manual") {
-						isAnalyzing = false;
-						analysisPhase = "complete";
-						memoryAutoExpand = true;
-					}
-
-					// Clear analysis type
-					currentAnalysisType = null;
-					currentAnalysisId = null;
-
-					// Reset to idle after 10 seconds
-					setTimeout(() => {
-						if (analysisStatus.status === "completed") {
-							analysisStatus = { status: "idle" };
+	statusUnsubscribe = uiToBackgroundClient.analysis.onStatus.subscribe(
+		undefined,
+		{
+			onData: (data) => {
+				// Handle status updates the same way as onMessage
+				match(data.status as "started" | "completed" | "skipped" | "error")
+					.with("started", () => {
+						// Determine type from message or current state
+						if (!currentAnalysisType) {
+							currentAnalysisType = data.message?.includes("manual")
+								? "manual"
+								: "ambient";
 						}
-						if (analysisPhase === "complete") {
-							analysisPhase = "idle";
+						analysisStatus = {
+							status: "running",
+							message: data.message || "Starting analysis...",
+						};
+					})
+					.with("completed", () => {
+						analysisStatus = {
+							status: "completed",
+							message: data.message || "Analysis completed",
+							itemCount: data.itemCount,
+						};
+
+						// Update UI state
+						if (currentAnalysisType === "manual") {
+							isAnalyzing = false;
+							analysisPhase = "complete";
+							memoryAutoExpand = true;
 						}
-					}, 10000);
-				})
-				.with("skipped", () => {
-					analysisStatus = {
-						status: "skipped",
-						message: data.message || "Analysis skipped",
-						reason: data.reason,
-					};
 
-					currentAnalysisType = null;
-					currentAnalysisId = null;
+						// Clear analysis type
+						currentAnalysisType = null;
+						currentAnalysisId = null;
 
-					// Reset to idle after 10 seconds
-					setTimeout(() => {
-						if (analysisStatus.status === "skipped") {
-							analysisStatus = { status: "idle" };
+						// Reset to idle after 10 seconds
+						setTimeout(() => {
+							if (analysisStatus.status === "completed") {
+								analysisStatus = { status: "idle" };
+							}
+							if (analysisPhase === "complete") {
+								analysisPhase = "idle";
+							}
+						}, 10000);
+					})
+					.with("skipped", () => {
+						analysisStatus = {
+							status: "skipped",
+							message: data.message || "Analysis skipped",
+							reason: data.reason,
+						};
+
+						currentAnalysisType = null;
+						currentAnalysisId = null;
+
+						// Reset to idle after 10 seconds
+						setTimeout(() => {
+							if (analysisStatus.status === "skipped") {
+								analysisStatus = { status: "idle" };
+							}
+						}, 10000);
+					})
+					.with("error", () => {
+						analysisStatus = {
+							status: "error",
+							message: data.message || "Analysis failed",
+						};
+
+						// Update UI state for manual analysis
+						if (currentAnalysisType === "manual") {
+							isAnalyzing = false;
+							analysisPhase = "error";
 						}
-					}, 10000);
-				})
-				.with("error", () => {
-					analysisStatus = {
-						status: "error",
-						message: data.message || "Analysis failed",
-					};
 
-					// Update UI state for manual analysis
-					if (currentAnalysisType === "manual") {
-						isAnalyzing = false;
-						analysisPhase = "error";
-					}
-
-					currentAnalysisType = null;
-					currentAnalysisId = null;
-				})
-				.exhaustive();
+						currentAnalysisType = null;
+						currentAnalysisId = null;
+					})
+					.exhaustive();
+			},
+			onError: (error) => {
+				console.error("Status subscription error:", error);
+			},
 		},
-		onError: (error) => {
-			console.error("Status subscription error:", error);
-		},
-	});
+	);
 
 	// Status updates now handled via tRPC subscription above
 
@@ -412,19 +415,22 @@ onMount(() => {
 	// Set up progress subscription when we have an analysis ID
 	$effect(() => {
 		if (currentAnalysisId && !progressUnsubscribe) {
-			progressUnsubscribe = trpc.analysis.onProgress.subscribe(undefined, {
-				onData: (data: AnalysisProgressType) => {
-					console.log("[App] tRPC progress update:", data);
-					analysisPhase = data.phase;
-					subPhase = data.subPhase;
-					if (data.chunkProgress) {
-						chunkProgress = data.chunkProgress;
-					}
+			progressUnsubscribe = uiToBackgroundClient.analysis.onProgress.subscribe(
+				undefined,
+				{
+					onData: (data: AnalysisProgressType) => {
+						console.log("[App] tRPC progress update:", data);
+						analysisPhase = data.phase;
+						subPhase = data.subPhase;
+						if (data.chunkProgress) {
+							chunkProgress = data.chunkProgress;
+						}
+					},
+					onError: (error) => {
+						console.error("Progress subscription error:", error);
+					},
 				},
-				onError: (error) => {
-					console.error("Progress subscription error:", error);
-				},
-			});
+			);
 		} else if (!currentAnalysisId && progressUnsubscribe) {
 			// Clean up subscription when analysis is done
 			progressUnsubscribe.unsubscribe();
@@ -434,7 +440,7 @@ onMount(() => {
 
 	// Set up AI status subscription
 	let aiStatusUnsubscribe: { unsubscribe: () => void } | null = null;
-	aiStatusUnsubscribe = trpc.ai.onStatus.subscribe(undefined, {
+	aiStatusUnsubscribe = uiToBackgroundClient.ai.onStatus.subscribe(undefined, {
 		onData: (data) => {
 			console.log("[App] AI status update:", data.status, data.error);
 			// Map status to AIProviderStatus

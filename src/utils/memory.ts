@@ -1,4 +1,4 @@
-import { offscreenTrpc as trpc } from "../trpc/client";
+import { offscreenToBackgroundClient } from "../trpc/client";
 import type { AnalysisMemory } from "../types";
 import { getStorageData, removeStorageData, setStorageData } from "./storage";
 
@@ -42,7 +42,7 @@ export function createEmptyMemory(): AnalysisMemory {
  */
 export async function loadMemoryFromServiceWorker(): Promise<AnalysisMemory | null> {
 	try {
-		const memory = await trpc.memory.read.query();
+		const memory = await offscreenToBackgroundClient.memory.read.query();
 		if (!memory) return null;
 
 		// SuperJSON via tRPC automatically handles Date deserialization
@@ -135,7 +135,7 @@ export async function saveMemoryToServiceWorker(
 	memory: AnalysisMemory,
 ): Promise<void> {
 	try {
-		await trpc.memory.write.mutate({ memory });
+		await offscreenToBackgroundClient.memory.write.mutate({ memory });
 	} catch (error) {
 		console.error("[Memory] Failed to save memory via service worker:", error);
 	}

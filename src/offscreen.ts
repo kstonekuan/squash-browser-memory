@@ -16,12 +16,16 @@ function createContext() {
 // Import the offscreen-specific router
 import { offscreenRouter } from "./trpc/offscreen-router";
 
-// Set up tRPC handler for incoming requests
+// Set up tRPC handler for incoming requests from background only
 createChromeHandler({
 	router: offscreenRouter,
 	createContext,
 	onError: (error, operation) => {
 		console.error("[Offscreen tRPC] Error:", error, "Operation:", operation);
+	},
+	// Only accept connections from the background script
+	acceptPort: (port) => {
+		return port.name === "background-to-offscreen";
 	},
 });
 

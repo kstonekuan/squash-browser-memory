@@ -5,7 +5,7 @@
 
 import { format } from "date-fns";
 import { match } from "ts-pattern";
-import { offscreenClient } from "./trpc/client";
+import { backgroundToOffscreenClient } from "./trpc/client";
 import type { AnalysisProgress } from "./trpc/schemas";
 import type { AnalysisMemory } from "./types";
 import type { AIProviderConfig } from "./utils/ai-interface";
@@ -282,7 +282,7 @@ export async function handleCancelAnalysis(input: {
 			});
 
 			if (contexts.length > 0) {
-				await offscreenClient.offscreen.cancelAnalysis.mutate({
+				await backgroundToOffscreenClient.offscreen.cancelAnalysis.mutate({
 					analysisId: input.analysisId,
 				});
 			}
@@ -318,7 +318,7 @@ export async function handleInitializeAI() {
 	console.log("[Background] Initializing AI provider");
 	await chromeAPI.ensureOffscreenDocument();
 	// Forward the message to the offscreen document
-	await offscreenClient.offscreen.initializeAI.mutate();
+	await backgroundToOffscreenClient.offscreen.initializeAI.mutate();
 }
 
 export async function handleGetAIConfig(): Promise<AIProviderConfig> {
@@ -456,13 +456,14 @@ async function runAnalysis(
 		await chromeAPI.ensureOffscreenDocument();
 
 		// Send analysis request to offscreen document
-		const result = await offscreenClient.offscreen.startAnalysis.mutate({
-			historyItems,
-			customPrompts,
-			analysisId,
-			trigger,
-			memorySettings,
-		});
+		const result =
+			await backgroundToOffscreenClient.offscreen.startAnalysis.mutate({
+				historyItems,
+				customPrompts,
+				analysisId,
+				trigger,
+				memorySettings,
+			});
 
 		console.log("[Background] Analysis started successfully:", result);
 

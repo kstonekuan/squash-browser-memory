@@ -75,7 +75,7 @@ self.addEventListener("error", (event) => {
 // tRPC Handler Setup
 // ============================================
 
-// Set up tRPC handler for all incoming requests
+// Set up tRPC handler for incoming requests from UI and offscreen
 createChromeHandler({
 	router: backgroundRouter,
 	createContext: () => ({
@@ -83,6 +83,10 @@ createChromeHandler({
 	}),
 	onError: (error, operation) => {
 		console.error("[background tRPC] Error:", error, "Operation:", operation);
+	},
+	// Only accept connections from UI and offscreen documents
+	acceptPort: (port) => {
+		return port.name === "ui-to-background" || port.name === "offscreen-trpc";
 	},
 });
 

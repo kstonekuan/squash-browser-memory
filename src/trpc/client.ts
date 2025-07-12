@@ -10,23 +10,24 @@ import type { OffscreenRouter } from "./offscreen-router";
 
 // Client for UI -> Background communication (used in sidepanel/popup)
 // Uses proxy client for cleaner syntax in UI components
-export const trpc = createTRPCProxyClient<BackgroundRouter>({
+export const uiToBackgroundClient = createTRPCProxyClient<BackgroundRouter>({
 	links: [chromePortLink({ portName: "ui-to-background" })],
 });
 
 // Client for Background -> Offscreen communication
 // Now uses the offscreen namespace from the unified router
-export const offscreenClient = createTRPCProxyClient<OffscreenRouter>({
-	links: [
-		chromePortLink({
-			portName: "background-to-offscreen",
-		}),
-	],
-});
+export const backgroundToOffscreenClient =
+	createTRPCProxyClient<OffscreenRouter>({
+		links: [
+			chromePortLink({
+				portName: "background-to-offscreen",
+			}),
+		],
+	});
 
 // Client for Offscreen -> Background communication (used in offscreen document)
 // Uses regular client for offscreen document
-export const offscreenTrpc = createTRPCClient<BackgroundRouter>({
+export const offscreenToBackgroundClient = createTRPCClient<BackgroundRouter>({
 	links: [
 		chromePortLink({
 			portName: "offscreen-trpc",
