@@ -18,16 +18,17 @@ interface ChromeLinkOptions {
 	 */
 	tabId?: number;
 	/**
-	 * Target context for the message (e.g., "background", "offscreen", "ui")
+	 * Target context for the message (e.g., "background", "offscreen", "sidepanel")
 	 */
 	target?: string;
 }
 
 /**
- * Chrome sendMessage link - for all tRPC operations
+ * Chrome sendMessage link with SuperJSON transformer support
  * Simple request/response pattern, no persistent connections
+ * The actual SuperJSON transformation happens in the routers
  */
-function chromeSendMessageLink<TRouter extends AnyRouter>(
+export function chromeLinkWithSuperjson<TRouter extends AnyRouter>(
 	options?: ChromeLinkOptions,
 ): TRPCLink<TRouter> {
 	return () => {
@@ -94,17 +95,6 @@ function chromeSendMessageLink<TRouter extends AnyRouter>(
 			});
 		};
 	};
-}
-
-/**
- * Chrome sendMessage link with SuperJSON transformer support
- * The actual SuperJSON transformation happens in the routers
- */
-export function chromeLinkWithSuperjson<TRouter extends AnyRouter>(
-	options?: ChromeLinkOptions,
-): TRPCLink<TRouter> {
-	// For now, this is just an alias since SuperJSON is handled at the router level
-	return chromeSendMessageLink(options);
 }
 
 // Re-export the message handler creation utility

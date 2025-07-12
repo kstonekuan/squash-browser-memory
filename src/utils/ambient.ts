@@ -37,10 +37,3 @@ export async function saveAutoAnalysisSettings(
 		[AUTO_ANALYSIS_SETTINGS_KEY]: settings,
 	});
 }
-
-// Note: createNotification function was moved inline to background.ts
-// to avoid ES6 imports in the service worker.
-
-// Note: runAmbientAnalysis function was moved inline to background.ts
-// to avoid ES6 imports in the service worker. The function is no longer
-// exported from this module but is still available in the background script.

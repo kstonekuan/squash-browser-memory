@@ -13,7 +13,7 @@ import MemoryViewer from "./lib/MemoryViewer.svelte";
 import { disableAmbientAnalysis } from "./stores/ambient-store";
 import { createTRPCMessageHandler } from "./trpc/chrome-adapter";
 // All messaging now handled via tRPC
-import { uiToBackgroundClient } from "./trpc/client";
+import { sidepanelToBackgroundClient } from "./trpc/client";
 import { createSidepanelRouter } from "./trpc/sidepanel-router";
 import type { FullAnalysisResult, MemorySettings } from "./types";
 import { loadAIConfigFromStorage } from "./utils/ai-config";
@@ -87,11 +87,12 @@ async function handleAnalysis(data: { items: chrome.history.HistoryItem[] }) {
 
 	try {
 		// Send analysis request to background script
-		const response = await uiToBackgroundClient.analysis.startManual.mutate({
-			historyItems: items,
-			customPrompts: customPrompts,
-			memorySettings: memorySettings,
-		});
+		const response =
+			await sidepanelToBackgroundClient.analysis.startManual.mutate({
+				historyItems: items,
+				customPrompts: customPrompts,
+				memorySettings: memorySettings,
+			});
 
 		if (!response.success) {
 			// Check if it's blocked by another analysis
@@ -175,7 +176,7 @@ async function handleToggleWorkflowPatterns(event: Event) {
 
 		// Clear existing pattern data from memory when disabling
 		try {
-			await uiToBackgroundClient.memory.clearPatterns.mutate();
+			await sidepanelToBackgroundClient.memory.clearPatterns.mutate();
 		} catch (error) {
 			console.error("Failed to clear pattern data:", error);
 		}
@@ -195,7 +196,7 @@ async function handleCancelAnalysis() {
 	}
 
 	try {
-		const response = await uiToBackgroundClient.analysis.cancel.mutate({
+		const response = await sidepanelToBackgroundClient.analysis.cancel.mutate({
 			analysisId: currentAnalysisId,
 		});
 
@@ -230,7 +231,7 @@ async function checkInitialAIStatus() {
 
 		// Always rely on offscreen document for AI status, regardless of provider
 		currentAIStatus = "unavailable"; // Default until we hear from offscreen
-		await uiToBackgroundClient.ai.initialize.mutate().catch((error) => {
+		await sidepanelToBackgroundClient.ai.initialize.mutate().catch((error) => {
 			console.log("[App] Error initializing AI:", error);
 		});
 	} catch (error) {
@@ -244,7 +245,7 @@ async function handleChromeAIRefresh() {
 
 	console.log("[App] Refreshing Chrome AI status...");
 	// Send initialize message to trigger status check in offscreen
-	await uiToBackgroundClient.ai.initialize.mutate().catch((error) => {
+	await sidepanelToBackgroundClient.ai.initialize.mutate().catch((error) => {
 		console.log("[App] Error refreshing Chrome AI status:", error);
 	});
 }
@@ -395,7 +396,7 @@ onMount(() => {
 	// No more tRPC subscriptions needed - removing subscription setup
 
 	// Query current status from background
-	uiToBackgroundClient.ambient.queryStatus
+	sidepanelToBackgroundClient.ambient.queryStatus
 		.query()
 		.then((response) => {
 			if (response?.isRunning) {
@@ -411,7 +412,7 @@ onMount(() => {
 		});
 
 	// Also query current analysis state
-	uiToBackgroundClient.analysis.getState
+	sidepanelToBackgroundClient.analysis.getState
 		.query()
 		.then((response) => {
 			if (response?.isRunning) {

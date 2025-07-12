@@ -4,7 +4,7 @@ import {
 	ambientSettings,
 	toggleAmbientAnalysis as toggleAmbient,
 } from "../stores/ambient-store";
-import { uiToBackgroundClient } from "../trpc/client";
+import { sidepanelToBackgroundClient } from "../trpc/client";
 import type { AutoAnalysisSettings } from "../utils/ambient";
 
 let { analysisStatus = { status: "idle" }, aiStatus = "unavailable" } = $props<{
@@ -44,7 +44,7 @@ let lastQueriedEnabled = false;
 $effect(() => {
 	// Only query if we're transitioning from disabled to enabled or on first mount
 	if (settings.enabled && !lastQueriedEnabled) {
-		uiToBackgroundClient.ambient.queryNextAlarm
+		sidepanelToBackgroundClient.ambient.queryNextAlarm
 			.query()
 			.then((response) => {
 				if (response?.nextRunTime) {

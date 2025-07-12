@@ -16,8 +16,8 @@ const DEFAULT_CONFIG: AIProviderConfig = {
 export async function loadAIConfigFromServiceWorker(): Promise<AIProviderConfig> {
 	try {
 		// Import tRPC client only when needed to avoid circular dependencies
-		const { uiToBackgroundClient } = await import("../trpc/client");
-		const config = await uiToBackgroundClient.ai.getConfig.query();
+		const { sidepanelToBackgroundClient } = await import("../trpc/client");
+		const config = await sidepanelToBackgroundClient.ai.getConfig.query();
 		console.log("Loaded AI config from service worker:", {
 			provider: config.provider,
 		});
