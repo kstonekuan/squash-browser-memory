@@ -1,4 +1,5 @@
 <script lang="ts">
+import { match } from "ts-pattern";
 import type { AIProviderStatus, AIProviderType } from "../utils/ai-interface";
 
 let {
@@ -27,46 +28,31 @@ async function handleRefresh() {
 }
 
 function getStatusColor(status: AIProviderStatus): string {
-	switch (status) {
-		case "available":
-			return "text-green-600";
-		case "needs-configuration":
-			return "text-yellow-600";
-		case "rate-limited":
-			return "text-orange-600";
-		case "error":
-		case "unavailable":
-			return "text-red-600";
-	}
+	return match(status)
+		.with("available", () => "text-green-600")
+		.with("needs-configuration", () => "text-yellow-600")
+		.with("rate-limited", () => "text-orange-600")
+		.with("error", "unavailable", () => "text-red-600")
+		.exhaustive();
 }
 
 function getStatusIcon(status: AIProviderStatus): string {
-	switch (status) {
-		case "available":
-			return "✓";
-		case "needs-configuration":
-			return "⚙";
-		case "rate-limited":
-			return "⏳";
-		case "error":
-		case "unavailable":
-			return "✗";
-	}
+	return match(status)
+		.with("available", () => "✓")
+		.with("needs-configuration", () => "⚙")
+		.with("rate-limited", () => "⏳")
+		.with("error", "unavailable", () => "✗")
+		.exhaustive();
 }
 
 function getStatusMessage(status: AIProviderStatus): string {
-	switch (status) {
-		case "available":
-			return `${providerName} is ready to use`;
-		case "needs-configuration":
-			return `${providerName} needs configuration`;
-		case "rate-limited":
-			return `${providerName} is rate limited`;
-		case "error":
-			return `${providerName} has an error`;
-		case "unavailable":
-			return `${providerName} is not available`;
-	}
+	return match(status)
+		.with("available", () => `${providerName} is ready to use`)
+		.with("needs-configuration", () => `${providerName} needs configuration`)
+		.with("rate-limited", () => `${providerName} is rate limited`)
+		.with("error", () => `${providerName} has an error`)
+		.with("unavailable", () => `${providerName} is not available`)
+		.exhaustive();
 }
 </script>
 

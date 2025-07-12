@@ -1,6 +1,7 @@
 <script lang="ts">
 import { format } from "date-fns";
 import { onMount } from "svelte";
+import { match } from "ts-pattern";
 import type { AnalysisMemory, MemorySettings } from "../types";
 import { loadMemoryFromStorage } from "../utils/memory";
 import CollapsibleSection from "./CollapsibleSection.svelte";
@@ -148,16 +149,11 @@ function formatDate(date: Date | string | number): string {
 function getAutomationPotentialColor(
 	potential: "high" | "medium" | "low",
 ): string {
-	switch (potential) {
-		case "high":
-			return "text-green-600 bg-green-50";
-		case "medium":
-			return "text-yellow-600 bg-yellow-50";
-		case "low":
-			return "text-red-600 bg-red-50";
-		default:
-			return "text-gray-600 bg-gray-50";
-	}
+	return match(potential)
+		.with("high", () => "text-green-600 bg-green-50")
+		.with("medium", () => "text-yellow-600 bg-yellow-50")
+		.with("low", () => "text-red-600 bg-red-50")
+		.exhaustive();
 }
 
 // Helper function to truncate text if it's too long
