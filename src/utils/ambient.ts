@@ -16,8 +16,8 @@ export interface AutoAnalysisSettings {
 // Default settings
 const defaultAutoAnalysisSettings: AutoAnalysisSettings = {
 	enabled: false,
-	notifyOnSuccess: true,
-	notifyOnError: true,
+	notifyOnSuccess: false,
+	notifyOnError: false,
 };
 
 // Load auto-analysis settings
