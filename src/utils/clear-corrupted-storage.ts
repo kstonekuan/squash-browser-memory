@@ -3,48 +3,29 @@
  * Run this in the background script to fix storage issues
  */
 
+import type { AnalysisMemory } from "../types";
+import { getStorageData, removeStorageData } from "./storage";
+
 export async function clearCorruptedMemory() {
 	const MEMORY_KEY = "history_analysis_memory";
 
 	try {
+		// Try to load using SuperJSON-enabled storage utilities
+		// If it fails or returns null, the data is corrupted
+		const memory = await getStorageData<AnalysisMemory>(MEMORY_KEY);
+
+		// If getStorageData returns null, it could be:
+		// 1. No data exists (which is fine)
+		// 2. Data exists but failed to parse (corrupted)
+		// We need to check if raw data exists
 		const result = await chrome.storage.local.get(MEMORY_KEY);
-		const stored = result[MEMORY_KEY];
+		const hasData = result[MEMORY_KEY] !== undefined;
 
-		// Check if the storage is corrupted (stored as string "[object Object]")
-		if (typeof stored === "string" && stored === "[object Object]") {
+		// If data exists but getStorageData returned null, it's corrupted
+		if (hasData && !memory) {
 			console.log("[Storage] Found corrupted memory data, clearing...");
-			await chrome.storage.local.remove(MEMORY_KEY);
+			await removeStorageData(MEMORY_KEY);
 			console.log("[Storage] Corrupted memory data cleared");
-			return true;
-		}
-
-		// Also check if it's an invalid JSON string
-		if (typeof stored === "string") {
-			try {
-				const parsed = JSON.parse(stored);
-				// Check if it's NOT SuperJSON format (missing json and meta properties)
-				if (!parsed.json || !parsed.meta) {
-					console.log("[Storage] Found non-SuperJSON data, needs migration...");
-					// This is legacy data that needs to be cleared
-					await chrome.storage.local.remove(MEMORY_KEY);
-					console.log("[Storage] Legacy memory data cleared for migration");
-					return true;
-				}
-			} catch {
-				console.log("[Storage] Found invalid JSON in memory data, clearing...");
-				await chrome.storage.local.remove(MEMORY_KEY);
-				console.log("[Storage] Invalid memory data cleared");
-				return true;
-			}
-		}
-
-		// Check if stored data is plain object (not SuperJSON serialized)
-		if (stored && typeof stored === "object" && !stored.json) {
-			console.log(
-				"[Storage] Found legacy non-SuperJSON memory data, clearing...",
-			);
-			await chrome.storage.local.remove(MEMORY_KEY);
-			console.log("[Storage] Legacy memory data cleared");
 			return true;
 		}
 

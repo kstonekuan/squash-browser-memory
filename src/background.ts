@@ -7,7 +7,9 @@ import {
 } from "./background-handlers";
 import { backgroundRouter } from "./trpc/background-router";
 import { createTRPCMessageHandler } from "./trpc/chrome-adapter";
+import { loadAutoAnalysisSettings } from "./utils/ambient";
 import { ensureOffscreenDocument } from "./utils/chrome-api";
+import { clearCorruptedMemory } from "./utils/clear-corrupted-storage";
 
 const ALARM_NAME = "hourly-analysis";
 
@@ -26,16 +28,12 @@ chrome.runtime.onInstalled.addListener(async () => {
 	console.log("History Workflow Analyzer extension installed");
 
 	// Clear any corrupted storage
-	const { clearCorruptedMemory } = await import(
-		"./utils/clear-corrupted-storage"
-	);
 	await clearCorruptedMemory();
 
 	// Create offscreen document on install
 	await ensureOffscreenDocument();
 	console.log("Offscreen document created");
 
-	const { loadAutoAnalysisSettings } = await import("./utils/ambient");
 	const settings = await loadAutoAnalysisSettings();
 
 	if (settings.enabled) {
@@ -66,9 +64,6 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
 // Check alarm status on startup
 chrome.runtime.onStartup.addListener(async () => {
 	// Clear any corrupted storage
-	const { clearCorruptedMemory } = await import(
-		"./utils/clear-corrupted-storage"
-	);
 	await clearCorruptedMemory();
 
 	// Create offscreen document on startup

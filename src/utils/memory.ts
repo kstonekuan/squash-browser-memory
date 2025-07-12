@@ -13,7 +13,7 @@ export interface HistoryChunk {
 }
 
 const MEMORY_KEY = "history_analysis_memory";
-const MEMORY_VERSION = "1.5.0"; // Nested structure: stableTraits and dynamicContext
+const MEMORY_VERSION = "2.0.0"; // Clean version without legacy support
 
 // Initialize empty memory
 export function createEmptyMemory(): AnalysisMemory {
@@ -76,35 +76,6 @@ export async function loadMemoryFromStorage(): Promise<AnalysisMemory | null> {
 			console.log("No existing memory found in chrome.storage.local");
 			return null;
 		}
-
-		// Handle lastHistoryTimestamp field (new in v1.0.3)
-		if (typeof stored.lastHistoryTimestamp !== "number") {
-			stored.lastHistoryTimestamp = 0;
-		}
-
-		// Handle UserProfile fields (v1.5.0 nested structure) - legacy migration
-		const legacyProfile = stored.userProfile as Record<string, unknown>;
-		if (!stored.userProfile.stableTraits) {
-			stored.userProfile.stableTraits = {
-				coreIdentities: (legacyProfile.coreIdentities as string[]) || [],
-				personalPreferences:
-					(legacyProfile.personalPreferences as {
-						category: string;
-						preference: string;
-					}[]) || [],
-			};
-		}
-		if (!stored.userProfile.dynamicContext) {
-			stored.userProfile.dynamicContext = {
-				currentTasks: (legacyProfile.currentTasks as string[]) || [],
-				currentInterests: (legacyProfile.currentInterests as string[]) || [],
-			};
-		}
-		// Clean up old flat fields if they exist
-		delete legacyProfile.coreIdentities;
-		delete legacyProfile.personalPreferences;
-		delete legacyProfile.currentTasks;
-		delete legacyProfile.currentInterests;
 
 		// Check version compatibility
 		if (stored.version !== MEMORY_VERSION) {
