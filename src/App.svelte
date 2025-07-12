@@ -10,7 +10,7 @@ import AnalysisResults from "./lib/AnalysisResults.svelte";
 import CollapsibleSection from "./lib/CollapsibleSection.svelte";
 import HistoryFetcher from "./lib/HistoryFetcher.svelte";
 import MemoryViewer from "./lib/MemoryViewer.svelte";
-import { disableAmbientAnalysis } from "./stores/ambient-store";
+import { disableAmbientAnalysis } from "./state/ambient-settings.svelte";
 import { createTRPCMessageHandler } from "./trpc/chrome-adapter";
 // All messaging now handled via tRPC
 import { sidepanelToBackgroundClient } from "./trpc/client";
@@ -139,14 +139,23 @@ function handlePromptsChange(prompts: {
 	};
 }
 
+// Track previous AI status to detect transitions
+let previousAIStatus = $state<AIProviderStatus | null>(null);
+
 // Effect to disable ambient analysis when AI becomes unavailable
+// Only disable if it was previously available (not on initial load)
 $effect(() => {
-	if (currentAIStatus !== "available" && currentAIStatus !== null) {
-		console.log("[App] AI is not available, disabling ambient analysis");
+	if (
+		previousAIStatus === "available" &&
+		currentAIStatus !== "available" &&
+		currentAIStatus !== null
+	) {
+		console.log("[App] AI became unavailable, disabling ambient analysis");
 		disableAmbientAnalysis().catch((error) => {
 			console.error("[App] Failed to disable ambient analysis:", error);
 		});
 	}
+	previousAIStatus = currentAIStatus;
 });
 
 async function handleClearMemory() {

@@ -1,10 +1,10 @@
 <script lang="ts">
 import { formatDistanceToNow } from "date-fns";
 import {
-	ambientSettings,
+	getAmbientSettings,
 	toggleAmbientAnalysis,
 	updateAmbientSettings,
-} from "../stores/ambient-store";
+} from "../state/ambient-settings.svelte";
 import {
 	getClaudeApiKey,
 	loadAIConfigFromStorage,
@@ -17,6 +17,7 @@ import {
 	getProviderDisplayName,
 } from "../utils/ai-provider-factory";
 import type { AutoAnalysisSettings } from "../utils/ambient";
+import { defaultAutoAnalysisSettings } from "../utils/ambient";
 import {
 	ANALYSIS_SYSTEM_PROMPT,
 	CHUNK_SYSTEM_PROMPT,
@@ -59,19 +60,13 @@ let claudeApiKey = $state("");
 let showApiKey = $state(false);
 
 // Auto-analysis state
-let autoAnalysisSettings = $state<AutoAnalysisSettings>({
-	enabled: false,
-	notifyOnSuccess: true,
-	notifyOnError: true,
-});
+let autoAnalysisSettings = $state<AutoAnalysisSettings>(
+	defaultAutoAnalysisSettings,
+);
 
-// Subscribe to the store
+// Sync with the store state
 $effect(() => {
-	const unsubscribe = ambientSettings.subscribe((value) => {
-		autoAnalysisSettings = value;
-	});
-
-	return unsubscribe;
+	autoAnalysisSettings = getAmbientSettings();
 });
 
 // Update current provider when prop changes

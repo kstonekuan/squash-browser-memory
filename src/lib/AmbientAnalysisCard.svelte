@@ -1,11 +1,13 @@
 <script lang="ts">
 import { format, formatDistanceToNow } from "date-fns";
 import {
-	ambientSettings,
+	getAmbientSettings,
 	toggleAmbientAnalysis as toggleAmbient,
-} from "../stores/ambient-store";
+	updateAmbientSettings,
+} from "../state/ambient-settings.svelte";
 import { sidepanelToBackgroundClient } from "../trpc/client";
 import type { AutoAnalysisSettings } from "../utils/ambient";
+import { defaultAutoAnalysisSettings } from "../utils/ambient";
 
 let { analysisStatus = { status: "idle" }, aiStatus = "unavailable" } = $props<{
 	analysisStatus?: {
@@ -22,21 +24,13 @@ let { analysisStatus = { status: "idle" }, aiStatus = "unavailable" } = $props<{
 		| "error";
 }>();
 
-let settings = $state<AutoAnalysisSettings>({
-	enabled: false,
-	notifyOnSuccess: true,
-	notifyOnError: true,
-});
+let settings = $state<AutoAnalysisSettings>(defaultAutoAnalysisSettings);
 let loading = $state(false);
 let toggling = $state(false);
 
-// Subscribe to the store
+// Sync with the store state
 $effect(() => {
-	const unsubscribe = ambientSettings.subscribe((value) => {
-		settings = value;
-	});
-
-	return unsubscribe;
+	settings = getAmbientSettings();
 });
 
 // Query actual alarm time on mount and when enabled
@@ -48,10 +42,9 @@ $effect(() => {
 			.query()
 			.then((response) => {
 				if (response?.nextRunTime) {
-					ambientSettings.update((s) => ({
-						...s,
+					updateAmbientSettings({
 						nextAlarmTime: response.nextRunTime,
-					}));
+					});
 				}
 			})
 			.catch(() => {

@@ -14,7 +14,7 @@ export interface AutoAnalysisSettings {
 }
 
 // Default settings
-const defaultAutoAnalysisSettings: AutoAnalysisSettings = {
+export const defaultAutoAnalysisSettings: AutoAnalysisSettings = {
 	enabled: false,
 	notifyOnSuccess: false,
 	notifyOnError: false,
