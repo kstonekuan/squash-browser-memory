@@ -6,12 +6,31 @@
 import { initTRPC } from "@trpc/server";
 import superjson from "superjson";
 import { z } from "zod";
+import {
+	handleAIStatusReport,
+	handleCancelAnalysis,
+	handleClearPatterns,
+	handleCompleteReport,
+	handleErrorReport,
+	handleGetAIConfig,
+	handleGetAnalysisState,
+	handleInitializeAI,
+	handleProgressReport,
+	handleQueryNextAlarm,
+	handleQueryStatus,
+	handleReadMemory,
+	handleStartManualAnalysis,
+	handleToggleAutoAnalysis,
+	handleWriteMemory,
+	subscribeToAIStatus,
+	subscribeToProgress,
+	subscribeToStatus,
+} from "../background-handlers";
 import type { AnalysisMemory } from "../types";
 import type { AIProviderConfig } from "../utils/ai-interface";
 import {
 	aiStatusSchema,
 	analysisProgressSchema,
-	startAnalysisInputSchema,
 	startManualAnalysisInputSchema,
 } from "./schemas";
 
@@ -68,31 +87,24 @@ export const backgroundRouter = t.router({
 		startManual: t.procedure
 			.input(startManualAnalysisInputSchema)
 			.mutation(async ({ input }) => {
-				const { handleStartManualAnalysis } = await import(
-					"../background-handlers"
-				);
 				return handleStartManualAnalysis(input);
 			}),
 
 		cancel: t.procedure
 			.input(z.object({ analysisId: z.string() }))
 			.mutation(async ({ input }) => {
-				const { handleCancelAnalysis } = await import("../background-handlers");
 				return handleCancelAnalysis(input);
 			}),
 
 		getState: t.procedure.query(async () => {
-			const { handleGetAnalysisState } = await import("../background-handlers");
 			return handleGetAnalysisState();
 		}),
 
 		onProgress: t.procedure.subscription(async function* () {
-			const { subscribeToProgress } = await import("../background-handlers");
 			yield* createSubscription(subscribeToProgress);
 		}),
 
 		onStatus: t.procedure.subscription(async function* () {
-			const { subscribeToStatus } = await import("../background-handlers");
 			yield* createSubscription(subscribeToStatus);
 		}),
 	}),
@@ -102,9 +114,6 @@ export const backgroundRouter = t.router({
 		toggleAutoAnalysis: t.procedure
 			.input(z.object({ enabled: z.boolean() }))
 			.mutation(async ({ input }) => {
-				const { handleToggleAutoAnalysis } = await import(
-					"../background-handlers"
-				);
 				return handleToggleAutoAnalysis(input);
 			}),
 	}),
@@ -112,12 +121,10 @@ export const backgroundRouter = t.router({
 	// Ambient analysis
 	ambient: t.router({
 		queryStatus: t.procedure.query(async () => {
-			const { handleQueryStatus } = await import("../background-handlers");
 			return handleQueryStatus();
 		}),
 
 		queryNextAlarm: t.procedure.query(async () => {
-			const { handleQueryNextAlarm } = await import("../background-handlers");
 			return handleQueryNextAlarm();
 		}),
 	}),
@@ -125,17 +132,14 @@ export const backgroundRouter = t.router({
 	// AI
 	ai: t.router({
 		initialize: t.procedure.mutation(async () => {
-			const { handleInitializeAI } = await import("../background-handlers");
 			return handleInitializeAI();
 		}),
 
 		getConfig: t.procedure.query(async (): Promise<AIProviderConfig> => {
-			const { handleGetAIConfig } = await import("../background-handlers");
 			return handleGetAIConfig();
 		}),
 
 		onStatus: t.procedure.subscription(async function* () {
-			const { subscribeToAIStatus } = await import("../background-handlers");
 			yield* createSubscription(subscribeToAIStatus);
 		}),
 	}),
@@ -143,7 +147,6 @@ export const backgroundRouter = t.router({
 	// Memory operations
 	memory: t.router({
 		read: t.procedure.query(async () => {
-			const { handleReadMemory } = await import("../background-handlers");
 			const result = await handleReadMemory();
 			return result.memory;
 		}),
@@ -151,12 +154,10 @@ export const backgroundRouter = t.router({
 		write: t.procedure
 			.input(z.object({ memory: z.any() as z.ZodType<AnalysisMemory> }))
 			.mutation(async ({ input }) => {
-				const { handleWriteMemory } = await import("../background-handlers");
 				return handleWriteMemory(input);
 			}),
 
 		clearPatterns: t.procedure.mutation(async () => {
-			const { handleClearPatterns } = await import("../background-handlers");
 			return handleClearPatterns();
 		}),
 	}),
@@ -166,7 +167,6 @@ export const backgroundRouter = t.router({
 		reportProgress: t.procedure
 			.input(analysisProgressSchema)
 			.mutation(async ({ input }) => {
-				const { handleProgressReport } = await import("../background-handlers");
 				return handleProgressReport(input);
 			}),
 
@@ -178,7 +178,6 @@ export const backgroundRouter = t.router({
 				}),
 			)
 			.mutation(async ({ input }) => {
-				const { handleCompleteReport } = await import("../background-handlers");
 				return handleCompleteReport(
 					input as { analysisId: string; result: unknown },
 				);
@@ -192,48 +191,17 @@ export const backgroundRouter = t.router({
 				}),
 			)
 			.mutation(async ({ input }) => {
-				const { handleErrorReport } = await import("../background-handlers");
 				return handleErrorReport(input);
 			}),
 
 		reportAIStatus: t.procedure
 			.input(aiStatusSchema)
 			.mutation(async ({ input }) => {
-				const { handleAIStatusReport } = await import("../background-handlers");
 				return handleAIStatusReport(input);
 			}),
 
 		keepalive: t.procedure.mutation(async () => {
 			return { success: true };
-		}),
-	}),
-
-	// Offscreen procedures (proxied to offscreen document)
-	offscreen: t.router({
-		startAnalysis: t.procedure
-			.input(startAnalysisInputSchema)
-			.mutation(async () => {
-				// This is handled by forwarding to the offscreen document
-				// The actual implementation is in offscreen-handlers
-				throw new Error(
-					"This procedure should be called on the offscreen document",
-				);
-			}),
-
-		cancelAnalysis: t.procedure
-			.input(z.object({ analysisId: z.string() }))
-			.mutation(async () => {
-				// This is handled by forwarding to the offscreen document
-				throw new Error(
-					"This procedure should be called on the offscreen document",
-				);
-			}),
-
-		initializeAI: t.procedure.mutation(async () => {
-			// This is handled by forwarding to the offscreen document
-			throw new Error(
-				"This procedure should be called on the offscreen document",
-			);
 		}),
 	}),
 });
