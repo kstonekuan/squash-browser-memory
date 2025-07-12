@@ -3,9 +3,9 @@ import type { MemorySettings } from "../types";
 // Settings key for memory management configuration
 const MEMORY_SETTINGS_KEY = "memory_settings";
 
-// Default memory settings - workflow patterns enabled by default (current behavior)
+// Default memory settings - workflow patterns disabled by default
 const defaultMemorySettings: MemorySettings = {
-	storeWorkflowPatterns: true,
+	storeWorkflowPatterns: false,
 };
 
 // Load memory settings
