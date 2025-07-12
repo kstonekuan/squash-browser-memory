@@ -90,7 +90,7 @@ function getStatusMessage(status: AIProviderStatus): string {
 				<li>Enable "Prompt API for Gemini Nano" in chrome://flags</li>
 				<li>Update "Optimization Guide On Device Model" in chrome://components
 					<div class="mt-1 ml-4 text-yellow-600 font-medium">
-						⚠️ Warning: This will download a model that is ~22GB
+						⚠️ Warning: This will download a model that is ~4GB
 					</div>
 				</li>
 			</ul>

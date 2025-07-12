@@ -10,8 +10,8 @@ import {
 // Default settings
 const defaultSettings: AutoAnalysisSettings = {
 	enabled: false,
-	notifyOnSuccess: true,
-	notifyOnError: true,
+	notifyOnSuccess: false,
+	notifyOnError: false,
 };
 
 // Create the store

@@ -752,9 +752,9 @@ class SimpleContextMatcher {
 			}
 		}
 
-		// Filter out suggestions below 20% relevance and sort by relevance, limit to 8
+		// Filter out suggestions below 10% relevance and sort by relevance, limit to 8
 		return suggestions
-			.filter((suggestion) => suggestion.relevanceScore >= 0.2) // Minimum 20% match
+			.filter((suggestion) => suggestion.relevanceScore >= 0.1) // Minimum 20% match
 			.sort((a, b) => b.relevanceScore - a.relevanceScore)
 			.slice(0, 8); // Increased from 5 to 8
 	}

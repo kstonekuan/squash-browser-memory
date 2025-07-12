@@ -25,7 +25,7 @@ import {
 
 let analysisResult: FullAnalysisResult | null = $state(null);
 let memoryAutoExpand = $state(false);
-let memorySettings = $state<MemorySettings>({ storeWorkflowPatterns: true });
+let memorySettings = $state<MemorySettings>({ storeWorkflowPatterns: false });
 let customPrompts = $state<{
 	systemPrompt?: string;
 	chunkPrompt?: string;
