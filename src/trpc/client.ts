@@ -1,6 +1,6 @@
 /**
  * Unified tRPC client configuration
- * Exports pre-configured client instances for each communication path
+ * All clients now use sendMessage for communication
  */
 
 import { createTRPCClient, createTRPCProxyClient } from "@trpc/client";
@@ -8,29 +8,21 @@ import type { BackgroundRouter } from "./background-router";
 import { chromeLinkWithSuperjson } from "./chrome-adapter";
 import type { OffscreenRouter } from "./offscreen-router";
 
-// Client for UI -> Background communication (used in sidepanel/popup)
+// Client for Sidepanel -> Background communication (used in sidepanel)
 // Uses proxy client for cleaner syntax in UI components
 export const uiToBackgroundClient = createTRPCProxyClient<BackgroundRouter>({
-	links: [chromeLinkWithSuperjson({ portName: "ui-to-background" })],
+	links: [chromeLinkWithSuperjson({ target: "background" })],
 });
 
 // Client for Background -> Offscreen communication
-// Now uses the offscreen namespace from the unified router
+// Now uses sendMessage instead of ports
 export const backgroundToOffscreenClient =
 	createTRPCProxyClient<OffscreenRouter>({
-		links: [
-			chromeLinkWithSuperjson({
-				portName: "background-to-offscreen",
-			}),
-		],
+		links: [chromeLinkWithSuperjson({ target: "offscreen" })],
 	});
 
 // Client for Offscreen -> Background communication (used in offscreen document)
 // Uses regular client for offscreen document
 export const offscreenToBackgroundClient = createTRPCClient<BackgroundRouter>({
-	links: [
-		chromeLinkWithSuperjson({
-			portName: "offscreen-trpc",
-		}),
-	],
+	links: [chromeLinkWithSuperjson({ target: "background" })],
 });

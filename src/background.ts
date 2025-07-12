@@ -1,8 +1,12 @@
 // Background service worker for the History Workflow Analyzer extension
 /// <reference types="@types/dom-chromium-ai" />
 
+import {
+	handleStartupAlarmCheck,
+	triggerAnalysis,
+} from "./background-handlers";
 import { backgroundRouter } from "./trpc/background-router";
-import { createChromeHandler } from "./trpc/chrome-adapter";
+import { createTRPCMessageHandler } from "./trpc/chrome-adapter";
 import { ensureOffscreenDocument } from "./utils/chrome-api";
 
 const ALARM_NAME = "hourly-analysis";
@@ -52,7 +56,6 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
 	if (alarm.name === ALARM_NAME) {
 		console.log("[Analysis] Alarm triggered");
 		try {
-			const { triggerAnalysis } = await import("./background-handlers");
 			await triggerAnalysis("alarm");
 		} catch (error) {
 			console.error("Failed to run analysis from alarm:", error);
@@ -72,7 +75,6 @@ chrome.runtime.onStartup.addListener(async () => {
 	await ensureOffscreenDocument();
 	console.log("Offscreen document created on startup");
 
-	const { handleStartupAlarmCheck } = await import("./background-handlers");
 	await handleStartupAlarmCheck();
 });
 
@@ -87,22 +89,24 @@ self.addEventListener("error", (event) => {
 // tRPC Handler Setup
 // ============================================
 
-// Set up tRPC handler for incoming requests from UI and offscreen
-createChromeHandler({
-	router: backgroundRouter,
-	createContext: () => ({
+// Set up tRPC message handler for incoming requests from sidepanel and offscreen
+const messageHandler = createTRPCMessageHandler(
+	backgroundRouter,
+	(sender) => ({
 		timestamp: Date.now(),
+		sender,
 	}),
-	onError: (error, operation) => {
-		console.error("[background tRPC] Error:", error, "Operation:", operation);
+	(message) => {
+		// Only accept messages targeted to background
+		const msg = message as { target?: string };
+		return !msg.target || msg.target === "background";
 	},
-	// Only accept connections from UI and offscreen documents
-	acceptPort: (port) => {
-		return port.name === "ui-to-background" || port.name === "offscreen-trpc";
-	},
-});
+);
 
-console.log("[Background] tRPC handler initialized");
+// Handle tRPC messages via sendMessage
+chrome.runtime.onMessage.addListener(messageHandler);
+
+console.log("[Background] tRPC message handler initialized");
 
 // Initialize offscreen document immediately on service worker start
 // This ensures it's available for all operations

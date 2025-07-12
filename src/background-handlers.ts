@@ -36,7 +36,7 @@ const analysisProgressMap = new Map<string, AnalysisProgress>();
 // Track active analyses
 const activeAnalyses = new Map<string, boolean>();
 
-// Status subscribers for broadcasting
+// Status update type for broadcasts
 type StatusUpdate = {
 	status: "started" | "completed" | "error" | "skipped";
 	message?: string;
@@ -45,54 +45,8 @@ type StatusUpdate = {
 	error?: string;
 };
 
-const statusSubscribers = new Set<(update: StatusUpdate) => void>();
-
-// Progress subscribers for broadcasting
-const progressSubscribers = new Set<(update: AnalysisProgress) => void>();
-
-// AI status subscribers for broadcasting
-const aiStatusSubscribers = new Set<
-	(update: {
-		status: "initializing" | "available" | "error";
-		error?: string;
-	}) => void
->();
-
-// Register a status subscriber
-export function subscribeToStatus(
-	callback: (update: StatusUpdate) => void,
-): () => void {
-	statusSubscribers.add(callback);
-	return () => {
-		statusSubscribers.delete(callback);
-	};
-}
-
-// Register a progress subscriber
-export function subscribeToProgress(
-	callback: (update: AnalysisProgress) => void,
-): () => void {
-	progressSubscribers.add(callback);
-	return () => {
-		progressSubscribers.delete(callback);
-	};
-}
-
-// Register an AI status subscriber
-export function subscribeToAIStatus(
-	callback: (update: {
-		status: "initializing" | "available" | "error";
-		error?: string;
-	}) => void,
-): () => void {
-	aiStatusSubscribers.add(callback);
-	return () => {
-		aiStatusSubscribers.delete(callback);
-	};
-}
-
-// Broadcast analysis status to all subscribers
-function broadcastAnalysisStatus(
+// Broadcast analysis status to all extension contexts
+async function broadcastAnalysisStatus(
 	status: "started" | "completed" | "error" | "skipped",
 	details: {
 		message?: string;
@@ -100,32 +54,43 @@ function broadcastAnalysisStatus(
 		reason?: string;
 		error?: string;
 	},
-): void {
+): Promise<void> {
 	const update: StatusUpdate = {
 		status,
 		...details,
 	};
 
-	statusSubscribers.forEach((callback) => {
-		try {
-			callback(update);
-		} catch (error) {
-			console.error("[Background] Error in status subscriber:", error);
-		}
-	});
+	// Send tRPC message to all extension contexts (including sidepanel)
+	// Using chrome.runtime.sendMessage broadcasts to all extension pages
+	try {
+		await chrome.runtime.sendMessage({
+			type: "trpc",
+			target: "sidepanel",
+			path: "statusUpdate",
+			input: update,
+		});
+	} catch {
+		// No listeners or sidepanel not open
+	}
 
 	console.log("[Background] Broadcast status:", status, details);
 }
 
-// Broadcast progress updates to all subscribers
-function broadcastProgressUpdate(progress: AnalysisProgress): void {
-	progressSubscribers.forEach((callback) => {
-		try {
-			callback(progress);
-		} catch (error) {
-			console.error("[Background] Error in progress subscriber:", error);
-		}
-	});
+// Broadcast progress updates to all extension contexts
+async function broadcastProgressUpdate(
+	progress: AnalysisProgress,
+): Promise<void> {
+	// Send tRPC message to all extension contexts (including sidepanel)
+	try {
+		await chrome.runtime.sendMessage({
+			type: "trpc",
+			target: "sidepanel",
+			path: "progressUpdate",
+			input: progress,
+		});
+	} catch {
+		// No listeners or sidepanel not open
+	}
 
 	console.log(
 		"[Background] Broadcast progress:",
@@ -134,18 +99,22 @@ function broadcastProgressUpdate(progress: AnalysisProgress): void {
 	);
 }
 
-// Broadcast AI status updates to all subscribers
-function broadcastAIStatusUpdate(aiStatus: {
+// Broadcast AI status updates to all extension contexts
+async function broadcastAIStatusUpdate(aiStatus: {
 	status: "initializing" | "available" | "error";
 	error?: string;
-}): void {
-	aiStatusSubscribers.forEach((callback) => {
-		try {
-			callback(aiStatus);
-		} catch (error) {
-			console.error("[Background] Error in AI status subscriber:", error);
-		}
-	});
+}): Promise<void> {
+	// Send tRPC message to all extension contexts (including sidepanel)
+	try {
+		await chrome.runtime.sendMessage({
+			type: "trpc",
+			target: "sidepanel",
+			path: "aiStatusUpdate",
+			input: aiStatus,
+		});
+	} catch {
+		// No listeners or sidepanel not open
+	}
 
 	console.log(
 		"[Background] Broadcast AI status:",
@@ -555,7 +524,7 @@ export async function triggerAnalysis(trigger: "manual" | "alarm") {
 		console.log("[Analysis] Analysis already in progress, skipping.");
 		if (trigger === "manual") {
 			// For manual triggers, notify the user
-			broadcastAnalysisStatus("skipped", {
+			await broadcastAnalysisStatus("skipped", {
 				reason: "analysis-already-running",
 				message: "Analysis is already in progress",
 			});
@@ -632,7 +601,7 @@ export async function triggerAnalysis(trigger: "manual" | "alarm") {
 			});
 
 			isAnalysisRunning = false;
-			broadcastAnalysisStatus("skipped", {
+			await broadcastAnalysisStatus("skipped", {
 				reason: "no-new-history",
 				message: "No browsing history to analyze",
 			});

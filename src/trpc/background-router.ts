@@ -22,9 +22,6 @@ import {
 	handleStartManualAnalysis,
 	handleToggleAutoAnalysis,
 	handleWriteMemory,
-	subscribeToAIStatus,
-	subscribeToProgress,
-	subscribeToStatus,
 } from "../background-handlers";
 import type { AnalysisMemory } from "../types";
 import type { AIProviderConfig } from "../utils/ai-interface";
@@ -47,39 +44,6 @@ const t = initTRPC.context<Context>().create({
 	transformer: superjson,
 });
 
-// Create subscriptions helper
-async function* createSubscription<T>(
-	subscribeFn: (callback: (update: T) => void) => () => void,
-): AsyncGenerator<T> {
-	const queue: T[] = [];
-	let resolveNext: (() => void) | null = null;
-
-	const unsubscribe = subscribeFn((update) => {
-		queue.push(update);
-		if (resolveNext) {
-			resolveNext();
-			resolveNext = null;
-		}
-	});
-
-	try {
-		while (true) {
-			if (queue.length === 0) {
-				await new Promise<void>((resolve) => {
-					resolveNext = resolve;
-				});
-			}
-
-			while (queue.length > 0) {
-				const update = queue.shift()!;
-				yield update;
-			}
-		}
-	} finally {
-		unsubscribe();
-	}
-}
-
 // Background procedures
 export const backgroundRouter = t.router({
 	// Analysis procedures
@@ -98,14 +62,6 @@ export const backgroundRouter = t.router({
 
 		getState: t.procedure.query(async () => {
 			return handleGetAnalysisState();
-		}),
-
-		onProgress: t.procedure.subscription(async function* () {
-			yield* createSubscription(subscribeToProgress);
-		}),
-
-		onStatus: t.procedure.subscription(async function* () {
-			yield* createSubscription(subscribeToStatus);
 		}),
 	}),
 
@@ -137,10 +93,6 @@ export const backgroundRouter = t.router({
 
 		getConfig: t.procedure.query(async (): Promise<AIProviderConfig> => {
 			return handleGetAIConfig();
-		}),
-
-		onStatus: t.procedure.subscription(async function* () {
-			yield* createSubscription(subscribeToAIStatus);
 		}),
 	}),
 

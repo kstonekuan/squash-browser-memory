@@ -11,9 +11,10 @@ import CollapsibleSection from "./lib/CollapsibleSection.svelte";
 import HistoryFetcher from "./lib/HistoryFetcher.svelte";
 import MemoryViewer from "./lib/MemoryViewer.svelte";
 import { disableAmbientAnalysis } from "./stores/ambient-store";
+import { createTRPCMessageHandler } from "./trpc/chrome-adapter";
 // All messaging now handled via tRPC
 import { uiToBackgroundClient } from "./trpc/client";
-import type { AnalysisProgress as AnalysisProgressType } from "./trpc/schemas";
+import { createSidepanelRouter } from "./trpc/sidepanel-router";
 import type { FullAnalysisResult, MemorySettings } from "./types";
 import { loadAIConfigFromStorage } from "./utils/ai-config";
 import type { AIProviderStatus, AIProviderType } from "./utils/ai-interface";
@@ -258,9 +259,126 @@ onMount(() => {
 		memorySettings = settings;
 	});
 
-	// Set up tRPC subscriptions
-	let statusUnsubscribe: { unsubscribe: () => void } | null = null;
-	let progressUnsubscribe: { unsubscribe: () => void } | null = null;
+	// Create sidepanel router for receiving broadcasts from background
+	const sidepanelRouter = createSidepanelRouter({
+		onStatusUpdate: (data) => {
+			// Handle status updates the same way as before
+			if (!data?.status) {
+				console.warn("[App] Received status update with no status:", data);
+				return;
+			}
+			match(data.status as "started" | "completed" | "skipped" | "error")
+				.with("started", () => {
+					// Determine type from message or current state
+					if (!currentAnalysisType) {
+						currentAnalysisType = data.message?.includes("manual")
+							? "manual"
+							: "ambient";
+					}
+					analysisStatus = {
+						status: "running",
+						message: data.message || "Starting analysis...",
+					};
+				})
+				.with("completed", () => {
+					analysisStatus = {
+						status: "completed",
+						message: data.message || "Analysis completed",
+						itemCount: data.itemCount,
+					};
+
+					// Update UI state
+					if (currentAnalysisType === "manual") {
+						isAnalyzing = false;
+						analysisPhase = "complete";
+						memoryAutoExpand = true;
+					}
+
+					// Clear analysis type
+					currentAnalysisType = null;
+					currentAnalysisId = null;
+
+					// Reset to idle after 10 seconds
+					setTimeout(() => {
+						if (analysisStatus.status === "completed") {
+							analysisStatus = { status: "idle" };
+						}
+						if (analysisPhase === "complete") {
+							analysisPhase = "idle";
+						}
+					}, 10000);
+				})
+				.with("skipped", () => {
+					analysisStatus = {
+						status: "skipped",
+						message: data.message || "Analysis skipped",
+						reason: data.reason,
+					};
+
+					currentAnalysisType = null;
+					currentAnalysisId = null;
+
+					// Reset to idle after 10 seconds
+					setTimeout(() => {
+						if (analysisStatus.status === "skipped") {
+							analysisStatus = { status: "idle" };
+						}
+					}, 10000);
+				})
+				.with("error", () => {
+					analysisStatus = {
+						status: "error",
+						message: data.message || "Analysis failed",
+					};
+
+					// Update UI state for manual analysis
+					if (currentAnalysisType === "manual") {
+						isAnalyzing = false;
+						analysisPhase = "error";
+					}
+
+					currentAnalysisType = null;
+					currentAnalysisId = null;
+				})
+				.exhaustive();
+		},
+		onProgressUpdate: (data) => {
+			console.log("[App] Progress update:", data);
+			analysisPhase = data.phase as AnalysisPhase;
+			subPhase = data.subPhase as SubPhase | undefined;
+			if (data.chunkProgress) {
+				chunkProgress = data.chunkProgress;
+			}
+		},
+		onAIStatusUpdate: (data) => {
+			console.log("[App] AI status update:", data?.status, data?.error);
+			if (!data?.status) {
+				console.warn("[App] Received AI status update with no status:", data);
+				return;
+			}
+			// Map status to AIProviderStatus
+			if (data.status === "available") {
+				currentAIStatus = "available";
+			} else if (data.status === "initializing") {
+				// Keep current status while initializing
+			} else {
+				// All other statuses (error) map to unavailable
+				currentAIStatus = "unavailable";
+			}
+		},
+	});
+
+	// Set up message handler for receiving tRPC broadcasts
+	const messageHandler = createTRPCMessageHandler(
+		sidepanelRouter,
+		undefined,
+		(message) => {
+			// Only accept messages targeted to sidepanel (from background broadcasts)
+			const msg = message as { target?: string };
+			return msg.target === "sidepanel";
+		},
+	);
+	chrome.runtime.onMessage.addListener(messageHandler);
 
 	// Listen for storage changes to detect provider changes
 	const storageListener = (changes: {
@@ -273,6 +391,8 @@ onMount(() => {
 		}
 	};
 	chrome.storage.onChanged.addListener(storageListener);
+
+	// No more tRPC subscriptions needed - removing subscription setup
 
 	// Query current status from background
 	uiToBackgroundClient.ambient.queryStatus
@@ -321,157 +441,12 @@ onMount(() => {
 			// Ignore errors
 		});
 
-	// Set up tRPC status subscription
-	statusUnsubscribe = uiToBackgroundClient.analysis.onStatus.subscribe(
-		undefined,
-		{
-			onData: (data) => {
-				// Handle status updates the same way as onMessage
-				if (!data?.status) {
-					console.warn("[App] Received status update with no status:", data);
-					return;
-				}
-				match(data.status as "started" | "completed" | "skipped" | "error")
-					.with("started", () => {
-						// Determine type from message or current state
-						if (!currentAnalysisType) {
-							currentAnalysisType = data.message?.includes("manual")
-								? "manual"
-								: "ambient";
-						}
-						analysisStatus = {
-							status: "running",
-							message: data.message || "Starting analysis...",
-						};
-					})
-					.with("completed", () => {
-						analysisStatus = {
-							status: "completed",
-							message: data.message || "Analysis completed",
-							itemCount: data.itemCount,
-						};
-
-						// Update UI state
-						if (currentAnalysisType === "manual") {
-							isAnalyzing = false;
-							analysisPhase = "complete";
-							memoryAutoExpand = true;
-						}
-
-						// Clear analysis type
-						currentAnalysisType = null;
-						currentAnalysisId = null;
-
-						// Reset to idle after 10 seconds
-						setTimeout(() => {
-							if (analysisStatus.status === "completed") {
-								analysisStatus = { status: "idle" };
-							}
-							if (analysisPhase === "complete") {
-								analysisPhase = "idle";
-							}
-						}, 10000);
-					})
-					.with("skipped", () => {
-						analysisStatus = {
-							status: "skipped",
-							message: data.message || "Analysis skipped",
-							reason: data.reason,
-						};
-
-						currentAnalysisType = null;
-						currentAnalysisId = null;
-
-						// Reset to idle after 10 seconds
-						setTimeout(() => {
-							if (analysisStatus.status === "skipped") {
-								analysisStatus = { status: "idle" };
-							}
-						}, 10000);
-					})
-					.with("error", () => {
-						analysisStatus = {
-							status: "error",
-							message: data.message || "Analysis failed",
-						};
-
-						// Update UI state for manual analysis
-						if (currentAnalysisType === "manual") {
-							isAnalyzing = false;
-							analysisPhase = "error";
-						}
-
-						currentAnalysisType = null;
-						currentAnalysisId = null;
-					})
-					.exhaustive();
-			},
-			onError: (error) => {
-				console.error("Status subscription error:", error);
-			},
-		},
-	);
-
-	// Status updates now handled via tRPC subscription above
-
-	// Progress updates now handled via tRPC subscription
-
-	// Set up progress subscription when we have an analysis ID
-	$effect(() => {
-		if (currentAnalysisId && !progressUnsubscribe) {
-			progressUnsubscribe = uiToBackgroundClient.analysis.onProgress.subscribe(
-				undefined,
-				{
-					onData: (data: AnalysisProgressType) => {
-						console.log("[App] tRPC progress update:", data);
-						analysisPhase = data.phase;
-						subPhase = data.subPhase;
-						if (data.chunkProgress) {
-							chunkProgress = data.chunkProgress;
-						}
-					},
-					onError: (error) => {
-						console.error("Progress subscription error:", error);
-					},
-				},
-			);
-		} else if (!currentAnalysisId && progressUnsubscribe) {
-			// Clean up subscription when analysis is done
-			progressUnsubscribe.unsubscribe();
-			progressUnsubscribe = null;
-		}
-	});
-
-	// Set up AI status subscription
-	let aiStatusUnsubscribe: { unsubscribe: () => void } | null = null;
-	aiStatusUnsubscribe = uiToBackgroundClient.ai.onStatus.subscribe(undefined, {
-		onData: (data) => {
-			console.log("[App] AI status update:", data?.status, data?.error);
-			if (!data?.status) {
-				console.warn("[App] Received AI status update with no status:", data);
-				return;
-			}
-			// Map status to AIProviderStatus
-			if (data.status === "available") {
-				currentAIStatus = "available";
-			} else if (data.status === "initializing") {
-				// Keep current status while initializing
-			} else {
-				// All other statuses (error) map to unavailable
-				currentAIStatus = "unavailable";
-			}
-		},
-		onError: (error) => {
-			console.error("AI status subscription error:", error);
-		},
-	});
+	// All status/progress/AI updates now handled via the sidepanel router and message handler above
 
 	// Cleanup
 	return () => {
 		chrome.storage.onChanged.removeListener(storageListener);
-		statusUnsubscribe?.unsubscribe();
-		progressUnsubscribe?.unsubscribe();
-		aiStatusUnsubscribe?.unsubscribe();
+		chrome.runtime.onMessage.removeListener(messageHandler);
 	};
 });
 </script>

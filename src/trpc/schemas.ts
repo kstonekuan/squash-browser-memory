@@ -71,5 +71,14 @@ export const startManualAnalysisInputSchema = z.object({
 	memorySettings: memorySettingsSchema.optional(),
 });
 
+// Status update schema for broadcasts
+export const statusUpdateSchema = z.object({
+	status: z.enum(["started", "completed", "error", "skipped"]),
+	message: z.string().optional(),
+	itemCount: z.number().optional(),
+	reason: z.string().optional(),
+	error: z.string().optional(),
+});
+
 // Helper type exports
 export type AnalysisProgress = z.infer<typeof analysisProgressSchema>;

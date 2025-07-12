@@ -1,32 +1,32 @@
 /// <reference types="@types/dom-chromium-ai" />
 
-import { createChromeHandler } from "./trpc/chrome-adapter";
+import { createTRPCMessageHandler } from "./trpc/chrome-adapter";
+import { offscreenRouter } from "./trpc/offscreen-router";
 
 // ============================================
 // tRPC Handler Setup
 // ============================================
 
 // Create context for tRPC procedures
-function createContext() {
+function createContext(sender?: chrome.runtime.MessageSender) {
 	return {
 		timestamp: Date.now(),
+		sender,
 	};
 }
 
-// Import the offscreen-specific router
-import { offscreenRouter } from "./trpc/offscreen-router";
-
-// Set up tRPC handler for incoming requests from background only
-createChromeHandler({
-	router: offscreenRouter,
+// Set up tRPC message handler for incoming requests from background
+const messageHandler = createTRPCMessageHandler(
+	offscreenRouter,
 	createContext,
-	onError: (error, operation) => {
-		console.error("[Offscreen tRPC] Error:", error, "Operation:", operation);
+	(message) => {
+		// Only accept messages targeted to offscreen
+		const msg = message as { target?: string };
+		return msg.target === "offscreen";
 	},
-	// Only accept connections from the background script
-	acceptPort: (port) => {
-		return port.name === "background-to-offscreen";
-	},
-});
+);
 
-console.log("[Offscreen] Document initialized with tRPC handler");
+// Handle tRPC messages via sendMessage
+chrome.runtime.onMessage.addListener(messageHandler);
+
+console.log("[Offscreen] Document initialized with tRPC message handler");
