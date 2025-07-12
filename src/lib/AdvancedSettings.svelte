@@ -5,6 +5,7 @@ import {
 	toggleAmbientAnalysis,
 	updateAmbientSettings,
 } from "../state/ambient-settings.svelte";
+import type { AIProviderStatus } from "../types/ui-types";
 import {
 	getClaudeApiKey,
 	loadAIConfigFromStorage,
@@ -38,12 +39,7 @@ let {
 		merge: string;
 	}) => void;
 	onProviderChange?: () => void;
-	aiStatus?:
-		| "available"
-		| "unavailable"
-		| "needs-configuration"
-		| "rate-limited"
-		| "error";
+	aiStatus?: AIProviderStatus;
 	currentProviderType?: AIProviderType;
 }>();
 

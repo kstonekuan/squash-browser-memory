@@ -6,22 +6,13 @@ import {
 	updateAmbientSettings,
 } from "../state/ambient-settings.svelte";
 import { sidepanelToBackgroundClient } from "../trpc/client";
+import type { AIProviderStatus, AnalysisStatus } from "../types/ui-types";
 import type { AutoAnalysisSettings } from "../utils/ambient";
 import { defaultAutoAnalysisSettings } from "../utils/ambient";
 
 let { analysisStatus = { status: "idle" }, aiStatus = "unavailable" } = $props<{
-	analysisStatus?: {
-		status: "idle" | "running" | "completed" | "skipped" | "error";
-		message?: string;
-		itemCount?: number;
-		reason?: string;
-	};
-	aiStatus?:
-		| "available"
-		| "unavailable"
-		| "needs-configuration"
-		| "rate-limited"
-		| "error";
+	analysisStatus?: AnalysisStatus;
+	aiStatus?: AIProviderStatus;
 }>();
 
 let settings = $state<AutoAnalysisSettings>(defaultAutoAnalysisSettings);

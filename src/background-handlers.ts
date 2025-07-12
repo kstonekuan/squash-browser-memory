@@ -6,7 +6,7 @@
 import { format } from "date-fns";
 import { match } from "ts-pattern";
 import { backgroundToOffscreenClient } from "./trpc/client";
-import type { AnalysisProgress } from "./trpc/schemas";
+import type { AIStatus, AnalysisProgress, StatusUpdate } from "./trpc/schemas";
 import type { AnalysisMemory } from "./types";
 import type { AIProviderConfig } from "./utils/ai-interface";
 import {
@@ -35,15 +35,6 @@ const analysisProgressMap = new Map<string, AnalysisProgress>();
 
 // Track active analyses
 const activeAnalyses = new Map<string, boolean>();
-
-// Status update type for broadcasts
-type StatusUpdate = {
-	status: "started" | "completed" | "error" | "skipped";
-	message?: string;
-	itemCount?: number;
-	reason?: string;
-	error?: string;
-};
 
 // Broadcast analysis status to all extension contexts
 async function broadcastAnalysisStatus(
@@ -100,10 +91,7 @@ async function broadcastProgressUpdate(
 }
 
 // Broadcast AI status updates to all extension contexts
-async function broadcastAIStatusUpdate(aiStatus: {
-	status: "initializing" | "available" | "error";
-	error?: string;
-}): Promise<void> {
+async function broadcastAIStatusUpdate(aiStatus: AIStatus): Promise<void> {
 	// Send tRPC message to all extension contexts (including sidepanel)
 	try {
 		await chrome.runtime.sendMessage({
@@ -390,10 +378,7 @@ export async function handleErrorReport(input: {
 }
 
 export async function handleAIStatusReport(
-	input: {
-		status: "initializing" | "available" | "error";
-		error?: string;
-	},
+	input: AIStatus,
 	_trpc?: unknown,
 ): Promise<{ success: boolean }> {
 	// Broadcast AI status to all subscribers

@@ -16,8 +16,9 @@ import { createTRPCMessageHandler } from "./trpc/chrome-adapter";
 import { sidepanelToBackgroundClient } from "./trpc/client";
 import { createSidepanelRouter } from "./trpc/sidepanel-router";
 import type { FullAnalysisResult, MemorySettings } from "./types";
+import type { AIProviderStatus, AnalysisStatus } from "./types/ui-types";
 import { loadAIConfigFromStorage } from "./utils/ai-config";
-import type { AIProviderStatus, AIProviderType } from "./utils/ai-interface";
+import type { AIProviderType } from "./utils/ai-interface";
 import { clearMemory } from "./utils/analyzer";
 import {
 	loadMemorySettings,
@@ -41,12 +42,7 @@ let currentAnalysisType = $state<AnalysisType>(null);
 let currentAnalysisId = $state<string | null>(null);
 
 // Unified status for both ambient card and progress bar
-let analysisStatus = $state<{
-	status: "idle" | "running" | "completed" | "skipped" | "error";
-	message?: string;
-	itemCount?: number;
-	reason?: string;
-}>({ status: "idle" });
+let analysisStatus = $state<AnalysisStatus>({ status: "idle" });
 
 // Analysis progress state
 let analysisPhase: AnalysisPhase = $state("idle");

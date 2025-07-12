@@ -2,7 +2,8 @@
 import { format, subDays, subHours, subWeeks } from "date-fns";
 import { onMount } from "svelte";
 import { match } from "ts-pattern";
-import type { AIProviderStatus, AIProviderType } from "../utils/ai-interface";
+import type { AIProviderStatus } from "../types/ui-types";
+import type { AIProviderType } from "../utils/ai-interface";
 import { loadMemoryFromStorage } from "../utils/memory";
 
 let {

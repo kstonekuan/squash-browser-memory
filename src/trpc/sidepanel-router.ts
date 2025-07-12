@@ -6,6 +6,7 @@
 import { initTRPC } from "@trpc/server";
 import superjson from "superjson";
 import {
+	type AIStatus,
 	aiStatusSchema,
 	analysisProgressSchema,
 	statusUpdateSchema,
@@ -42,10 +43,7 @@ export const createSidepanelRouter = (handlers: {
 			description: string;
 		};
 	}) => void;
-	onAIStatusUpdate: (input: {
-		status: "initializing" | "available" | "error";
-		error?: string;
-	}) => void;
+	onAIStatusUpdate: (input: AIStatus) => void;
 }) => {
 	return t.router({
 		statusUpdate: t.procedure

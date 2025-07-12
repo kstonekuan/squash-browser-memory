@@ -63,31 +63,26 @@ export async function toggleAmbientAnalysis(): Promise<void> {
 	updateAmbientSettings(newSettings);
 
 	// Send message to background script
-	try {
-		const response =
-			await sidepanelToBackgroundClient.settings.toggleAutoAnalysis.mutate({
-				enabled: newEnabled,
-			});
+	const response =
+		await sidepanelToBackgroundClient.settings.toggleAutoAnalysis.mutate({
+			enabled: newEnabled,
+		});
 
-		if (!response?.success) {
-			// Revert on error using updateAmbientSettings
-			updateAmbientSettings({
-				enabled: !newEnabled,
-				// Restore previous timestamp if reverting
-				lastRunTimestamp: currentSettings.lastRunTimestamp,
-			});
-			throw new Error(response?.error || "Failed to update auto-analysis");
-		}
+	if (!response?.success) {
+		// Revert on error using updateAmbientSettings
+		updateAmbientSettings({
+			enabled: !newEnabled,
+			// Restore previous timestamp if reverting
+			lastRunTimestamp: currentSettings.lastRunTimestamp,
+		});
+		throw new Error(response?.error || "Failed to update auto-analysis");
+	}
 
-		// If we have the actual next run time from the alarm, store it
-		if (response.nextRunTime && newEnabled) {
-			updateAmbientSettings({
-				nextAlarmTime: response.nextRunTime,
-			});
-		}
-	} catch (error) {
-		// Revert on error is already handled above
-		throw error;
+	// If we have the actual next run time from the alarm, store it
+	if (response.nextRunTime && newEnabled) {
+		updateAmbientSettings({
+			nextAlarmTime: response.nextRunTime,
+		});
 	}
 }
 
@@ -104,20 +99,15 @@ export async function disableAmbientAnalysis(): Promise<void> {
 	updateAmbientSettings({ enabled: false });
 
 	// Send message to background script to clear alarms
-	try {
-		const response =
-			await sidepanelToBackgroundClient.settings.toggleAutoAnalysis.mutate({
-				enabled: false,
-			});
+	const response =
+		await sidepanelToBackgroundClient.settings.toggleAutoAnalysis.mutate({
+			enabled: false,
+		});
 
-		if (!response?.success) {
-			// Revert on error using updateAmbientSettings
-			updateAmbientSettings({ enabled: true });
-			throw new Error(response?.error || "Failed to disable auto-analysis");
-		}
-	} catch (error) {
-		// Revert on error is already handled above
-		throw error;
+	if (!response?.success) {
+		// Revert on error using updateAmbientSettings
+		updateAmbientSettings({ enabled: true });
+		throw new Error(response?.error || "Failed to disable auto-analysis");
 	}
 }
 

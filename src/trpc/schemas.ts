@@ -82,3 +82,5 @@ export const statusUpdateSchema = z.object({
 
 // Helper type exports
 export type AnalysisProgress = z.infer<typeof analysisProgressSchema>;
+export type StatusUpdate = z.infer<typeof statusUpdateSchema>;
+export type AIStatus = z.infer<typeof aiStatusSchema>;
