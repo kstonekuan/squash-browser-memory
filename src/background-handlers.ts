@@ -478,6 +478,7 @@ async function runAnalysis(
 			...settings,
 			lastRunTimestamp: Date.now(),
 			lastRunStatus: "success",
+			lastRunError: undefined, // Clear any previous error
 		});
 
 		if (settings.notifyOnSuccess) {

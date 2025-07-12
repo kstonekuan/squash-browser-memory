@@ -1,5 +1,5 @@
 {
-	"extends": ["@tsconfig/svelte/tsconfig.json", "./tsconfig.base.json"],
+	"extends": "./tsconfig.base.json",
 	"compilerOptions": {
 		"useDefineForClassFields": true,
 		"noEmit": true

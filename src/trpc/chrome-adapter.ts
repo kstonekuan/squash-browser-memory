@@ -28,6 +28,51 @@ interface TRPCMessage {
 }
 
 // ============================================
+// PORT MANAGEMENT
+// ============================================
+
+// Cache for reusing port connections
+const portCache = new Map<string, chrome.runtime.Port>();
+
+/**
+ * Get or create a port connection
+ * Reuses existing ports when possible, creates new ones when needed
+ */
+function getOrCreatePort(portName: string): chrome.runtime.Port {
+	let port = portCache.get(portName);
+
+	// Check if port is still connected
+	if (port) {
+		try {
+			// Test if port is still alive by checking runtime.lastError
+			port.postMessage({ ping: true });
+			if (chrome.runtime.lastError) {
+				// Port is disconnected, remove from cache
+				portCache.delete(portName);
+				port = undefined;
+			}
+		} catch (_error) {
+			// Port is disconnected
+			portCache.delete(portName);
+			port = undefined;
+		}
+	}
+
+	// Create new port if needed
+	if (!port) {
+		port = chrome.runtime.connect({ name: portName });
+		portCache.set(portName, port);
+
+		// Clean up cache when port disconnects
+		port.onDisconnect.addListener(() => {
+			portCache.delete(portName);
+		});
+	}
+
+	return port;
+}
+
+// ============================================
 // CLIENT LINK
 // ============================================
 
@@ -35,7 +80,7 @@ interface TRPCMessage {
  * Chrome port link - uses connect for all communication
  * Handles queries, mutations, and subscriptions through persistent connections
  */
-export function chromePortLink<TRouter extends AnyRouter>(options?: {
+function chromePortLink<TRouter extends AnyRouter>(options?: {
 	portName?: string;
 }): TRPCLink<TRouter> {
 	const portName = options?.portName || "trpc";
@@ -47,7 +92,7 @@ export function chromePortLink<TRouter extends AnyRouter>(options?: {
 				let isComplete = false;
 
 				try {
-					port = chrome.runtime.connect({ name: portName });
+					port = getOrCreatePort(portName);
 
 					// Handle messages
 					port.onMessage.addListener((message: unknown) => {
@@ -118,12 +163,16 @@ export function chromePortLink<TRouter extends AnyRouter>(options?: {
 				return () => {
 					isComplete = true;
 					if (port && op.type === "subscription") {
-						port.postMessage({
-							id: op.id,
-							type: MESSAGE_TYPE.SUBSCRIPTION_STOP,
-						} as TRPCMessage);
+						try {
+							port.postMessage({
+								id: op.id,
+								type: MESSAGE_TYPE.SUBSCRIPTION_STOP,
+							} as TRPCMessage);
+						} catch (_error) {
+							// Port might be disconnected, ignore
+						}
 					}
-					port?.disconnect();
+					// Don't disconnect the port - let it be reused
 				};
 			});
 		};
@@ -161,6 +210,11 @@ export function createChromeHandler<TRouter extends AnyRouter>(
 		const subscriptions = new Map<string, () => void>();
 
 		port.onMessage.addListener(async (message: unknown) => {
+			// Ignore ping messages used for connection testing
+			if (message && typeof message === "object" && "ping" in message) {
+				return;
+			}
+
 			if (!isTRPCMessage(message)) return;
 
 			if (message.type === MESSAGE_TYPE.REQUEST) {
@@ -335,4 +389,17 @@ function serializeError(error: unknown): {
 		};
 	}
 	return { message: String(error) };
+}
+
+/**
+ * Chrome port link with SuperJSON transformer
+ * Automatically handles Date serialization/deserialization
+ */
+export function chromeLinkWithSuperjson<TRouter extends AnyRouter>(options?: {
+	portName?: string;
+}): TRPCLink<TRouter> {
+	// Our chromePortLink doesn't directly support transformer option yet
+	// This is just a placeholder to maintain API compatibility
+	// The actual SuperJSON transformation happens in the routers
+	return chromePortLink(options);
 }

@@ -327,6 +327,10 @@ onMount(() => {
 		{
 			onData: (data) => {
 				// Handle status updates the same way as onMessage
+				if (!data?.status) {
+					console.warn("[App] Received status update with no status:", data);
+					return;
+				}
 				match(data.status as "started" | "completed" | "skipped" | "error")
 					.with("started", () => {
 						// Determine type from message or current state
@@ -442,7 +446,11 @@ onMount(() => {
 	let aiStatusUnsubscribe: { unsubscribe: () => void } | null = null;
 	aiStatusUnsubscribe = uiToBackgroundClient.ai.onStatus.subscribe(undefined, {
 		onData: (data) => {
-			console.log("[App] AI status update:", data.status, data.error);
+			console.log("[App] AI status update:", data?.status, data?.error);
+			if (!data?.status) {
+				console.warn("[App] Received AI status update with no status:", data);
+				return;
+			}
 			// Map status to AIProviderStatus
 			if (data.status === "available") {
 				currentAIStatus = "available";

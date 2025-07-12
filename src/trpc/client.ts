@@ -5,13 +5,13 @@
 
 import { createTRPCClient, createTRPCProxyClient } from "@trpc/client";
 import type { BackgroundRouter } from "./background-router";
-import { chromePortLink } from "./chrome-adapter";
+import { chromeLinkWithSuperjson } from "./chrome-adapter";
 import type { OffscreenRouter } from "./offscreen-router";
 
 // Client for UI -> Background communication (used in sidepanel/popup)
 // Uses proxy client for cleaner syntax in UI components
 export const uiToBackgroundClient = createTRPCProxyClient<BackgroundRouter>({
-	links: [chromePortLink({ portName: "ui-to-background" })],
+	links: [chromeLinkWithSuperjson({ portName: "ui-to-background" })],
 });
 
 // Client for Background -> Offscreen communication
@@ -19,7 +19,7 @@ export const uiToBackgroundClient = createTRPCProxyClient<BackgroundRouter>({
 export const backgroundToOffscreenClient =
 	createTRPCProxyClient<OffscreenRouter>({
 		links: [
-			chromePortLink({
+			chromeLinkWithSuperjson({
 				portName: "background-to-offscreen",
 			}),
 		],
@@ -29,7 +29,7 @@ export const backgroundToOffscreenClient =
 // Uses regular client for offscreen document
 export const offscreenToBackgroundClient = createTRPCClient<BackgroundRouter>({
 	links: [
-		chromePortLink({
+		chromeLinkWithSuperjson({
 			portName: "offscreen-trpc",
 		}),
 	],

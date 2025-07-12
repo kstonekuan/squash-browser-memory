@@ -21,6 +21,12 @@ chrome.sidePanel
 chrome.runtime.onInstalled.addListener(async () => {
 	console.log("History Workflow Analyzer extension installed");
 
+	// Clear any corrupted storage
+	const { clearCorruptedMemory } = await import(
+		"./utils/clear-corrupted-storage"
+	);
+	await clearCorruptedMemory();
+
 	// Create offscreen document on install
 	await ensureOffscreenDocument();
 	console.log("Offscreen document created");
@@ -56,6 +62,12 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
 
 // Check alarm status on startup
 chrome.runtime.onStartup.addListener(async () => {
+	// Clear any corrupted storage
+	const { clearCorruptedMemory } = await import(
+		"./utils/clear-corrupted-storage"
+	);
+	await clearCorruptedMemory();
+
 	// Create offscreen document on startup
 	await ensureOffscreenDocument();
 	console.log("Offscreen document created on startup");

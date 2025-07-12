@@ -115,17 +115,34 @@ async function refreshMemory() {
 	}
 }
 
-function formatDate(date: Date): string {
-	if (!date || Number.isNaN(date.getTime())) {
+function formatDate(date: Date | string | number): string {
+	// Handle various date formats
+	let dateObj: Date;
+
+	if (!date) {
+		return "Never";
+	}
+
+	if (date instanceof Date) {
+		dateObj = date;
+	} else if (typeof date === "string") {
+		dateObj = new Date(date);
+	} else if (typeof date === "number") {
+		dateObj = new Date(date);
+	} else {
+		return "Never";
+	}
+
+	if (!dateObj || Number.isNaN(dateObj.getTime())) {
 		return "Never";
 	}
 
 	// If the date is the epoch (Unix time 0), show "Never"
-	if (date.getTime() === 0) {
+	if (dateObj.getTime() === 0) {
 		return "Never";
 	}
 
-	return format(date, "PPpp");
+	return format(dateObj, "PPpp");
 }
 
 function getAutomationPotentialColor(
