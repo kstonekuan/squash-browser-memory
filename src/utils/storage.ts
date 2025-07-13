@@ -3,36 +3,69 @@
  * Provides type-safe storage with automatic Date serialization
  */
 
+import { err, ok, ResultAsync } from "neverthrow";
 import superjson from "superjson";
 
 /**
  * Store data in Chrome storage with SuperJSON serialization
  * Automatically handles Date objects and other complex types
  */
-export async function setStorageData<T>(key: string, value: T): Promise<void> {
-	const serialized = superjson.stringify(value);
-	await chrome.storage.local.set({ [key]: serialized });
+export function setStorageData<T>(
+	key: string,
+	value: T,
+): ResultAsync<void, Error> {
+	try {
+		const serialized = superjson.stringify(value);
+		return ResultAsync.fromPromise(
+			chrome.storage.local.set({ [key]: serialized }),
+			(error) => {
+				// Check if it's a quota exceeded error
+				if (error instanceof Error && error.message.includes("quota")) {
+					return new Error(`Storage quota exceeded`, { cause: error });
+				}
+				return new Error(`Failed to save to storage`, { cause: error });
+			},
+		);
+	} catch (error) {
+		// Serialization failed
+		return ResultAsync.fromSafePromise(
+			Promise.reject(new Error(`Failed to serialize data`, { cause: error })),
+		);
+	}
 }
 
 /**
  * Retrieve data from Chrome storage with SuperJSON deserialization
  * Automatically restores Date objects and other complex types
  */
-export async function getStorageData<T>(key: string): Promise<T | null> {
-	const result = await chrome.storage.local.get(key);
-	if (!result[key]) return null;
+export function getStorageData<T>(
+	key: string,
+): ResultAsync<{ type: "found"; data: T } | { type: "not-found" }, Error> {
+	return ResultAsync.fromPromise(
+		chrome.storage.local.get(key),
+		(error) => new Error(`Failed to access storage`, { cause: error }),
+	).andThen((result) => {
+		if (!result[key]) {
+			return ok({ type: "not-found" as const });
+		}
 
-	try {
-		return superjson.parse(result[key]) as T;
-	} catch (error) {
-		console.warn(`Failed to deserialize storage data for key "${key}":`, error);
-		return null;
-	}
+		try {
+			const data = superjson.parse(result[key]) as T;
+			return ok({ type: "found" as const, data });
+		} catch (error) {
+			console.warn(`Failed to deserialize storage data for key "${key}"`);
+			return err(new Error(`Failed to parse storage data`, { cause: error }));
+		}
+	});
 }
 
 /**
  * Remove data from Chrome storage
  */
-export async function removeStorageData(key: string): Promise<void> {
-	await chrome.storage.local.remove(key);
+export function removeStorageData(key: string): ResultAsync<void, Error> {
+	return ResultAsync.fromPromise(
+		chrome.storage.local.remove(key),
+		(error) =>
+			new Error(`Failed to remove storage key ${key}`, { cause: error }),
+	);
 }

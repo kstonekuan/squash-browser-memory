@@ -11,22 +11,27 @@ export async function clearCorruptedMemory() {
 
 	try {
 		// Try to load using SuperJSON-enabled storage utilities
-		// If it fails or returns null, the data is corrupted
-		const memory = await getStorageData<AnalysisMemory>(MEMORY_KEY);
+		const memoryResult = await getStorageData<AnalysisMemory>(MEMORY_KEY);
 
-		// If getStorageData returns null, it could be:
-		// 1. No data exists (which is fine)
-		// 2. Data exists but failed to parse (corrupted)
-		// We need to check if raw data exists
-		const result = await chrome.storage.local.get(MEMORY_KEY);
-		const hasData = result[MEMORY_KEY] !== undefined;
+		// If it failed with an error (not just not-found), the data might be corrupted
+		if (memoryResult.isErr()) {
+			// Check if raw data exists to confirm it's corrupted
+			const result = await chrome.storage.local.get(MEMORY_KEY);
+			const hasData = result[MEMORY_KEY] !== undefined;
 
-		// If data exists but getStorageData returned null, it's corrupted
-		if (hasData && !memory) {
-			console.log("[Storage] Found corrupted memory data, clearing...");
-			await removeStorageData(MEMORY_KEY);
-			console.log("[Storage] Corrupted memory data cleared");
-			return true;
+			if (hasData) {
+				console.log("[Storage] Found corrupted memory data, clearing...");
+				const removeResult = await removeStorageData(MEMORY_KEY);
+				if (removeResult.isErr()) {
+					console.error(
+						"[Storage] Failed to remove corrupted data:",
+						removeResult.error,
+					);
+					return false;
+				}
+				console.log("[Storage] Corrupted memory data cleared");
+				return true;
+			}
 		}
 
 		return false;

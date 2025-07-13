@@ -26,6 +26,9 @@ importers:
       jsonrepair:
         specifier: 3.13.0
         version: 3.13.0
+      neverthrow:
+        specifier: ^8.2.0
+        version: 8.2.0
       simple-chromium-ai:
         specifier: 0.1.1
         version: 0.1.1

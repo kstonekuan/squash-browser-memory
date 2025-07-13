@@ -3,104 +3,131 @@
  * Centralized location for all Chrome API interactions
  */
 
+import { ok, ResultAsync } from "neverthrow";
+
 // Offscreen document management
 let creatingOffscreenDocument: Promise<void> | null = null;
 let offscreenDocumentReady = false;
 
-export async function ensureOffscreenDocument(): Promise<void> {
+export function ensureOffscreenDocument(): ResultAsync<void, Error> {
 	// Fast path: already confirmed to exist
 	if (offscreenDocumentReady) {
-		return;
+		return ResultAsync.fromSafePromise(Promise.resolve());
 	}
 
-	try {
-		const existingContexts = await chrome.runtime.getContexts({
+	// Check if document exists
+	const checkExisting = ResultAsync.fromPromise(
+		chrome.runtime.getContexts({
 			contextTypes: ["OFFSCREEN_DOCUMENT" as chrome.runtime.ContextType],
 			documentUrls: [chrome.runtime.getURL("offscreen.html")],
-		});
+		}),
+		(error) =>
+			new Error(`Error checking for offscreen document`, { cause: error }),
+	);
 
+	return checkExisting.andThen((existingContexts) => {
 		if (existingContexts.length > 0) {
 			offscreenDocumentReady = true;
-			return;
+			return ok(undefined);
 		}
-	} catch (error) {
-		console.error("[Chrome API] Error checking for offscreen document:", error);
-	}
 
-	// If already creating, wait for it
-	if (creatingOffscreenDocument) {
-		console.debug(
-			"[Chrome API] Offscreen document creation in progress, waiting...",
+		// If already creating, wait for it
+		if (creatingOffscreenDocument) {
+			console.debug(
+				"[Chrome API] Offscreen document creation in progress, waiting...",
+			);
+			return ResultAsync.fromPromise(
+				creatingOffscreenDocument,
+				(error) =>
+					new Error(`Failed to create offscreen document`, { cause: error }),
+			);
+		}
+
+		console.debug("[Chrome API] Creating offscreen document...");
+
+		// Create new document
+		creatingOffscreenDocument = chrome.offscreen
+			.createDocument({
+				url: "offscreen.html",
+				reasons: ["DOM_PARSER" as chrome.offscreen.Reason],
+				justification:
+					"AI analysis of browsing history in the background requires long-living offscreen document",
+			})
+			.then(() => {
+				offscreenDocumentReady = true;
+				console.log("[Chrome API] Offscreen document created successfully");
+			})
+			.finally(() => {
+				creatingOffscreenDocument = null;
+			});
+
+		return ResultAsync.fromPromise(
+			creatingOffscreenDocument,
+			(error) =>
+				new Error(`Failed to create offscreen document`, { cause: error }),
 		);
-		await creatingOffscreenDocument;
-		return;
-	}
-
-	console.debug("[Chrome API] Creating offscreen document...");
-
-	// Create new document
-	creatingOffscreenDocument = chrome.offscreen
-		.createDocument({
-			url: "offscreen.html",
-			reasons: ["DOM_PARSER" as chrome.offscreen.Reason],
-			justification:
-				"AI analysis of browsing history in the background requires long-living offscreen document",
-		})
-		.then(() => {
-			offscreenDocumentReady = true;
-			console.log("[Chrome API] Offscreen document created successfully");
-		})
-		.catch((error) => {
-			console.error("[Chrome API] Failed to create offscreen document:", error);
-			throw error;
-		})
-		.finally(() => {
-			creatingOffscreenDocument = null;
-		});
-
-	await creatingOffscreenDocument;
+	});
 }
 
 // Alarm management
-export async function setAlarm(
+export function setAlarm(
 	name: string,
 	delayInMinutes: number,
-): Promise<void> {
-	await chrome.alarms.clear(name);
-	await chrome.alarms.create(name, { delayInMinutes });
+): ResultAsync<void, Error> {
+	return ResultAsync.fromPromise(
+		chrome.alarms.clear(name),
+		(error) => new Error(`Failed to clear alarm`, { cause: error }),
+	).andThen(() =>
+		ResultAsync.fromPromise(
+			chrome.alarms.create(name, { delayInMinutes }),
+			(error) => new Error(`Failed to create alarm`, { cause: error }),
+		),
+	);
 }
 
-export async function getAlarm(
+export function getAlarm(
 	name: string,
-): Promise<chrome.alarms.Alarm | undefined> {
+): ResultAsync<chrome.alarms.Alarm | undefined, Error> {
 	// Note: @types/chrome incorrectly types this as Promise<Alarm>
 	// but runtime returns undefined when alarm doesn't exist
-	return chrome.alarms.get(name);
+	return ResultAsync.fromPromise(
+		chrome.alarms.get(name),
+		(error) => new Error(`Failed to get alarm`, { cause: error }),
+	);
 }
 
-export async function clearAlarm(name: string): Promise<boolean> {
-	return chrome.alarms.clear(name);
+export function clearAlarm(name: string): ResultAsync<boolean, Error> {
+	return ResultAsync.fromPromise(
+		chrome.alarms.clear(name),
+		(error) => new Error(`Failed to clear alarm`, { cause: error }),
+	);
 }
 
 // History API
-export async function searchHistory(
+export function searchHistory(
 	query: chrome.history.HistoryQuery,
-): Promise<chrome.history.HistoryItem[]> {
-	return new Promise((resolve) => {
-		chrome.history.search(query, (items) => {
-			resolve(items);
-		});
-	});
+): ResultAsync<chrome.history.HistoryItem[], Error> {
+	return ResultAsync.fromPromise(
+		new Promise<chrome.history.HistoryItem[]>((resolve) => {
+			chrome.history.search(query, (items) => {
+				resolve(items);
+			});
+		}),
+		(error) => new Error(`Failed to search history`, { cause: error }),
+	);
 }
 
 // Notification API
-export async function createNotification(
+export function createNotification(
 	notificationId: string,
 	options: chrome.notifications.NotificationCreateOptions,
-): Promise<string> {
-	return new Promise((resolve) => {
-		chrome.notifications.create(notificationId, options, (id) => {
-			resolve(id);
-		});
-	});
+): ResultAsync<string, Error> {
+	return ResultAsync.fromPromise(
+		new Promise<string>((resolve) => {
+			chrome.notifications.create(notificationId, options, (id) => {
+				resolve(id);
+			});
+		}),
+		(error) => new Error(`Failed to create notification`, { cause: error }),
+	);
 }

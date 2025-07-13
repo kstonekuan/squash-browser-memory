@@ -57,46 +57,49 @@ export async function loadMemoryFromServiceWorker(): Promise<AnalysisMemory | nu
  * Load memory from Chrome storage using SuperJSON
  */
 export async function loadMemoryFromStorage(): Promise<AnalysisMemory | null> {
-	try {
-		// Check if we're in an environment with chrome.storage access
-		if (
-			typeof chrome === "undefined" ||
-			!chrome.storage ||
-			!chrome.storage.local
-		) {
-			console.log(
-				"Chrome storage API not available for memory, returning null",
-			);
-			return null;
-		}
-
-		const stored = await getStorageData<AnalysisMemory>(MEMORY_KEY);
-
-		if (!stored) {
-			console.log("No existing memory found in chrome.storage.local");
-			return null;
-		}
-
-		// Check version compatibility
-		if (stored.version !== MEMORY_VERSION) {
-			console.log(
-				`Memory version mismatch (${stored.version} !== ${MEMORY_VERSION}), creating new memory`,
-			);
-			return null;
-		}
-
-		console.log("Loaded memory from chrome.storage.local:", {
-			patterns: stored.patterns.length,
-			lastAnalyzed: stored.lastAnalyzedDate,
-			lastAnalyzedType: typeof stored.lastAnalyzedDate,
-			lastAnalyzedIsDate: stored.lastAnalyzedDate instanceof Date,
-			lastHistoryTimestamp: stored.lastHistoryTimestamp,
-		});
-		return stored;
-	} catch (error) {
-		console.error("Failed to load memory:", error);
+	// Check if we're in an environment with chrome.storage access
+	if (
+		typeof chrome === "undefined" ||
+		!chrome.storage ||
+		!chrome.storage.local
+	) {
+		console.log("Chrome storage API not available for memory, returning null");
 		return null;
 	}
+
+	const storageResult = await getStorageData<AnalysisMemory>(MEMORY_KEY);
+
+	return storageResult.match(
+		(result) => {
+			if (result.type === "not-found") {
+				console.log("No existing memory found in chrome.storage.local");
+				return null;
+			}
+
+			const stored = result.data;
+
+			// Check version compatibility
+			if (stored.version !== MEMORY_VERSION) {
+				console.log(
+					`Memory version mismatch (${stored.version} !== ${MEMORY_VERSION}), creating new memory`,
+				);
+				return null;
+			}
+
+			console.log("Loaded memory from chrome.storage.local:", {
+				patterns: stored.patterns.length,
+				lastAnalyzed: stored.lastAnalyzedDate,
+				lastAnalyzedType: typeof stored.lastAnalyzedDate,
+				lastAnalyzedIsDate: stored.lastAnalyzedDate instanceof Date,
+				lastHistoryTimestamp: stored.lastHistoryTimestamp,
+			});
+			return stored;
+		},
+		(error) => {
+			console.error("Failed to load memory from storage:", error);
+			return null;
+		},
+	);
 }
 
 /**
@@ -118,39 +121,41 @@ export async function saveMemoryToServiceWorker(
 export async function saveMemoryToStorage(
 	memory: AnalysisMemory,
 ): Promise<void> {
-	try {
-		// Check if we're in an environment with chrome.storage access
-		if (
-			typeof chrome === "undefined" ||
-			!chrome.storage ||
-			!chrome.storage.local
-		) {
-			console.log(
-				"Chrome storage API not available for saving memory, skipping",
-			);
-			return;
-		}
-
-		// SuperJSON handles Date serialization automatically
-		await setStorageData(MEMORY_KEY, memory);
-		console.log("[Memory] Saved to chrome.storage.local:", {
-			key: MEMORY_KEY,
-			patterns: memory.patterns.length,
-			lastAnalyzedDate: memory.lastAnalyzedDate,
-			lastAnalyzedType: typeof memory.lastAnalyzedDate,
-			lastAnalyzedIsDate: memory.lastAnalyzedDate instanceof Date,
-			lastHistoryTimestamp: memory.lastHistoryTimestamp,
-			userProfile: {
-				coreIdentities:
-					memory.userProfile?.stableTraits?.coreIdentities?.length || 0,
-				currentTasks:
-					memory.userProfile?.dynamicContext?.currentTasks?.length || 0,
-				summary: memory.userProfile?.summary || "No summary",
-			},
-		});
-	} catch (error) {
-		console.error("Failed to save memory:", error);
+	// Check if we're in an environment with chrome.storage access
+	if (
+		typeof chrome === "undefined" ||
+		!chrome.storage ||
+		!chrome.storage.local
+	) {
+		console.log("Chrome storage API not available for saving memory, skipping");
+		return;
 	}
+
+	// SuperJSON handles Date serialization automatically
+	const saveResult = await setStorageData(MEMORY_KEY, memory);
+
+	saveResult.match(
+		() => {
+			console.log("[Memory] Saved to chrome.storage.local:", {
+				key: MEMORY_KEY,
+				patterns: memory.patterns.length,
+				lastAnalyzedDate: memory.lastAnalyzedDate,
+				lastAnalyzedType: typeof memory.lastAnalyzedDate,
+				lastAnalyzedIsDate: memory.lastAnalyzedDate instanceof Date,
+				lastHistoryTimestamp: memory.lastHistoryTimestamp,
+				userProfile: {
+					coreIdentities:
+						memory.userProfile?.stableTraits?.coreIdentities?.length || 0,
+					currentTasks:
+						memory.userProfile?.dynamicContext?.currentTasks?.length || 0,
+					summary: memory.userProfile?.summary || "No summary",
+				},
+			});
+		},
+		(error) => {
+			console.error("Failed to save memory:", error);
+		},
+	);
 }
 
 /**
@@ -169,6 +174,10 @@ export async function clearMemoryFromStorage(): Promise<void> {
 		return;
 	}
 
-	await removeStorageData(MEMORY_KEY);
-	console.log("Analysis memory cleared from chrome.storage.local");
+	const removeResult = await removeStorageData(MEMORY_KEY);
+
+	removeResult.match(
+		() => console.log("Analysis memory cleared from chrome.storage.local"),
+		(error) => console.error("Failed to clear memory from storage:", error),
+	);
 }

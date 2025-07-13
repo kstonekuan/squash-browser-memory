@@ -31,7 +31,14 @@ chrome.runtime.onInstalled.addListener(async () => {
 	await clearCorruptedMemory();
 
 	// Create offscreen document on install
-	await ensureOffscreenDocument();
+	const offscreenResult = await ensureOffscreenDocument();
+	if (offscreenResult.isErr()) {
+		console.error(
+			"Failed to create offscreen document:",
+			offscreenResult.error,
+		);
+		throw offscreenResult.error;
+	}
 	console.log("Offscreen document created");
 
 	const settings = await loadAutoAnalysisSettings();
@@ -105,8 +112,8 @@ console.log("[Background] tRPC message handler initialized");
 
 // Initialize offscreen document immediately on service worker start
 // This ensures it's available for all operations
-ensureOffscreenDocument()
-	.then(() => console.log("[Background] Offscreen document ready"))
-	.catch((error) =>
+ensureOffscreenDocument().match(
+	() => console.log("[Background] Offscreen document ready"),
+	(error) =>
 		console.error("[Background] Failed to create offscreen document:", error),
-	);
+);

@@ -17,6 +17,7 @@
 		"@trpc/server": "11.4.3",
 		"date-fns": "4.1.0",
 		"jsonrepair": "3.13.0",
+		"neverthrow": "^8.2.0",
 		"simple-chromium-ai": "0.1.1",
 		"superjson": "2.2.2",
 		"ts-pattern": "5.7.1",

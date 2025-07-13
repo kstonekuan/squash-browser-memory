@@ -47,20 +47,28 @@ async function createNotification(
 		const notificationId = `history-analyzer-${Date.now()}`;
 		const iconUrl = chrome.runtime.getURL("icon-48.png");
 
-		await chromeAPI.createNotification(notificationId, {
-			type: "basic",
-			iconUrl,
-			title,
-			message,
-			priority: type === "error" ? 2 : 1,
-		});
+		const notificationResult = await chromeAPI.createNotification(
+			notificationId,
+			{
+				type: "basic",
+				iconUrl,
+				title,
+				message,
+				priority: type === "error" ? 2 : 1,
+			},
+		);
 
-		// Auto-clear success notifications after 10 seconds
-		if (type === "success") {
-			setTimeout(() => {
-				chrome.notifications.clear(notificationId);
-			}, 10000);
-		}
+		notificationResult.match(
+			// Auto-clear notifications after 10 seconds
+			(notificationId) => {
+				setTimeout(() => {
+					chrome.notifications.clear(notificationId);
+				}, 10000);
+			},
+			(error) => {
+				console.error("[Background] Failed to create notification:", error);
+			},
+		);
 	} catch (error) {
 		console.error("[Background] Failed to create notification:", error);
 	}
@@ -70,10 +78,23 @@ const ALARM_NAME = "hourly-analysis";
 
 // Chrome API adapters
 const chromeAlarmAPI: AlarmAPI = {
-	clear: (name: string) => chromeAPI.clearAlarm(name),
-	create: (name: string, alarmInfo: chrome.alarms.AlarmCreateInfo) =>
-		chromeAPI.setAlarm(name, alarmInfo.delayInMinutes || 0),
-	get: (name: string) => chromeAPI.getAlarm(name),
+	clear: async (name: string) => {
+		const result = await chromeAPI.clearAlarm(name);
+		if (result.isErr()) throw result.error;
+		return result.value;
+	},
+	create: async (name: string, alarmInfo: chrome.alarms.AlarmCreateInfo) => {
+		const result = await chromeAPI.setAlarm(
+			name,
+			alarmInfo.delayInMinutes || 0,
+		);
+		if (result.isErr()) throw result.error;
+	},
+	get: async (name: string) => {
+		const result = await chromeAPI.getAlarm(name);
+		if (result.isErr()) throw result.error;
+		return result.value;
+	},
 };
 
 // Handler functions for tRPC procedures
@@ -200,7 +221,10 @@ export async function handleQueryNextAlarm() {
 
 export async function handleInitializeAI() {
 	console.log("[Background] Initializing AI provider");
-	await chromeAPI.ensureOffscreenDocument();
+	const result = await chromeAPI.ensureOffscreenDocument();
+	if (result.isErr()) {
+		throw result.error;
+	}
 	// Forward the message to the offscreen document
 	await backgroundToOffscreenClient.offscreen.initializeAI.mutate();
 }
@@ -335,7 +359,10 @@ async function runAnalysis(
 
 	try {
 		// Ensure offscreen document exists
-		await chromeAPI.ensureOffscreenDocument();
+		const offscreenResult = await chromeAPI.ensureOffscreenDocument();
+		if (offscreenResult.isErr()) {
+			throw offscreenResult.error;
+		}
 
 		// Send analysis request to offscreen document
 		const result =
@@ -485,12 +512,16 @@ export async function triggerAnalysis(trigger: "manual" | "alarm") {
 		if (trigger === "manual") {
 			// For manual trigger, get last hour of history
 			const searchStartTime = Date.now() - 60 * 60 * 1000; // 1 hour ago
-			historyItems = await chromeAPI.searchHistory({
+			const historyResult = await chromeAPI.searchHistory({
 				text: "",
 				startTime: searchStartTime,
 				endTime: Date.now(),
 				maxResults: 5000,
 			});
+			if (historyResult.isErr()) {
+				throw historyResult.error;
+			}
+			historyItems = historyResult.value;
 		} else {
 			// For alarm trigger, get history since last analysis
 			const memoryResult = await chrome.storage.local.get(
@@ -510,12 +541,16 @@ export async function triggerAnalysis(trigger: "manual" | "alarm") {
 			const searchStartTime =
 				lastTimestamp > 0 ? lastTimestamp + 1 : Date.now() - 60 * 60 * 1000;
 
-			historyItems = await chromeAPI.searchHistory({
+			const historyResult = await chromeAPI.searchHistory({
 				text: "",
 				startTime: searchStartTime,
 				endTime: Date.now(),
 				maxResults: 5000,
 			});
+			if (historyResult.isErr()) {
+				throw historyResult.error;
+			}
+			historyItems = historyResult.value;
 		}
 
 		console.log(
