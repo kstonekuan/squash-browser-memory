@@ -1,63 +1,57 @@
 <script lang="ts">
-import { addMinutes, format, formatDistanceToNow, isAfter } from "date-fns";
+import { format, formatDistanceToNow } from "date-fns";
 import {
-	ambientSettings,
+	getAmbientSettings,
 	toggleAmbientAnalysis as toggleAmbient,
-} from "../stores/ambient-store";
+} from "../state/ambient-settings.svelte";
+import { sidepanelToBackgroundClient } from "../trpc/client";
+import type { AIProviderStatus, AnalysisStatus } from "../types/ui-types";
 import type { AutoAnalysisSettings } from "../utils/ambient";
-import { sendMessage } from "../utils/messaging";
+import { defaultAutoAnalysisSettings } from "../utils/ambient";
 
 let { analysisStatus = { status: "idle" }, aiStatus = "unavailable" } = $props<{
-	analysisStatus?: {
-		status: "idle" | "running" | "completed" | "skipped" | "error";
-		message?: string;
-		itemCount?: number;
-		reason?: string;
-	};
-	aiStatus?:
-		| "available"
-		| "unavailable"
-		| "needs-configuration"
-		| "rate-limited"
-		| "error";
+	analysisStatus?: AnalysisStatus;
+	aiStatus?: AIProviderStatus;
 }>();
 
-let settings = $state<AutoAnalysisSettings>({
-	enabled: false,
-	notifyOnSuccess: true,
-	notifyOnError: true,
-});
+let settings = $state<AutoAnalysisSettings>(defaultAutoAnalysisSettings);
 let loading = $state(false);
 let toggling = $state(false);
 
-// Subscribe to the store
+// Sync with the store state
 $effect(() => {
-	const unsubscribe = ambientSettings.subscribe((value) => {
-		settings = value;
-	});
-
-	return unsubscribe;
+	settings = getAmbientSettings();
 });
 
 // Query actual alarm time on mount and when enabled
-let lastQueriedEnabled = false;
-$effect(() => {
-	// Only query if we're transitioning from disabled to enabled or on first mount
-	if (settings.enabled && !lastQueriedEnabled) {
-		sendMessage("ambient:query-next-alarm")
-			.then((response) => {
-				if (response?.nextRunTime) {
-					ambientSettings.update((s) => ({
-						...s,
-						nextAlarmTime: response.nextRunTime,
-					}));
-				}
-			})
-			.catch(() => {
-				// Ignore errors - background might not be ready
-			});
+// Also refresh periodically to handle sleep/wake scenarios
+let actualNextAlarmTime = $state<number | null>(null);
+
+async function refreshAlarmTime() {
+	if (!settings.enabled) return;
+
+	try {
+		const response =
+			await sidepanelToBackgroundClient.ambient.queryNextAlarm.query();
+		if (response?.nextRunTime) {
+			actualNextAlarmTime = response.nextRunTime;
+		}
+	} catch {
+		// Ignore errors - background might not be ready
 	}
-	lastQueriedEnabled = settings.enabled;
+}
+
+$effect(() => {
+	// Query immediately when enabled changes or on mount
+	if (settings.enabled) {
+		refreshAlarmTime();
+
+		// Refresh every 30 seconds to catch sleep/wake scenarios
+		const interval = setInterval(refreshAlarmTime, 30000);
+		return () => clearInterval(interval);
+	} else {
+		actualNextAlarmTime = null;
+	}
 });
 
 async function toggleAmbientAnalysis() {
@@ -120,12 +114,16 @@ function getStatusColor() {
 }
 
 function getNextAnalysisTime(): string {
-	// If we have the actual alarm time, use it
-	if (settings.nextAlarmTime) {
-		return format(new Date(settings.nextAlarmTime), "p");
+	// Use the actual alarm time we're querying every 30 seconds
+	if (actualNextAlarmTime) {
+		const alarmTime = new Date(actualNextAlarmTime);
+		// Double-check it's in the future (should always be true with our new approach)
+		if (alarmTime.getTime() > Date.now()) {
+			return format(alarmTime, "p");
+		}
 	}
 
-	// Otherwise, estimate based on last run
+	// Fallback: estimate based on last run
 	if (!settings.lastRunTimestamp) {
 		// First run will be in 1 minute
 		const nextTime = new Date(Date.now() + 60000);

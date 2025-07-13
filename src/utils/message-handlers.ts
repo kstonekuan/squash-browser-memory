@@ -4,8 +4,8 @@
  */
 
 import { format } from "date-fns";
+import type { AnalysisProgress } from "../trpc/schemas";
 import { loadAutoAnalysisSettings } from "./ambient";
-import type { AnalysisProgress } from "./messaging";
 
 // Types for our handler functions
 export interface AlarmAPI {
@@ -14,7 +14,7 @@ export interface AlarmAPI {
 		name: string,
 		alarmInfo: chrome.alarms.AlarmCreateInfo,
 	) => Promise<void>;
-	get: (name: string) => Promise<chrome.alarms.Alarm | null>;
+	get: (name: string) => Promise<chrome.alarms.Alarm | undefined>;
 }
 
 // Business logic for auto-analysis toggle
@@ -67,6 +67,28 @@ export async function queryNextAlarmLogic(
 	alarms: AlarmAPI,
 ): Promise<{ nextRunTime?: number; alarmExists: boolean }> {
 	const alarm = await alarms.get(alarmName);
+
+	// If no alarm exists but ambient analysis is enabled, create one
+	if (!alarm) {
+		const settings = await loadAutoAnalysisSettings();
+		if (settings.enabled) {
+			console.log(
+				"[Ambient] No alarm found but ambient is enabled, creating new alarm",
+			);
+			await alarms.clear(alarmName);
+			await alarms.create(alarmName, {
+				delayInMinutes: 60, // Next run in 1 hour
+			});
+
+			// Get the newly created alarm
+			const newAlarm = await alarms.get(alarmName);
+			return {
+				nextRunTime: newAlarm ? newAlarm.scheduledTime : undefined,
+				alarmExists: !!newAlarm,
+			};
+		}
+	}
+
 	return {
 		nextRunTime: alarm ? alarm.scheduledTime : undefined,
 		alarmExists: !!alarm,

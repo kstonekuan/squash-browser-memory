@@ -1,5 +1,6 @@
 <script lang="ts">
 import type { Snippet } from "svelte";
+import { match } from "ts-pattern";
 
 interface Props {
 	title: string;
@@ -26,18 +27,12 @@ let {
 let isOpen = $state(defaultOpen);
 
 function getBadgeClasses(color: string) {
-	switch (color) {
-		case "blue":
-			return "bg-blue-100 text-blue-800";
-		case "green":
-			return "bg-green-100 text-green-800";
-		case "yellow":
-			return "bg-yellow-100 text-yellow-800";
-		case "red":
-			return "bg-red-100 text-red-800";
-		default:
-			return "bg-gray-100 text-gray-800";
-	}
+	return match(color)
+		.with("blue", () => "bg-blue-100 text-blue-800")
+		.with("green", () => "bg-green-100 text-green-800")
+		.with("yellow", () => "bg-yellow-100 text-yellow-800")
+		.with("red", () => "bg-red-100 text-red-800")
+		.otherwise(() => "bg-gray-100 text-gray-800");
 }
 </script>
 
