@@ -12,7 +12,13 @@ let {
 	onRefresh?: () => void;
 }>();
 
-let providerName = $derived(providerType === "chrome" ? "Chrome AI" : "Claude");
+let providerName = $derived(
+	providerType === "chrome"
+		? "Chrome AI"
+		: providerType === "claude"
+			? "Claude"
+			: "Gemini",
+);
 let isRefreshing = $state(false);
 
 async function handleRefresh() {
@@ -58,7 +64,7 @@ function getStatusMessage(status: AIProviderStatus): string {
 
 <div class={`flex items-center gap-2 text-sm ${isRefreshing ? 'text-gray-500' : getStatusColor(status)}`}>
 	<span class="text-lg">{isRefreshing ? '⟳' : getStatusIcon(status)}</span>
-	<span>{isRefreshing ? 'Checking Chrome AI status...' : getStatusMessage(status)}</span>
+	<span>{isRefreshing ? `Checking ${providerName} status...` : getStatusMessage(status)}</span>
 </div>
 
 {#if status === 'needs-configuration'}
@@ -89,7 +95,59 @@ function getStatusMessage(status: AIProviderStatus): string {
 				</button>
 			{/if}
 		{:else}
-			<p class="text-gray-500">Checking Chrome AI status...</p>
+			<p class="text-gray-500">Checking {providerName} status...</p>
+		{/if}
+	</div>
+{:else if status === 'unavailable' && providerName === 'Gemini'}
+	<div class="mt-2 text-xs text-gray-600">
+		{#if !isRefreshing}
+			<p>Gemini API is not available. Please ensure:</p>
+			<ul class="mt-1 ml-4 list-disc">
+				<li>You have a valid Gemini API key</li>
+				<li>Your API key is correctly entered in Advanced Settings</li>
+				<li>Your internet connection is working</li>
+				<li>You have sufficient API quota remaining</li>
+			</ul>
+			<p class="mt-2">
+				Get a free API key from 
+				<a href="https://makersuite.google.com/app/apikey" target="_blank" class="text-blue-600 hover:text-blue-800 underline" rel="noopener">Google AI Studio</a>
+			</p>
+			{#if onRefresh}
+				<button
+					onclick={handleRefresh}
+					class="mt-3 px-3 py-1.5 bg-blue-600 text-white text-xs font-medium rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 cursor-pointer transition-colors duration-150"
+				>
+					Check Status Again
+				</button>
+			{/if}
+		{:else}
+			<p class="text-gray-500">Checking {providerName} status...</p>
+		{/if}
+	</div>
+{:else if status === 'unavailable' && providerName === 'Claude'}
+	<div class="mt-2 text-xs text-gray-600">
+		{#if !isRefreshing}
+			<p>Claude API is not available. Please ensure:</p>
+			<ul class="mt-1 ml-4 list-disc">
+				<li>You have a valid Claude API key</li>
+				<li>Your API key is correctly entered in Advanced Settings</li>
+				<li>Your internet connection is working</li>
+				<li>You have sufficient API credits remaining</li>
+			</ul>
+			<p class="mt-2">
+				Get an API key from 
+				<a href="https://console.anthropic.com/" target="_blank" class="text-blue-600 hover:text-blue-800 underline" rel="noopener">Anthropic Console</a>
+			</p>
+			{#if onRefresh}
+				<button
+					onclick={handleRefresh}
+					class="mt-3 px-3 py-1.5 bg-blue-600 text-white text-xs font-medium rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 cursor-pointer transition-colors duration-150"
+				>
+					Check Status Again
+				</button>
+			{/if}
+		{:else}
+			<p class="text-gray-500">Checking {providerName} status...</p>
 		{/if}
 	</div>
 {:else if status === 'unavailable'}

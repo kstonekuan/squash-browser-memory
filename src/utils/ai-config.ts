@@ -47,7 +47,10 @@ export async function loadAIConfigFromStorage(): Promise<AIProviderConfig> {
 		const result = await chrome.storage.local.get(AI_CONFIG_KEY);
 		const stored = result[AI_CONFIG_KEY];
 
-		if (stored?.provider && ["chrome", "claude"].includes(stored.provider)) {
+		if (
+			stored?.provider &&
+			["chrome", "claude", "gemini"].includes(stored.provider)
+		) {
 			console.log("Loaded AI config:", { provider: stored.provider });
 			return stored;
 		}
@@ -91,6 +94,27 @@ export async function getClaudeApiKey(): Promise<string | undefined> {
 	const config = await loadAIConfigFromStorage();
 	if (config.provider === "claude") {
 		return config.claudeApiKey;
+	}
+	return undefined;
+}
+
+/**
+ * Set Gemini API key
+ */
+export async function setGeminiApiKey(apiKey: string): Promise<void> {
+	const config = await loadAIConfigFromStorage();
+	if (config.provider === "gemini") {
+		await saveAIConfigToStorage({ ...config, geminiApiKey: apiKey });
+	}
+}
+
+/**
+ * Get Gemini API key
+ */
+export async function getGeminiApiKey(): Promise<string | undefined> {
+	const config = await loadAIConfigFromStorage();
+	if (config.provider === "gemini") {
+		return config.geminiApiKey;
 	}
 	return undefined;
 }

@@ -9,11 +9,13 @@ import type {
 	AIProviderType,
 } from "./ai-interface";
 import { ChromeAIProvider } from "./chrome-ai";
+import { GeminiProvider } from "./gemini-provider";
 import { ClaudeProvider } from "./remote-ai";
 
 // Provider instances for singleton pattern
 let chromeProvider: ChromeAIProvider | null = null;
 let claudeProvider: ClaudeProvider | null = null;
+let geminiProvider: GeminiProvider | null = null;
 
 /**
  * Get an AI provider instance based on configuration
@@ -37,6 +39,17 @@ export function getProvider(config: AIProviderConfig): AIProvider {
 
 			return claudeProvider;
 		})
+		.with({ provider: "gemini" }, (conf) => {
+			if (!geminiProvider || conf.geminiApiKey) {
+				geminiProvider = new GeminiProvider(conf.geminiApiKey);
+			}
+
+			if (!geminiProvider) {
+				throw new Error("Could not create Gemini provider instance");
+			}
+
+			return geminiProvider;
+		})
 		.exhaustive();
 }
 
@@ -44,7 +57,7 @@ export function getProvider(config: AIProviderConfig): AIProvider {
  * Get all available provider types
  */
 export function getAvailableProviders(): AIProviderType[] {
-	return ["chrome", "claude"];
+	return ["chrome", "claude", "gemini"];
 }
 
 /**
@@ -54,5 +67,6 @@ export function getProviderDisplayName(type: AIProviderType): string {
 	return match(type)
 		.with("chrome", () => "Chrome AI (Local)")
 		.with("claude", () => "Claude API (Remote)")
+		.with("gemini", () => "Gemini API (Remote)")
 		.exhaustive();
 }

@@ -285,7 +285,10 @@ export async function handleGetAIConfig(): Promise<AIProviderConfig> {
 		const result = await chrome.storage.local.get(AI_CONFIG_KEY);
 		const stored = result[AI_CONFIG_KEY];
 
-		if (stored?.provider && ["chrome", "claude"].includes(stored.provider)) {
+		if (
+			stored?.provider &&
+			["chrome", "claude", "gemini"].includes(stored.provider)
+		) {
 			console.log("[Background] Loaded AI config for offscreen:", {
 				provider: stored.provider,
 			});

@@ -8,9 +8,11 @@ import {
 import type { AIProviderStatus } from "../types/ui-types";
 import {
 	getClaudeApiKey,
+	getGeminiApiKey,
 	loadAIConfigFromStorage,
 	saveAIConfigToStorage,
 	setClaudeApiKey,
+	setGeminiApiKey,
 } from "../utils/ai-config";
 import type { AIProviderType } from "../utils/ai-interface";
 import {
@@ -53,6 +55,7 @@ let showMergeSchema = $state(false);
 // AI Provider state
 let currentProvider = $state<AIProviderType>(currentProviderType);
 let claudeApiKey = $state("");
+let geminiApiKey = $state("");
 let showApiKey = $state(false);
 
 // Auto-analysis state
@@ -70,9 +73,10 @@ $effect(() => {
 	currentProvider = currentProviderType;
 });
 
-// Load Claude API key on mount
+// Load API keys on mount
 (async () => {
 	claudeApiKey = (await getClaudeApiKey()) || "";
+	geminiApiKey = (await getGeminiApiKey()) || "";
 })();
 
 async function handleProviderChange(provider: AIProviderType) {
@@ -83,9 +87,16 @@ async function handleProviderChange(provider: AIProviderType) {
 	onProviderChange?.();
 }
 
-async function handleApiKeyChange() {
+async function handleClaudeApiKeyChange() {
 	if (claudeApiKey.trim()) {
 		await setClaudeApiKey(claudeApiKey.trim());
+	}
+	onProviderChange?.();
+}
+
+async function handleGeminiApiKeyChange() {
+	if (geminiApiKey.trim()) {
+		await setGeminiApiKey(geminiApiKey.trim());
 	}
 	onProviderChange?.();
 }
@@ -191,6 +202,8 @@ function formatLastRunTime(): string {
 													Uses Chrome's built-in AI (local, private, free)
 												{:else if provider === "claude"}
 													Uses Anthropic's Claude API (remote, requires API key)
+												{:else if provider === "gemini"}
+													Uses Google's Gemini API (remote, requires API key)
 												{/if}
 											</div>
 										</div>
@@ -222,12 +235,41 @@ function formatLastRunTime(): string {
 								id="claude-api-key"
 								type={showApiKey ? "text" : "password"}
 								bind:value={claudeApiKey}
-								onblur={handleApiKeyChange}
+								onblur={handleClaudeApiKeyChange}
 								placeholder="sk-ant-api..."
 								class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
 							/>
 							<p class="mt-1 text-xs text-gray-600">
 								Get your API key from <a href="https://console.anthropic.com/" target="_blank" class="text-blue-600 hover:text-blue-800" rel="noopener">Anthropic Console</a>
+							</p>
+						</div>
+					{/if}
+
+					<!-- Gemini API Key Input -->
+					{#if currentProvider === "gemini"}
+						<div class="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+							<div class="flex items-center justify-between mb-2">
+								<label for="gemini-api-key" class="block text-sm font-medium text-gray-700">
+									Gemini API Key
+								</label>
+								<button
+									type="button"
+									onclick={() => showApiKey = !showApiKey}
+									class="text-xs text-blue-600 hover:text-blue-800"
+								>
+									{showApiKey ? 'Hide' : 'Show'}
+								</button>
+							</div>
+							<input
+								id="gemini-api-key"
+								type={showApiKey ? "text" : "password"}
+								bind:value={geminiApiKey}
+								onblur={handleGeminiApiKeyChange}
+								placeholder="AIza..."
+								class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+							/>
+							<p class="mt-1 text-xs text-gray-600">
+								Get your API key from <a href="https://makersuite.google.com/app/apikey" target="_blank" class="text-blue-600 hover:text-blue-800" rel="noopener">Google AI Studio</a>
 							</p>
 						</div>
 					{/if}

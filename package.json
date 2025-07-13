@@ -12,6 +12,7 @@
 	},
 	"dependencies": {
 		"@anthropic-ai/sdk": "0.56.0",
+		"@google/genai": "^1.9.0",
 		"@trpc/client": "11.4.3",
 		"@trpc/server": "11.4.3",
 		"date-fns": "4.1.0",

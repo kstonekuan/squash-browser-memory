@@ -80,7 +80,7 @@ export type AIProviderStatus =
 	| "rate-limited"
 	| "error";
 
-export type AIProviderType = "chrome" | "claude";
+export type AIProviderType = "chrome" | "claude" | "gemini";
 
 /**
  * Configuration for AI providers
@@ -92,4 +92,8 @@ export type AIProviderConfig =
 	| {
 			provider: "claude";
 			claudeApiKey?: string;
+	  }
+	| {
+			provider: "gemini";
+			geminiApiKey?: string;
 	  };
