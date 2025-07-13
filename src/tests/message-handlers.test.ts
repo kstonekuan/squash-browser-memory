@@ -92,7 +92,7 @@ describe("Message Handler Business Logic", () => {
 			const mockAlarms = {
 				clear: vi.fn().mockResolvedValue(true),
 				create: vi.fn().mockResolvedValue(undefined),
-				get: vi.fn().mockResolvedValue(null), // No alarm created
+				get: vi.fn().mockResolvedValue(undefined), // No alarm created
 				onAlarm: {
 					addListener: vi.fn(),
 					removeListener: vi.fn(),

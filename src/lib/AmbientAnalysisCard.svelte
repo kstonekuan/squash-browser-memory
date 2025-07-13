@@ -3,7 +3,6 @@ import { format, formatDistanceToNow } from "date-fns";
 import {
 	getAmbientSettings,
 	toggleAmbientAnalysis as toggleAmbient,
-	updateAmbientSettings,
 } from "../state/ambient-settings.svelte";
 import { sidepanelToBackgroundClient } from "../trpc/client";
 import type { AIProviderStatus, AnalysisStatus } from "../types/ui-types";
@@ -25,24 +24,34 @@ $effect(() => {
 });
 
 // Query actual alarm time on mount and when enabled
-let lastQueriedEnabled = false;
-$effect(() => {
-	// Only query if we're transitioning from disabled to enabled or on first mount
-	if (settings.enabled && !lastQueriedEnabled) {
-		sidepanelToBackgroundClient.ambient.queryNextAlarm
-			.query()
-			.then((response) => {
-				if (response?.nextRunTime) {
-					updateAmbientSettings({
-						nextAlarmTime: response.nextRunTime,
-					});
-				}
-			})
-			.catch(() => {
-				// Ignore errors - background might not be ready
-			});
+// Also refresh periodically to handle sleep/wake scenarios
+let actualNextAlarmTime = $state<number | null>(null);
+
+async function refreshAlarmTime() {
+	if (!settings.enabled) return;
+
+	try {
+		const response =
+			await sidepanelToBackgroundClient.ambient.queryNextAlarm.query();
+		if (response?.nextRunTime) {
+			actualNextAlarmTime = response.nextRunTime;
+		}
+	} catch {
+		// Ignore errors - background might not be ready
 	}
-	lastQueriedEnabled = settings.enabled;
+}
+
+$effect(() => {
+	// Query immediately when enabled changes or on mount
+	if (settings.enabled) {
+		refreshAlarmTime();
+
+		// Refresh every 30 seconds to catch sleep/wake scenarios
+		const interval = setInterval(refreshAlarmTime, 30000);
+		return () => clearInterval(interval);
+	} else {
+		actualNextAlarmTime = null;
+	}
 });
 
 async function toggleAmbientAnalysis() {
@@ -105,12 +114,16 @@ function getStatusColor() {
 }
 
 function getNextAnalysisTime(): string {
-	// If we have the actual alarm time, use it
-	if (settings.nextAlarmTime) {
-		return format(new Date(settings.nextAlarmTime), "p");
+	// Use the actual alarm time we're querying every 30 seconds
+	if (actualNextAlarmTime) {
+		const alarmTime = new Date(actualNextAlarmTime);
+		// Double-check it's in the future (should always be true with our new approach)
+		if (alarmTime.getTime() > Date.now()) {
+			return format(alarmTime, "p");
+		}
 	}
 
-	// Otherwise, estimate based on last run
+	// Fallback: estimate based on last run
 	if (!settings.lastRunTimestamp) {
 		// First run will be in 1 minute
 		const nextTime = new Date(Date.now() + 60000);

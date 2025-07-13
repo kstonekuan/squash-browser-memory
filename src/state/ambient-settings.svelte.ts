@@ -77,13 +77,6 @@ export async function toggleAmbientAnalysis(): Promise<void> {
 		});
 		throw new Error(response?.error || "Failed to update auto-analysis");
 	}
-
-	// If we have the actual next run time from the alarm, store it
-	if (response.nextRunTime && newEnabled) {
-		updateAmbientSettings({
-			nextAlarmTime: response.nextRunTime,
-		});
-	}
 }
 
 // Helper function to disable ambient analysis (used when AI becomes unavailable)

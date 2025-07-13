@@ -25,3 +25,16 @@ afterAll(() => {
 	console.error = originalConsole.error;
 	console.debug = originalConsole.debug;
 });
+
+// Mock chrome storage API
+// biome-ignore lint/suspicious/noExplicitAny: Required for test mocking
+(global as any).chrome = {
+	storage: {
+		local: {
+			get: vi.fn().mockResolvedValue({}),
+			set: vi.fn().mockResolvedValue(undefined),
+			remove: vi.fn().mockResolvedValue(undefined),
+			clear: vi.fn().mockResolvedValue(undefined),
+		},
+	},
+};

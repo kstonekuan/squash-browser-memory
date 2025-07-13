@@ -72,9 +72,8 @@ export async function setAlarm(
 
 export async function getAlarm(
 	name: string,
-): Promise<chrome.alarms.Alarm | null> {
-	const alarm = await chrome.alarms.get(name);
-	return alarm || null;
+): Promise<chrome.alarms.Alarm | undefined> {
+	return chrome.alarms.get(name);
 }
 
 export async function clearAlarm(name: string): Promise<boolean> {
