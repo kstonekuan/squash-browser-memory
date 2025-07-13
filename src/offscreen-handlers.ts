@@ -79,8 +79,7 @@ export async function handleStartAnalysis(input: {
 	trigger: "manual" | "alarm";
 	memorySettings?: { storeWorkflowPatterns: boolean };
 }) {
-	const { historyItems, customPrompts, analysisId, trigger, memorySettings } =
-		input;
+	const { historyItems, customPrompts, analysisId, memorySettings } = input;
 
 	// Cancel any existing analysis
 	prepareForNewAnalysis(currentAnalysisId, activeAnalyses);
@@ -104,7 +103,6 @@ export async function handleStartAnalysis(input: {
 			aiConfig,
 			customPrompts,
 			createProgressCallback(),
-			trigger,
 			abortController.signal,
 			memorySettings,
 		);

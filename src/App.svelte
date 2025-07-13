@@ -273,8 +273,8 @@ onMount(() => {
 				console.warn("[App] Received status update with no status:", data);
 				return;
 			}
-			match(data.status as "started" | "completed" | "skipped" | "error")
-				.with("started", () => {
+			match(data.status as "running" | "completed" | "skipped" | "error")
+				.with("running", () => {
 					// Determine type from message or current state
 					if (!currentAnalysisType) {
 						currentAnalysisType = data.message?.includes("manual")

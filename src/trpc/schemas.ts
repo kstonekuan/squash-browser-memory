@@ -73,7 +73,7 @@ export const startManualAnalysisInputSchema = z.object({
 
 // Status update schema for broadcasts
 export const statusUpdateSchema = z.object({
-	status: z.enum(["started", "completed", "error", "skipped"]),
+	status: z.enum(["running", "completed", "error", "skipped"]),
 	message: z.string().optional(),
 	itemCount: z.number().optional(),
 	reason: z.string().optional(),
