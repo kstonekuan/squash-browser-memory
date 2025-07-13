@@ -1,6 +1,6 @@
 /**
- * Universal tRPC message handler for Chrome extensions
- * Handles tRPC calls via chrome.runtime.sendMessage
+ * Chrome transport layer for tRPC in extensions
+ * Converts Chrome runtime messages into tRPC procedure calls
  */
 
 import type { AnyRouter } from "@trpc/server";

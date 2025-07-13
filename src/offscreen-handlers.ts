@@ -7,18 +7,18 @@ import { offscreenToBackgroundClient } from "./trpc/client";
 import type { AnalysisProgress } from "./trpc/schemas";
 import { loadAIConfigFromServiceWorker } from "./utils/ai-config";
 import { getProvider } from "./utils/ai-provider-factory";
-import { analyzeHistoryItems, type ProgressCallback } from "./utils/analyzer";
-import {
-	loadMemoryFromServiceWorker,
-	saveMemoryToServiceWorker,
-} from "./utils/memory";
 import {
 	cleanupAnalysis,
 	handleCancelLogic,
 	prepareForNewAnalysis,
 	registerAnalysis,
 	shouldStopKeepalive,
-} from "./utils/message-handlers";
+} from "./utils/analysis-operations";
+import { analyzeHistoryItems, type ProgressCallback } from "./utils/analyzer";
+import {
+	loadMemoryFromServiceWorker,
+	saveMemoryToServiceWorker,
+} from "./utils/memory";
 
 // Track active analyses
 const activeAnalyses = new Map<string, AbortController>();
@@ -79,8 +79,7 @@ export async function handleStartAnalysis(input: {
 	trigger: "manual" | "alarm";
 	memorySettings?: { storeWorkflowPatterns: boolean };
 }) {
-	const { historyItems, customPrompts, analysisId, trigger, memorySettings } =
-		input;
+	const { historyItems, customPrompts, analysisId, memorySettings } = input;
 
 	// Cancel any existing analysis
 	prepareForNewAnalysis(currentAnalysisId, activeAnalyses);
@@ -104,7 +103,6 @@ export async function handleStartAnalysis(input: {
 			aiConfig,
 			customPrompts,
 			createProgressCallback(),
-			trigger,
 			abortController.signal,
 			memorySettings,
 		);

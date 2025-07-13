@@ -6,15 +6,13 @@
 import { format } from "date-fns";
 import { match } from "ts-pattern";
 import { backgroundToOffscreenClient } from "./trpc/client";
-import type { AIStatus, AnalysisProgress, StatusUpdate } from "./trpc/schemas";
+import type { AIStatus, AnalysisProgress } from "./trpc/schemas";
 import type { AnalysisMemory } from "./types";
 import type { AIProviderConfig } from "./utils/ai-interface";
 import {
 	loadAutoAnalysisSettings,
 	saveAutoAnalysisSettings,
 } from "./utils/ambient";
-import * as chromeAPI from "./utils/chrome-api";
-import { loadMemoryFromStorage, saveMemoryToStorage } from "./utils/memory";
 import {
 	type AlarmAPI,
 	cancelAnalysisLogic,
@@ -24,7 +22,10 @@ import {
 	handleStartupAlarmCheckLogic,
 	queryNextAlarmLogic,
 	updateProgressMap,
-} from "./utils/message-handlers";
+} from "./utils/analysis-operations";
+import { broadcast } from "./utils/broadcast";
+import * as chromeAPI from "./utils/chrome-api";
+import { loadMemoryFromStorage, saveMemoryToStorage } from "./utils/memory";
 
 // Track analysis state
 let isAnalysisRunning = false;
@@ -35,81 +36,6 @@ const analysisProgressMap = new Map<string, AnalysisProgress>();
 
 // Track active analyses
 const activeAnalyses = new Map<string, boolean>();
-
-// Broadcast analysis status to all extension contexts
-async function broadcastAnalysisStatus(
-	status: "started" | "completed" | "error" | "skipped",
-	details: {
-		message?: string;
-		itemCount?: number;
-		reason?: string;
-		error?: string;
-	},
-): Promise<void> {
-	const update: StatusUpdate = {
-		status,
-		...details,
-	};
-
-	// Send tRPC message to all extension contexts (including sidepanel)
-	// Using chrome.runtime.sendMessage broadcasts to all extension pages
-	try {
-		await chrome.runtime.sendMessage({
-			type: "trpc",
-			target: "sidepanel",
-			path: "statusUpdate",
-			input: update,
-		});
-	} catch {
-		// No listeners or sidepanel not open
-	}
-
-	console.log("[Background] Broadcast status:", status, details);
-}
-
-// Broadcast progress updates to all extension contexts
-async function broadcastProgressUpdate(
-	progress: AnalysisProgress,
-): Promise<void> {
-	// Send tRPC message to all extension contexts (including sidepanel)
-	try {
-		await chrome.runtime.sendMessage({
-			type: "trpc",
-			target: "sidepanel",
-			path: "progressUpdate",
-			input: progress,
-		});
-	} catch {
-		// No listeners or sidepanel not open
-	}
-
-	console.log(
-		"[Background] Broadcast progress:",
-		progress.analysisId,
-		progress.phase,
-	);
-}
-
-// Broadcast AI status updates to all extension contexts
-async function broadcastAIStatusUpdate(aiStatus: AIStatus): Promise<void> {
-	// Send tRPC message to all extension contexts (including sidepanel)
-	try {
-		await chrome.runtime.sendMessage({
-			type: "trpc",
-			target: "sidepanel",
-			path: "aiStatusUpdate",
-			input: aiStatus,
-		});
-	} catch {
-		// No listeners or sidepanel not open
-	}
-
-	console.log(
-		"[Background] Broadcast AI status:",
-		aiStatus.status,
-		aiStatus.error,
-	);
-}
 
 // Create notification using chrome-api wrapper
 async function createNotification(
@@ -185,7 +111,8 @@ export async function handleStartManualAnalysis(input: {
 	const analysisId = `manual-${Date.now()}`;
 	currentAnalysisId = analysisId;
 
-	broadcastAnalysisStatus("started", {
+	broadcast.analysisStatus({
+		status: "running",
 		message: `Starting manual analysis of ${historyItems.length} items...`,
 	});
 
@@ -333,7 +260,6 @@ export async function handleClearPatterns() {
 // Reporting handlers (called by offscreen document)
 export async function handleProgressReport(
 	input: AnalysisProgress,
-	_trpc?: unknown,
 ): Promise<{ success: boolean }> {
 	// Store progress for state queries
 	if (input.analysisId) {
@@ -341,7 +267,7 @@ export async function handleProgressReport(
 	}
 
 	// Broadcast progress to all subscribers
-	broadcastProgressUpdate(input);
+	broadcast.analysisProgress(input);
 
 	return { success: true };
 }
@@ -382,10 +308,9 @@ export async function handleErrorReport(input: {
 
 export async function handleAIStatusReport(
 	input: AIStatus,
-	_trpc?: unknown,
 ): Promise<{ success: boolean }> {
 	// Broadcast AI status to all subscribers
-	broadcastAIStatusUpdate(input);
+	broadcast.aiStatus(input);
 
 	return { success: true };
 }
@@ -424,7 +349,8 @@ async function runAnalysis(
 
 		console.log("[Background] Analysis started successfully:", result);
 
-		broadcastAnalysisStatus("completed", {
+		broadcast.analysisStatus({
+			status: "completed",
 			message: `Analysis completed successfully for ${historyItems.length} items`,
 			itemCount: historyItems.length,
 		});
@@ -454,13 +380,15 @@ async function runAnalysis(
 		// Handle different error types
 		await match(error)
 			.with({ message: "Analysis cancelled" }, async () => {
-				broadcastAnalysisStatus("error", {
+				broadcast.analysisStatus({
+					status: "error",
 					error: "Analysis cancelled",
 					message: "Analysis was cancelled by user",
 				});
 			})
 			.otherwise(async () => {
-				broadcastAnalysisStatus("error", {
+				broadcast.analysisStatus({
+					status: "error",
 					error: errorMessage,
 					message: `Analysis failed: ${errorMessage}`,
 				});
@@ -494,8 +422,8 @@ async function runAnalysis(
 		// Schedule next analysis in 1 hour if auto-analysis is enabled
 		const settings = await loadAutoAnalysisSettings();
 		if (settings.enabled) {
-			await chrome.alarms.clear(ALARM_NAME);
-			await chrome.alarms.create(ALARM_NAME, {
+			await chromeAlarmAPI.clear(ALARM_NAME);
+			await chromeAlarmAPI.create(ALARM_NAME, {
 				delayInMinutes: 60,
 			});
 			console.log("[Background] Next analysis scheduled in 1 hour");
@@ -510,9 +438,23 @@ export async function triggerAnalysis(trigger: "manual" | "alarm") {
 	// Check if analysis is already running
 	if (isAnalysisRunning) {
 		console.log("[Analysis] Analysis already in progress, skipping.");
+
+		// For alarm triggers, reschedule to try again in 60 minutes
+		if (trigger === "alarm") {
+			const settings = await loadAutoAnalysisSettings();
+			if (settings.enabled) {
+				await chromeAlarmAPI.clear(ALARM_NAME);
+				await chromeAlarmAPI.create(ALARM_NAME, {
+					delayInMinutes: 60,
+				});
+				console.log("[Analysis] Rescheduled alarm for next hour");
+			}
+		}
+
 		if (trigger === "manual") {
 			// For manual triggers, notify the user
-			await broadcastAnalysisStatus("skipped", {
+			await broadcast.analysisStatus({
+				status: "skipped",
 				reason: "analysis-already-running",
 				message: "Analysis is already in progress",
 			});
@@ -531,7 +473,8 @@ export async function triggerAnalysis(trigger: "manual" | "alarm") {
 	}
 
 	isAnalysisRunning = true;
-	broadcastAnalysisStatus("started", {
+	broadcast.analysisStatus({
+		status: "running",
 		message: "Checking for new browsing history...",
 	});
 
@@ -589,7 +532,8 @@ export async function triggerAnalysis(trigger: "manual" | "alarm") {
 			});
 
 			isAnalysisRunning = false;
-			await broadcastAnalysisStatus("skipped", {
+			await broadcast.analysisStatus({
+				status: "skipped",
 				reason: "no-new-history",
 				message: "No browsing history to analyze",
 			});
@@ -628,4 +572,26 @@ export async function triggerAnalysis(trigger: "manual" | "alarm") {
 
 export async function handleStartupAlarmCheck() {
 	await handleStartupAlarmCheckLogic(ALARM_NAME, chromeAlarmAPI);
+}
+
+export async function handleVerifyAlarmHealth(): Promise<{
+	healthy: boolean;
+	recreated: boolean;
+}> {
+	const settings = await loadAutoAnalysisSettings();
+	if (!settings.enabled) {
+		return { healthy: true, recreated: false };
+	}
+
+	const alarm = await chromeAlarmAPI.get(ALARM_NAME);
+	if (!alarm) {
+		console.log("[Alarm Health] Missing alarm detected, recreating...");
+		await chromeAlarmAPI.clear(ALARM_NAME);
+		await chromeAlarmAPI.create(ALARM_NAME, {
+			delayInMinutes: 60,
+		});
+		return { healthy: false, recreated: true };
+	}
+
+	return { healthy: true, recreated: false };
 }

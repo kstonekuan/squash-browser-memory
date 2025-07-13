@@ -1,5 +1,5 @@
 {
-	"name": "squash-history-analyzer",
+	"name": "squash-browser-memory",
 	"private": true,
 	"version": "0.0.0",
 	"type": "module",
@@ -20,7 +20,7 @@
 		"simple-chromium-ai": "0.1.1",
 		"superjson": "2.2.2",
 		"ts-pattern": "5.7.1",
-		"zod": "4.0.2"
+		"zod": "4.0.5"
 	},
 	"devDependencies": {
 		"@biomejs/biome": "2.1.1",
@@ -29,14 +29,14 @@
 		"@tailwindcss/forms": "0.5.10",
 		"@tailwindcss/postcss": "4.1.11",
 		"@testing-library/jest-dom": "6.6.3",
-		"@types/chrome": "0.0.332",
+		"@types/chrome": "0.1.0",
 		"@types/dom-chromium-ai": "0.0.9",
-		"@types/node": "24.0.12",
+		"@types/node": "24.0.13",
 		"@vitest/ui": "3.2.4",
 		"jsdom": "26.1.0",
 		"knip": "5.61.3",
 		"postcss": "8.5.6",
-		"svelte": "5.35.5",
+		"svelte": "5.35.6",
 		"svelte-check": "4.2.2",
 		"tailwindcss": "4.1.11",
 		"typescript": "5.8.3",

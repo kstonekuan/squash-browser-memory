@@ -21,6 +21,7 @@ import {
 	handleReadMemory,
 	handleStartManualAnalysis,
 	handleToggleAutoAnalysis,
+	handleVerifyAlarmHealth,
 	handleWriteMemory,
 } from "../background-handlers";
 import type { AnalysisMemory } from "../types";
@@ -82,6 +83,10 @@ export const backgroundRouter = t.router({
 
 		queryNextAlarm: t.procedure.query(async () => {
 			return handleQueryNextAlarm();
+		}),
+
+		verifyAlarmHealth: t.procedure.query(async () => {
+			return handleVerifyAlarmHealth();
 		}),
 	}),
 

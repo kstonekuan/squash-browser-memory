@@ -1,6 +1,7 @@
 /// <reference types="@types/dom-chromium-ai" />
 
 import { createTRPCMessageHandler } from "./trpc/chrome-adapter";
+import { offscreenToBackgroundClient } from "./trpc/client";
 import { offscreenRouter } from "./trpc/offscreen-router";
 
 // ============================================
@@ -30,3 +31,25 @@ const messageHandler = createTRPCMessageHandler(
 chrome.runtime.onMessage.addListener(messageHandler);
 
 console.log("[Offscreen] Document initialized with tRPC message handler");
+
+// Periodic alarm health check (every 5 minutes)
+setInterval(
+	async () => {
+		try {
+			const result =
+				await offscreenToBackgroundClient.ambient.verifyAlarmHealth.query();
+			if (result.recreated) {
+				console.log("[Offscreen] Alarm was recreated during health check");
+			}
+		} catch (error) {
+			// Background might be sleeping, that's ok
+			console.debug(
+				"[Offscreen] Alarm health check failed (background sleeping?):",
+				error,
+			);
+		}
+	},
+	5 * 60 * 1000,
+); // Every 5 minutes
+
+console.log("[Offscreen] Started periodic alarm health checks");

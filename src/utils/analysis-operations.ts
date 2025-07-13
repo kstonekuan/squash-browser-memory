@@ -1,6 +1,6 @@
 /**
- * Pure business logic functions for message handlers
- * These functions contain the core logic separated from the messaging infrastructure
+ * Business logic operations for analysis and alarm management
+ * Pure functions that can be easily tested without Chrome API dependencies
  */
 
 import { format } from "date-fns";

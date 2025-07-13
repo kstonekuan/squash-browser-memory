@@ -7,8 +7,10 @@ import { initTRPC } from "@trpc/server";
 import superjson from "superjson";
 import {
 	type AIStatus,
+	type AnalysisProgress,
 	aiStatusSchema,
 	analysisProgressSchema,
+	type StatusUpdate,
 	statusUpdateSchema,
 } from "./schemas";
 
@@ -26,23 +28,8 @@ const t = initTRPC.context<SidepanelContext>().create({
 
 // Define the procedures that the sidepanel can receive
 export const createSidepanelRouter = (handlers: {
-	onStatusUpdate: (input: {
-		status: "started" | "completed" | "error" | "skipped";
-		message?: string;
-		itemCount?: number;
-		reason?: string;
-		error?: string;
-	}) => void;
-	onProgressUpdate: (input: {
-		analysisId: string;
-		phase: string;
-		subPhase?: string;
-		chunkProgress?: {
-			current: number;
-			total: number;
-			description: string;
-		};
-	}) => void;
+	onStatusUpdate: (input: StatusUpdate) => void;
+	onProgressUpdate: (input: AnalysisProgress) => void;
 	onAIStatusUpdate: (input: AIStatus) => void;
 }) => {
 	return t.router({

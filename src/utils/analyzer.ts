@@ -112,7 +112,6 @@ export async function analyzeHistoryItems(
 	aiConfig: AIProviderConfig,
 	customPrompts?: CustomPrompts,
 	onProgress?: ProgressCallback,
-	_trigger: "manual" | "alarm" = "manual",
 	abortSignal?: AbortSignal,
 	memorySettingsOverride?: { storeWorkflowPatterns: boolean },
 ): Promise<FullAnalysisResult> {

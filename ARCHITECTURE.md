@@ -167,7 +167,7 @@ A key feature of the extension is its ability to inject context into popular AI 
 - **DOM Injection**: Dynamically injects a "Context" button into the chat interface using platform-specific selectors.
 - **Input Monitoring**: Listens to the user's input in the chat box.
 
-#### 6.2. Context Matching (`utils/simple-context-matcher.ts`)
+#### 6.2. Context Matching (`content-scripts/universal-context.ts`)
 - **Memory Access**: Retrieves the user's profile and workflow patterns from `chrome.storage.local`.
 - **String Similarity**: As the user types, it uses a simple string similarity algorithm (Dice's Coefficient) to find relevant context from memory.
 - **Suggestion UI**: Displays relevant suggestions in a dropdown panel, allowing the user to insert them into their prompt.
