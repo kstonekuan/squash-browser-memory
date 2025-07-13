@@ -491,8 +491,8 @@ async function runAnalysis(
 		// Schedule next analysis in 1 hour if auto-analysis is enabled
 		const settings = await loadAutoAnalysisSettings();
 		if (settings.enabled) {
-			await chrome.alarms.clear(ALARM_NAME);
-			await chrome.alarms.create(ALARM_NAME, {
+			await chromeAlarmAPI.clear(ALARM_NAME);
+			await chromeAlarmAPI.create(ALARM_NAME, {
 				delayInMinutes: 60,
 			});
 			console.log("[Background] Next analysis scheduled in 1 hour");
@@ -507,6 +507,19 @@ export async function triggerAnalysis(trigger: "manual" | "alarm") {
 	// Check if analysis is already running
 	if (isAnalysisRunning) {
 		console.log("[Analysis] Analysis already in progress, skipping.");
+
+		// For alarm triggers, reschedule to try again in 60 minutes
+		if (trigger === "alarm") {
+			const settings = await loadAutoAnalysisSettings();
+			if (settings.enabled) {
+				await chromeAlarmAPI.clear(ALARM_NAME);
+				await chromeAlarmAPI.create(ALARM_NAME, {
+					delayInMinutes: 60,
+				});
+				console.log("[Analysis] Rescheduled alarm for next hour");
+			}
+		}
+
 		if (trigger === "manual") {
 			// For manual triggers, notify the user
 			await broadcastAnalysisStatus("skipped", {
@@ -625,4 +638,26 @@ export async function triggerAnalysis(trigger: "manual" | "alarm") {
 
 export async function handleStartupAlarmCheck() {
 	await handleStartupAlarmCheckLogic(ALARM_NAME, chromeAlarmAPI);
+}
+
+export async function handleVerifyAlarmHealth(): Promise<{
+	healthy: boolean;
+	recreated: boolean;
+}> {
+	const settings = await loadAutoAnalysisSettings();
+	if (!settings.enabled) {
+		return { healthy: true, recreated: false };
+	}
+
+	const alarm = await chromeAlarmAPI.get(ALARM_NAME);
+	if (!alarm) {
+		console.log("[Alarm Health] Missing alarm detected, recreating...");
+		await chromeAlarmAPI.clear(ALARM_NAME);
+		await chromeAlarmAPI.create(ALARM_NAME, {
+			delayInMinutes: 60,
+		});
+		return { healthy: false, recreated: true };
+	}
+
+	return { healthy: true, recreated: false };
 }
