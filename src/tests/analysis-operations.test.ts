@@ -1,5 +1,5 @@
 /**
- * Unit tests for pure message handler business logic
+ * Unit tests for analysis operations business logic
  */
 
 import { describe, expect, it, vi } from "vitest";
@@ -17,9 +17,9 @@ import {
 	shouldCreateOffscreenDocument,
 	shouldStopKeepalive,
 	updateProgressMap,
-} from "../utils/message-handlers";
+} from "../utils/analysis-operations";
 
-describe("Message Handler Business Logic", () => {
+describe("Analysis Operations", () => {
 	describe("handleAutoAnalysisToggleLogic", () => {
 		it("should enable auto-analysis and create alarm", async () => {
 			const mockAlarms = {

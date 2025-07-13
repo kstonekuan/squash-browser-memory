@@ -7,18 +7,18 @@ import { offscreenToBackgroundClient } from "./trpc/client";
 import type { AnalysisProgress } from "./trpc/schemas";
 import { loadAIConfigFromServiceWorker } from "./utils/ai-config";
 import { getProvider } from "./utils/ai-provider-factory";
-import { analyzeHistoryItems, type ProgressCallback } from "./utils/analyzer";
-import {
-	loadMemoryFromServiceWorker,
-	saveMemoryToServiceWorker,
-} from "./utils/memory";
 import {
 	cleanupAnalysis,
 	handleCancelLogic,
 	prepareForNewAnalysis,
 	registerAnalysis,
 	shouldStopKeepalive,
-} from "./utils/message-handlers";
+} from "./utils/analysis-operations";
+import { analyzeHistoryItems, type ProgressCallback } from "./utils/analyzer";
+import {
+	loadMemoryFromServiceWorker,
+	saveMemoryToServiceWorker,
+} from "./utils/memory";
 
 // Track active analyses
 const activeAnalyses = new Map<string, AbortController>();
