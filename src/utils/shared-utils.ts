@@ -90,12 +90,10 @@ export async function calculateOptimalChunkSize(
 		try {
 			tokenCount = await measureTokens(testItems);
 			console.log(`Testing ${mid} items: ${tokenCount} tokens`);
-
 		} catch {
 			// If measurement fails, use estimation
 			tokenCount = mid * estimateTokensPerItem;
 			console.log(`Estimating ${mid} items = ${tokenCount} tokens`);
-
 		}
 
 		if (tokenCount <= maxTokens) {
