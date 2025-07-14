@@ -3,7 +3,7 @@
 import { createChromeStorage, getStorageData, setStorageData } from "./storage";
 
 // Settings key for auto-analysis configuration
-export const AUTO_ANALYSIS_SETTINGS_KEY = "auto_analysis_settings";
+import { AUTO_ANALYSIS_SETTINGS_KEY } from "./storage-keys";
 
 export interface AutoAnalysisSettings {
 	enabled: boolean;
@@ -29,10 +29,7 @@ export async function loadAutoAnalysisSettings(): Promise<AutoAnalysisSettings> 
 		return defaultAutoAnalysisSettings;
 	}
 
-	const result = await getStorageData<AutoAnalysisSettings>(
-		storage,
-		AUTO_ANALYSIS_SETTINGS_KEY,
-	);
+	const result = await getStorageData(storage, AUTO_ANALYSIS_SETTINGS_KEY);
 
 	return result.match(
 		(data) => {
@@ -60,7 +57,7 @@ export async function saveAutoAnalysisSettings(
 		return;
 	}
 
-	const saveResult = await setStorageData<AutoAnalysisSettings>(
+	const saveResult = await setStorageData(
 		storage,
 		AUTO_ANALYSIS_SETTINGS_KEY,
 		settings,

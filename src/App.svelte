@@ -12,7 +12,6 @@ import HistoryFetcher from "./lib/HistoryFetcher.svelte";
 import MemoryViewer from "./lib/MemoryViewer.svelte";
 import { disableAmbientAnalysis } from "./state/ambient-settings.svelte";
 import { createTRPCMessageHandler } from "./trpc/chrome-adapter";
-// All messaging now handled via tRPC
 import { sidepanelToBackgroundClient } from "./trpc/client";
 import { createSidepanelRouter } from "./trpc/sidepanel-router";
 import type { FullAnalysisResult, MemorySettings } from "./types";
@@ -24,6 +23,8 @@ import {
 	loadMemorySettings,
 	saveMemorySettings,
 } from "./utils/memory-settings";
+import { createChromeStorage, getStorageData } from "./utils/storage";
+import { LAST_ANALYSIS_RESULT_KEY } from "./utils/storage-keys";
 
 let analysisResult: FullAnalysisResult | null = $state(null);
 let memoryAutoExpand = $state(false);
@@ -140,10 +141,12 @@ let previousAIStatus = $state<AIProviderStatus | null>(null);
 
 // Effect to disable ambient analysis when AI becomes unavailable
 // Only disable if it was previously available (not on initial load)
+// Don't disable during loading state (provider switching)
 $effect(() => {
 	if (
 		previousAIStatus === "available" &&
 		currentAIStatus !== "available" &&
+		currentAIStatus !== "loading" &&
 		currentAIStatus !== null
 	) {
 		console.log("[App] AI became unavailable, disabling ambient analysis");
@@ -234,14 +237,23 @@ async function checkInitialAIStatus() {
 		const config = await loadAIConfigFromStorage();
 		currentProvider = config.provider;
 
+		// Set loading state while initializing the provider
+		currentAIStatus = "loading";
+
 		// Always rely on offscreen document for AI status, regardless of provider
-		currentAIStatus = "unavailable"; // Default until we hear from offscreen
 		await sidepanelToBackgroundClient.ai.initialize.mutate().catch((error) => {
 			console.log("[App] Error initializing AI:", error);
+			// Only set to unavailable if we're still in loading state
+			if (currentAIStatus === "loading") {
+				currentAIStatus = "unavailable";
+			}
 		});
 	} catch (error) {
 		console.error("Error checking initial AI status:", error);
-		currentAIStatus = "unavailable";
+		// Only set to unavailable if we're still in loading state
+		if (currentAIStatus === "loading") {
+			currentAIStatus = "unavailable";
+		}
 	}
 }
 
@@ -265,6 +277,16 @@ onMount(() => {
 		memorySettings = settings;
 	});
 
+	// Load any previous analysis results
+	const storage = createChromeStorage();
+	if (storage) {
+		getStorageData(storage, LAST_ANALYSIS_RESULT_KEY).then((storedResult) => {
+			if (storedResult.isOk() && storedResult.value) {
+				analysisResult = storedResult.value;
+			}
+		});
+	}
+
 	// Create sidepanel router for receiving broadcasts from background
 	const sidepanelRouter = createSidepanelRouter({
 		onStatusUpdate: (data) => {
@@ -286,7 +308,7 @@ onMount(() => {
 						message: data.message || "Starting analysis...",
 					};
 				})
-				.with("completed", () => {
+				.with("completed", async () => {
 					analysisStatus = {
 						status: "completed",
 						message: data.message || "Analysis completed",
@@ -294,15 +316,25 @@ onMount(() => {
 					};
 
 					// Update UI state
-					if (currentAnalysisType === "manual") {
-						isAnalyzing = false;
-						analysisPhase = "complete";
-						memoryAutoExpand = true;
-					}
+					isAnalyzing = false;
+					analysisPhase = "complete";
+					memoryAutoExpand = true;
 
 					// Clear analysis type
 					currentAnalysisType = null;
 					currentAnalysisId = null;
+
+					// Load results from storage
+					const storage = createChromeStorage();
+					if (storage) {
+						const storedResult = await getStorageData(
+							storage,
+							LAST_ANALYSIS_RESULT_KEY,
+						);
+						if (storedResult.isOk() && storedResult.value) {
+							analysisResult = storedResult.value;
+						}
+					}
 
 					// Reset to idle after 10 seconds
 					setTimeout(() => {
@@ -556,7 +588,9 @@ onMount(() => {
 
 		<!-- Analysis Results -->
 		{#if analysisResult}
-			<AnalysisResults result={analysisResult} onDismiss={handleDismissAnalysis} memorySettings={memorySettings} />
+			<div class="mt-4">
+				<AnalysisResults result={analysisResult} onDismiss={handleDismissAnalysis} memorySettings={memorySettings} />
+			</div>
 		{/if}
 	</div>
 </main>

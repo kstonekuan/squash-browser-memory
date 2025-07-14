@@ -6,19 +6,21 @@ import type { AIProviderStatus } from "../types/ui-types";
 import type { AIProviderType } from "../utils/ai-interface";
 import { loadMemoryFromStorage } from "../utils/memory";
 
+type Props = {
+	isAnalyzing?: boolean;
+	isAmbientAnalysisRunning?: boolean;
+	onAnalysisRequest?: (data: { items: chrome.history.HistoryItem[] }) => void;
+	aiStatus?: AIProviderStatus;
+	provider?: AIProviderType;
+};
+
 let {
 	isAnalyzing = $bindable(false),
 	isAmbientAnalysisRunning = false,
 	onAnalysisRequest = () => {},
 	aiStatus = "unavailable",
 	provider = "chrome",
-} = $props<{
-	isAnalyzing?: boolean;
-	isAmbientAnalysisRunning?: boolean;
-	onAnalysisRequest?: (data: { items: chrome.history.HistoryItem[] }) => void;
-	aiStatus?: AIProviderStatus;
-	provider?: AIProviderType;
-}>();
+}: Props = $props();
 
 let error = $state("");
 type DateRange = "1hour" | "3hours" | "day" | "week" | "all";

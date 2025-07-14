@@ -6,7 +6,7 @@
 import { offscreenToBackgroundClient } from "./trpc/client";
 import type { AnalysisProgress } from "./trpc/schemas";
 import { loadAIConfigFromServiceWorker } from "./utils/ai-config";
-import { getProvider } from "./utils/ai-provider-factory";
+import { createProvider } from "./utils/ai-provider-factory";
 import {
 	cleanupAnalysis,
 	handleCancelLogic,
@@ -76,7 +76,6 @@ export async function handleStartAnalysis(input: {
 		mergePrompt?: string;
 	};
 	analysisId: string;
-	trigger: "manual" | "alarm";
 	memorySettings?: { storeWorkflowPatterns: boolean };
 }) {
 	const { historyItems, customPrompts, analysisId, memorySettings } = input;
@@ -177,10 +176,22 @@ export async function handleInitializeAI() {
 			status: "initializing",
 		});
 
-		// Get the provider from the factory
-		const provider = getProvider(config);
+		// Always create a fresh provider instance
+		const provider = createProvider(config);
 
-		// Initialize the provider
+		// Check status before initialization
+		const preInitStatus = await provider.getStatus();
+
+		if (preInitStatus === "needs-configuration") {
+			// Report needs configuration status
+			await offscreenToBackgroundClient._internal.reportAIStatus.mutate({
+				status: "error",
+				error: `${provider.getProviderName()} requires API key configuration`,
+			});
+			return { success: false };
+		}
+
+		// Try to initialize the provider
 		await provider.initialize();
 
 		// Check status after initialization

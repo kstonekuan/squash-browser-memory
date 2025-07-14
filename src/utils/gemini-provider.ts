@@ -14,6 +14,9 @@ import type {
 const GEMINI_MODEL = "gemini-2.5-flash";
 const GEMINI_MAX_OUTPUT_TOKENS = 8192;
 
+export const GEMINI_CONSOLE_URL = "https://aistudio.google.com/apikey";
+export const GEMINI_CONSOLE_NAME = "Google AI Studio";
+
 export class GeminiProvider implements AIProvider {
 	private apiKey?: string;
 	private client?: GoogleGenAI;
@@ -36,14 +39,8 @@ export class GeminiProvider implements AIProvider {
 		// Test API key validity with a minimal request
 		try {
 			await this.client.models.generateContent({
-				model: GEMINI_MODEL,
+				model: "gemini-2.0-flash-lite", // Use a cheaper model for availability check
 				contents: "test",
-				config: {
-					maxOutputTokens: 1,
-					thinkingConfig: {
-						thinkingBudget: 0, // Disable thinking for faster test
-					},
-				},
 			});
 
 			return true;
@@ -220,13 +217,6 @@ export class GeminiProvider implements AIProvider {
 
 	async validateConfiguration(): Promise<boolean> {
 		return this.isAvailable();
-	}
-
-	setApiKey(apiKey: string): void {
-		this.apiKey = apiKey;
-		this.client = new GoogleGenAI({
-			apiKey: apiKey,
-		});
 	}
 
 	getCapabilities(): AIProviderCapabilities {

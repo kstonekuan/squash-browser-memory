@@ -5,36 +5,25 @@
  */
 
 import type { AIProvider, AIProviderConfig } from "./ai-interface";
-import { getProvider } from "./ai-provider-factory";
-
-// Store the current provider instance
-let currentProvider: AIProvider | null = null;
-let isInitialized = false;
+import { createProvider } from "./ai-provider-factory";
 
 /**
- * Get or create an initialized AI provider using the current configuration
+ * Create and initialize a new AI provider instance using the given configuration
  * @param systemPrompt Optional system prompt to use
- * @param config Optional AI provider config to use instead of loading from storage
+ * @param config AI provider config to use
  */
 export async function getInitializedProvider(
 	config: AIProviderConfig,
 	systemPrompt?: string,
 ): Promise<AIProvider | null> {
 	try {
-		const provider = getProvider(config);
+		const provider = createProvider(config);
 
-		// Check if we need to reinitialize (different provider or not initialized)
-		if (currentProvider !== provider || !isInitialized) {
-			currentProvider = provider;
-			await provider.initialize(systemPrompt);
-			isInitialized = true;
-			console.log(`Initialized AI provider: ${provider.getProviderName()}`);
-		} else if (systemPrompt && currentProvider) {
-			// Reinitialize with new system prompt if provided
-			await currentProvider.initialize(systemPrompt);
-		}
+		// Initialize the new provider instance
+		await provider.initialize(systemPrompt);
+		console.log(`Initialized AI provider: ${provider.getProviderName()}`);
 
-		return currentProvider;
+		return provider;
 	} catch (error) {
 		console.error("Failed to initialize AI provider:", error);
 		return null;

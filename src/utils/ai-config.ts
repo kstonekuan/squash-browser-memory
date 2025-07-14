@@ -6,7 +6,7 @@ import { sidepanelToBackgroundClient } from "../trpc/client";
 import type { AIProviderConfig } from "./ai-interface";
 import { createChromeStorage, getStorageData, setStorageData } from "./storage";
 
-const AI_CONFIG_KEY = "ai_provider_config";
+import { AI_CONFIG_KEY } from "./storage-keys";
 
 const DEFAULT_CONFIG: AIProviderConfig = {
 	provider: "chrome",
@@ -40,7 +40,7 @@ export async function loadAIConfigFromStorage(): Promise<AIProviderConfig> {
 		return DEFAULT_CONFIG;
 	}
 
-	const result = await getStorageData<AIProviderConfig>(storage, AI_CONFIG_KEY);
+	const result = await getStorageData(storage, AI_CONFIG_KEY);
 
 	return result.match(
 		(data) => {
@@ -90,10 +90,17 @@ export async function saveAIConfigToStorage(
 /**
  * Set Claude API key
  */
-export async function setClaudeApiKey(apiKey: string): Promise<void> {
+export async function setClaudeApiKey(apiKey: string | null): Promise<void> {
 	const config = await loadAIConfigFromStorage();
+
 	if (config.provider === "claude") {
-		await saveAIConfigToStorage({ ...config, claudeApiKey: apiKey });
+		if (apiKey) {
+			// Update the key
+			await saveAIConfigToStorage({ ...config, claudeApiKey: apiKey });
+		} else {
+			// Remove the key by saving config without it
+			await saveAIConfigToStorage({ provider: "claude" });
+		}
 	}
 }
 
@@ -111,10 +118,17 @@ export async function getClaudeApiKey(): Promise<string | undefined> {
 /**
  * Set Gemini API key
  */
-export async function setGeminiApiKey(apiKey: string): Promise<void> {
+export async function setGeminiApiKey(apiKey: string | null): Promise<void> {
 	const config = await loadAIConfigFromStorage();
+
 	if (config.provider === "gemini") {
-		await saveAIConfigToStorage({ ...config, geminiApiKey: apiKey });
+		if (apiKey) {
+			// Update the key
+			await saveAIConfigToStorage({ ...config, geminiApiKey: apiKey });
+		} else {
+			// Remove the key by saving config without it
+			await saveAIConfigToStorage({ provider: "gemini" });
+		}
 	}
 }
 

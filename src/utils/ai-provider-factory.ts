@@ -9,46 +9,23 @@ import type {
 	AIProviderType,
 } from "./ai-interface";
 import { ChromeAIProvider } from "./chrome-ai";
+import { ClaudeProvider } from "./claude-provider";
 import { GeminiProvider } from "./gemini-provider";
-import { ClaudeProvider } from "./remote-ai";
-
-// Provider instances for singleton pattern
-let chromeProvider: ChromeAIProvider | null = null;
-let claudeProvider: ClaudeProvider | null = null;
-let geminiProvider: GeminiProvider | null = null;
 
 /**
- * Get an AI provider instance based on configuration
+ * Create a new AI provider instance based on configuration
+ * Note: The offscreen document manages provider lifecycle
  */
-export function getProvider(config: AIProviderConfig): AIProvider {
+export function createProvider(config: AIProviderConfig): AIProvider {
 	return match(config)
 		.with({ provider: "chrome" }, () => {
-			if (!chromeProvider) {
-				chromeProvider = new ChromeAIProvider();
-			}
-			return chromeProvider;
+			return new ChromeAIProvider();
 		})
 		.with({ provider: "claude" }, (conf) => {
-			if (!claudeProvider || conf.claudeApiKey) {
-				claudeProvider = new ClaudeProvider(conf.claudeApiKey);
-			}
-
-			if (!claudeProvider) {
-				throw new Error("Could not create Claude provider instance");
-			}
-
-			return claudeProvider;
+			return new ClaudeProvider(conf.claudeApiKey);
 		})
 		.with({ provider: "gemini" }, (conf) => {
-			if (!geminiProvider || conf.geminiApiKey) {
-				geminiProvider = new GeminiProvider(conf.geminiApiKey);
-			}
-
-			if (!geminiProvider) {
-				throw new Error("Could not create Gemini provider instance");
-			}
-
-			return geminiProvider;
+			return new GeminiProvider(conf.geminiApiKey);
 		})
 		.exhaustive();
 }

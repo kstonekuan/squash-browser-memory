@@ -9,10 +9,13 @@ import type { AIProviderStatus, AnalysisStatus } from "../types/ui-types";
 import type { AutoAnalysisSettings } from "../utils/ambient";
 import { defaultAutoAnalysisSettings } from "../utils/ambient";
 
-let { analysisStatus = { status: "idle" }, aiStatus = "unavailable" } = $props<{
+type Props = {
 	analysisStatus?: AnalysisStatus;
 	aiStatus?: AIProviderStatus;
-}>();
+};
+
+let { analysisStatus = { status: "idle" }, aiStatus = "unavailable" }: Props =
+	$props();
 
 let settings = $state<AutoAnalysisSettings>(defaultAutoAnalysisSettings);
 let loading = $state(false);

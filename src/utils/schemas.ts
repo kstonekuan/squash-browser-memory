@@ -139,12 +139,28 @@ const UserProfileOnlySchema = z.object({
 	userProfile: UserProfileSchema,
 });
 
+// Schema for workflow patterns only (no user profile)
+const WorkflowPatternsOnlySchema = z.object({
+	patterns: z
+		.array(WorkflowPatternSchema)
+		.max(15)
+		.describe(
+			"Workflow patterns discovered in browsing history with URLs, frequencies, and automation opportunities",
+		),
+});
+
 // Generate JSON schemas from Zod schemas for Chrome AI
 export const ANALYSIS_SCHEMA = toJSONSchema(AnalysisResultSchema);
 const ANALYSIS_SCHEMA_NO_PATTERNS = toJSONSchema(UserProfileOnlySchema);
+const WORKFLOW_PATTERNS_ONLY_SCHEMA = toJSONSchema(WorkflowPatternsOnlySchema);
 export const CHUNK_SCHEMA = toJSONSchema(ChunkSchema);
 
 // Function to get appropriate schema based on settings
 export function getAnalysisSchema(includePatterns: boolean) {
 	return includePatterns ? ANALYSIS_SCHEMA : ANALYSIS_SCHEMA_NO_PATTERNS;
+}
+
+// Export workflow patterns schema
+export function getWorkflowPatternsSchema() {
+	return WORKFLOW_PATTERNS_ONLY_SCHEMA;
 }

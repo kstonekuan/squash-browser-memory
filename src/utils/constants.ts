@@ -26,6 +26,18 @@ Merge rules:
 - Most specific and recent evidence wins
 - Maintain narrative coherence in the summary`;
 
+export const WORKFLOW_PATTERNS_SYSTEM_PROMPT = `Analyze browsing history to identify recurring workflow patterns and automation opportunities.
+
+Analysis rules:
+- Focus on identifying repetitive sequences of actions and frequently visited site combinations
+- Look for patterns that occur regularly (daily, weekly, or in specific contexts)
+- Identify workflows that could benefit from automation or optimization
+- Consider time-based patterns (morning routines, work hours, evening activities)
+- Group related URLs that form cohesive workflows
+- Provide specific, actionable suggestions for each pattern
+- Rate automation potential based on pattern regularity and complexity
+- Use actual evidence from browsing history, avoid speculation`;
+
 import { format } from "date-fns";
 import type { MemoryData } from "../types";
 

@@ -2,15 +2,17 @@
 import { match } from "ts-pattern";
 import type { AIProviderStatus, AIProviderType } from "../utils/ai-interface";
 
+type Props = {
+	status?: AIProviderStatus;
+	providerType?: AIProviderType;
+	onRefresh?: () => void;
+};
+
 let {
 	status = "unavailable",
 	providerType = "chrome",
 	onRefresh,
-} = $props<{
-	status?: AIProviderStatus;
-	providerType?: AIProviderType;
-	onRefresh?: () => void;
-}>();
+}: Props = $props();
 
 let providerName = $derived(
 	providerType === "chrome"
@@ -38,6 +40,7 @@ function getStatusColor(status: AIProviderStatus): string {
 		.with("available", () => "text-green-600")
 		.with("needs-configuration", () => "text-yellow-600")
 		.with("rate-limited", () => "text-orange-600")
+		.with("loading", () => "text-blue-600")
 		.with("error", "unavailable", () => "text-red-600")
 		.exhaustive();
 }
@@ -47,6 +50,7 @@ function getStatusIcon(status: AIProviderStatus): string {
 		.with("available", () => "✓")
 		.with("needs-configuration", () => "⚙")
 		.with("rate-limited", () => "⏳")
+		.with("loading", () => "⟳")
 		.with("error", "unavailable", () => "✗")
 		.exhaustive();
 }
@@ -57,6 +61,7 @@ function getStatusMessage(status: AIProviderStatus): string {
 		.with("needs-configuration", () => `${providerName} needs configuration`)
 		.with("rate-limited", () => `${providerName} is rate limited`)
 		.with("error", () => `${providerName} has an error`)
+		.with("loading", () => `Loading ${providerName}...`)
 		.with("unavailable", () => `${providerName} is not available`)
 		.exhaustive();
 }

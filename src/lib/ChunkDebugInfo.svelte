@@ -1,10 +1,12 @@
 <script lang="ts">
 import CollapsibleSection from "./CollapsibleSection.svelte";
 
-let { rawResponse = "", error = "" } = $props<{
+type Props = {
 	rawResponse?: string;
 	error?: string;
-}>();
+};
+
+let { rawResponse = "", error = "" }: Props = $props();
 
 function formatJson(json: string): string {
 	try {

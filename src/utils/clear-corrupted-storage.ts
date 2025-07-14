@@ -3,9 +3,6 @@
  * Run this in the background script to fix storage issues
  */
 
-import type { AnalysisMemory, MemorySettings } from "../types";
-import type { AIProviderConfig } from "./ai-interface";
-import type { AutoAnalysisSettings } from "./ambient";
 import {
 	createChromeStorage,
 	getStorageData,
@@ -13,11 +10,7 @@ import {
 	removeStorageData,
 } from "./storage";
 
-interface CustomPrompts {
-	systemPrompt?: string;
-	chunkPrompt?: string;
-	mergePrompt?: string;
-}
+import { storageKeys } from "./storage-keys";
 
 /**
  * Check and clear all corrupted storage data
@@ -39,36 +32,11 @@ export async function clearCorruptedStorage(): Promise<{
 	const errors: string[] = [];
 
 	// Check each storage key with its proper type
-	const checks = [
-		{
-			key: "history_analysis_memory",
-			name: "Analysis Memory",
-			check: () =>
-				getStorageData<AnalysisMemory>(storage, "history_analysis_memory"),
-		},
-		{
-			key: "memory_settings",
-			name: "Memory Settings",
-			check: () => getStorageData<MemorySettings>(storage, "memory_settings"),
-		},
-		{
-			key: "ai_provider_config",
-			name: "AI Provider Config",
-			check: () =>
-				getStorageData<AIProviderConfig>(storage, "ai_provider_config"),
-		},
-		{
-			key: "auto_analysis_settings",
-			name: "Auto Analysis Settings",
-			check: () =>
-				getStorageData<AutoAnalysisSettings>(storage, "auto_analysis_settings"),
-		},
-		{
-			key: "custom_prompts",
-			name: "Custom Prompts",
-			check: () => getStorageData<CustomPrompts>(storage, "custom_prompts"),
-		},
-	];
+	const checks = storageKeys.map((key) => ({
+		key,
+		name: key.replaceAll("_", " "),
+		check: () => getStorageData(storage, key),
+	}));
 
 	for (const { key, name, check } of checks) {
 		try {

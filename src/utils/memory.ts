@@ -17,7 +17,8 @@ export interface HistoryChunk {
 	isFallback?: boolean;
 }
 
-const MEMORY_KEY = "history_analysis_memory";
+import { MEMORY_KEY } from "./storage-keys";
+
 const MEMORY_VERSION = "2.0.0"; // Clean version without legacy support
 
 // Initialize empty memory
@@ -69,10 +70,7 @@ export async function loadMemoryFromStorage(): Promise<AnalysisMemory | null> {
 		return null;
 	}
 
-	const storageResult = await getStorageData<AnalysisMemory>(
-		storage,
-		MEMORY_KEY,
-	);
+	const storageResult = await getStorageData(storage, MEMORY_KEY);
 
 	return storageResult.match(
 		(data) => {

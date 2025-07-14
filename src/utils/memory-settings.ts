@@ -2,7 +2,7 @@ import type { MemorySettings } from "../types";
 import { createChromeStorage, getStorageData, setStorageData } from "./storage";
 
 // Settings key for memory management configuration
-const MEMORY_SETTINGS_KEY = "memory_settings";
+import { MEMORY_SETTINGS_KEY } from "./storage-keys";
 
 // Default memory settings - workflow patterns disabled by default
 const defaultMemorySettings: MemorySettings = {
@@ -17,10 +17,7 @@ export async function loadMemorySettings(): Promise<MemorySettings> {
 		return defaultMemorySettings;
 	}
 
-	const result = await getStorageData<MemorySettings>(
-		storage,
-		MEMORY_SETTINGS_KEY,
-	);
+	const result = await getStorageData(storage, MEMORY_SETTINGS_KEY);
 
 	return result.match(
 		(data) => {

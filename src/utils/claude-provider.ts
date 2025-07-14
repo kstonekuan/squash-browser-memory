@@ -1,7 +1,7 @@
 /// <reference types="@types/dom-chromium-ai" />
 
 /**
- * Remote AI provider implementation using Claude API
+ * Claude AI provider implementation using Anthropic SDK
  */
 
 import Anthropic from "@anthropic-ai/sdk";
@@ -13,6 +13,9 @@ import type {
 
 const CLAUDE_MODEL = "claude-3-5-haiku-latest";
 const CLAUDE_MAX_TOKENS = 8192;
+
+export const CLAUDE_CONSOLE_URL = "https://console.anthropic.com/";
+export const CLAUDE_CONSOLE_NAME = "Anthropic Console";
 
 export class ClaudeProvider implements AIProvider {
 	private apiKey?: string;
@@ -209,14 +212,6 @@ export class ClaudeProvider implements AIProvider {
 
 	async validateConfiguration(): Promise<boolean> {
 		return this.isAvailable();
-	}
-
-	setApiKey(apiKey: string): void {
-		this.apiKey = apiKey;
-		this.client = new Anthropic({
-			apiKey: apiKey,
-			dangerouslyAllowBrowser: true,
-		});
 	}
 
 	getCapabilities(): AIProviderCapabilities {
