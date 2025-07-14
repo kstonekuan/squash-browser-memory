@@ -1,4 +1,4 @@
-// Background service worker for the History Workflow Analyzer extension
+// Background service worker for the Squash extension
 /// <reference types="@types/dom-chromium-ai" />
 
 import {
@@ -25,7 +25,7 @@ chrome.sidePanel
 
 // Listen for installation
 chrome.runtime.onInstalled.addListener(async () => {
-	console.log("History Workflow Analyzer extension installed");
+	console.log("Squash extension installed");
 
 	// Clear any corrupted storage
 	await clearCorruptedStorage();

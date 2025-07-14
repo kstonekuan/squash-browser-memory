@@ -1,8 +1,8 @@
-# Squash History Workflow Analyzer - Architecture Documentation
+# Squash - Architecture Documentation
 
 ## Overview
 
-The **History Workflow Analyzer** is a Chrome browser extension that analyzes browsing history to identify repetitive workflows and behavioral patterns. It uses a dual AI provider model, supporting both Chrome's built-in AI for local processing and remote AI providers for more powerful analysis.
+**Squash** is a Chrome browser extension that adds an invisible memory layer to your browser, compressing every click into portable context for any AI agent. It uses a multi-AI provider model, supporting Chrome's built-in AI for local processing and remote AI providers like Claude and Gemini for more powerful analysis.
 
 ### High-Level Diagram
 
@@ -43,7 +43,8 @@ The **History Workflow Analyzer** is a Chrome browser extension that analyzes br
 | AI Providers                   |
 | ------------------------------ |
 | - Chrome AI (Local, on-device) |
-| - Claude API (Remote)          |
+| - Claude API (Remote)
+- Gemini API (Remote)          |
 +----------------------------------+
 ```
 

@@ -773,6 +773,13 @@ async function analyzeChunkWithSubdivision(
 		// Determine max tokens
 		const maxTokens = capabilities.optimalChunkTokens;
 
+		// Fallback to estimation
+		const providerName = providerForCapabilities.getProviderName();
+		const tokensPerItem =
+			providerName.includes("Claude") || providerName.includes("Gemini")
+				? 50
+				: 25;
+
 		// Calculate optimal size using binary search
 		const optimalSize = await calculateOptimalChunkSize(
 			items,
@@ -782,12 +789,6 @@ async function analyzeChunkWithSubdivision(
 					!capabilities.supportsTokenMeasurement ||
 					!provider.measureInputUsage
 				) {
-					// Fallback to estimation
-					const tokensPerItem = providerForCapabilities
-						.getProviderName()
-						.includes("Claude")
-						? 50
-						: 25;
 					return testItems.length * tokensPerItem;
 				}
 
@@ -798,7 +799,7 @@ async function analyzeChunkWithSubdivision(
 					signal: abortSignal,
 				});
 			},
-			providerForCapabilities.getProviderName().includes("Claude") ? 50 : 25,
+			tokensPerItem,
 			abortSignal,
 		);
 

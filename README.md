@@ -47,6 +47,10 @@ Squash studies your browsing patterns, learns how you work, and automatically pr
 - Get API key from [Anthropic Console](https://console.anthropic.com/)
 - Enter in extension's Advanced Settings
 
+### Gemini API (Remote)
+- Get API key from [Google AI Studio](https://aistudio.google.com/apikey)
+- Enter in extension's Advanced Settings
+
 ## Usage
 
 1. **Ambient Mode**: Enable in Advanced Settings for automatic hourly analysis

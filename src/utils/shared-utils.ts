@@ -85,27 +85,24 @@ export async function calculateOptimalChunkSize(
 		const mid = Math.floor((left + right) / 2);
 		const testItems = items.slice(0, mid);
 
+		let tokenCount: number;
+
 		try {
-			const tokenCount = await measureTokens(testItems);
+			tokenCount = await measureTokens(testItems);
 			console.log(`Testing ${mid} items: ${tokenCount} tokens`);
 
-			if (tokenCount <= maxTokens) {
-				optimalSize = mid;
-				left = mid + 1;
-			} else {
-				right = mid - 1;
-			}
 		} catch {
 			// If measurement fails, use estimation
-			const estimatedTokens = mid * estimateTokensPerItem;
-			console.log(`Estimating ${mid} items = ${estimatedTokens} tokens`);
+			tokenCount = mid * estimateTokensPerItem;
+			console.log(`Estimating ${mid} items = ${tokenCount} tokens`);
 
-			if (estimatedTokens <= maxTokens) {
-				optimalSize = mid;
-				left = mid + 1;
-			} else {
-				right = mid - 1;
-			}
+		}
+
+		if (tokenCount <= maxTokens) {
+			optimalSize = mid;
+			left = mid + 1;
+		} else {
+			right = mid - 1;
 		}
 	}
 
