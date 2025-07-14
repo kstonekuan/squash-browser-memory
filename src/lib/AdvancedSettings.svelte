@@ -38,12 +38,7 @@ import { ANALYSIS_SCHEMA, CHUNK_SCHEMA } from "../utils/schemas";
 import CollapsibleSection from "./CollapsibleSection.svelte";
 import RemoteAIProviderSettings from "./RemoteAIProviderSettings.svelte";
 
-let {
-	onPromptsChange,
-	onProviderChange,
-	aiStatus = "unavailable",
-	currentProviderType = "chrome",
-} = $props<{
+type Props = {
 	onPromptsChange?: (prompts: {
 		system: string;
 		chunk: string;
@@ -52,7 +47,14 @@ let {
 	onProviderChange?: () => void;
 	aiStatus?: AIProviderStatus;
 	currentProviderType?: AIProviderType;
-}>();
+};
+
+let {
+	onPromptsChange,
+	onProviderChange,
+	aiStatus = "unavailable",
+	currentProviderType = "chrome",
+}: Props = $props();
 
 let editableSystemPrompt = $state(ANALYSIS_SYSTEM_PROMPT);
 let editableChunkPrompt = $state(CHUNK_SYSTEM_PROMPT);

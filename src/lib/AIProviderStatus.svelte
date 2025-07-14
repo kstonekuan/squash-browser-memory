@@ -2,15 +2,17 @@
 import { match } from "ts-pattern";
 import type { AIProviderStatus, AIProviderType } from "../utils/ai-interface";
 
+type Props = {
+	status?: AIProviderStatus;
+	providerType?: AIProviderType;
+	onRefresh?: () => void;
+};
+
 let {
 	status = "unavailable",
 	providerType = "chrome",
 	onRefresh,
-} = $props<{
-	status?: AIProviderStatus;
-	providerType?: AIProviderType;
-	onRefresh?: () => void;
-}>();
+}: Props = $props();
 
 let providerName = $derived(
 	providerType === "chrome"

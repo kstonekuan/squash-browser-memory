@@ -7,13 +7,7 @@ export type AnalysisPhase = AnalysisProgress["phase"];
 
 export type SubPhase = NonNullable<AnalysisProgress["subPhase"]>;
 
-let {
-	phase = "idle",
-	chunkProgress = null,
-	onCancel,
-	subPhase = undefined,
-	isAmbientAnalysis = false,
-} = $props<{
+type Props = {
 	phase: AnalysisPhase;
 	chunkProgress?: {
 		current: number;
@@ -23,7 +17,15 @@ let {
 	onCancel?: () => void;
 	subPhase?: SubPhase;
 	isAmbientAnalysis?: boolean;
-}>();
+};
+
+let {
+	phase = "idle",
+	chunkProgress = null,
+	onCancel,
+	subPhase = undefined,
+	isAmbientAnalysis = false,
+}: Props = $props();
 
 const phases = [
 	{

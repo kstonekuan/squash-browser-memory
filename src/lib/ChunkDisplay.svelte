@@ -3,7 +3,11 @@ import { format, formatDistance, isSameDay } from "date-fns";
 import type { ChunkInfo } from "../types";
 import CollapsibleSection from "./CollapsibleSection.svelte";
 
-let { chunks = [] } = $props<{ chunks: ChunkInfo[] }>();
+type Props = {
+	chunks: ChunkInfo[];
+};
+
+let { chunks = [] }: Props = $props();
 
 function formatDateRange(start: Date, end: Date): string {
 	if (isSameDay(start, end)) {

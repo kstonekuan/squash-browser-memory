@@ -23,6 +23,8 @@ import {
 	loadMemorySettings,
 	saveMemorySettings,
 } from "./utils/memory-settings";
+import { createChromeStorage, getStorageData } from "./utils/storage";
+import { LAST_ANALYSIS_RESULT_KEY } from "./utils/storage-keys";
 
 let analysisResult: FullAnalysisResult | null = $state(null);
 let memoryAutoExpand = $state(false);
@@ -275,6 +277,16 @@ onMount(() => {
 		memorySettings = settings;
 	});
 
+	// Load any previous analysis results
+	const storage = createChromeStorage();
+	if (storage) {
+		getStorageData(storage, LAST_ANALYSIS_RESULT_KEY).then((storedResult) => {
+			if (storedResult.isOk() && storedResult.value) {
+				analysisResult = storedResult.value;
+			}
+		});
+	}
+
 	// Create sidepanel router for receiving broadcasts from background
 	const sidepanelRouter = createSidepanelRouter({
 		onStatusUpdate: (data) => {
@@ -296,7 +308,7 @@ onMount(() => {
 						message: data.message || "Starting analysis...",
 					};
 				})
-				.with("completed", () => {
+				.with("completed", async () => {
 					analysisStatus = {
 						status: "completed",
 						message: data.message || "Analysis completed",
@@ -304,15 +316,25 @@ onMount(() => {
 					};
 
 					// Update UI state
-					if (currentAnalysisType === "manual") {
-						isAnalyzing = false;
-						analysisPhase = "complete";
-						memoryAutoExpand = true;
-					}
+					isAnalyzing = false;
+					analysisPhase = "complete";
+					memoryAutoExpand = true;
 
 					// Clear analysis type
 					currentAnalysisType = null;
 					currentAnalysisId = null;
+
+					// Load results from storage
+					const storage = createChromeStorage();
+					if (storage) {
+						const storedResult = await getStorageData(
+							storage,
+							LAST_ANALYSIS_RESULT_KEY,
+						);
+						if (storedResult.isOk() && storedResult.value) {
+							analysisResult = storedResult.value;
+						}
+					}
 
 					// Reset to idle after 10 seconds
 					setTimeout(() => {
@@ -566,7 +588,9 @@ onMount(() => {
 
 		<!-- Analysis Results -->
 		{#if analysisResult}
-			<AnalysisResults result={analysisResult} onDismiss={handleDismissAnalysis} memorySettings={memorySettings} />
+			<div class="mt-4">
+				<AnalysisResults result={analysisResult} onDismiss={handleDismissAnalysis} memorySettings={memorySettings} />
+			</div>
 		{/if}
 	</div>
 </main>

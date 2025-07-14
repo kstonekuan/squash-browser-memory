@@ -10,17 +10,19 @@ interface RemoteProviderConfig {
 	colorClass?: string;
 }
 
+type Props = {
+	provider: RemoteProviderConfig;
+	apiKey: string;
+	showApiKey: boolean;
+	onApiKeyChange: () => void;
+};
+
 let {
 	provider,
 	apiKey = $bindable(""),
 	showApiKey = $bindable(false),
 	onApiKeyChange,
-}: {
-	provider: RemoteProviderConfig;
-	apiKey: string;
-	showApiKey: boolean;
-	onApiKeyChange: () => void;
-} = $props();
+}: Props = $props();
 </script>
 
 <div class="p-3 {provider.colorClass || 'bg-blue-50 border-blue-200'} border rounded-lg">

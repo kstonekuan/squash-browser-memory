@@ -6,10 +6,12 @@ import type { AnalysisMemory, MemorySettings } from "../types";
 import { loadMemoryFromStorage } from "../utils/memory";
 import CollapsibleSection from "./CollapsibleSection.svelte";
 
-const { autoExpand = false, memorySettings } = $props<{
+type Props = {
 	autoExpand?: boolean;
 	memorySettings?: MemorySettings;
-}>();
+};
+
+const { autoExpand = false, memorySettings }: Props = $props();
 
 let showMemory = $state(autoExpand);
 let sectionIsOpen = $state(autoExpand);
