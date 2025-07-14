@@ -7,17 +7,29 @@ import { err, ok, ResultAsync } from "neverthrow";
 import superjson from "superjson";
 
 /**
+ * Create a Chrome storage instance if available
+ * Returns null if Chrome storage API is not available
+ */
+export function createChromeStorage(): chrome.storage.StorageArea | null {
+	if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.local) {
+		return chrome.storage.local;
+	}
+	return null;
+}
+
+/**
  * Store data in Chrome storage with SuperJSON serialization
  * Automatically handles Date objects and other complex types
  */
 export function setStorageData<T>(
+	handle: chrome.storage.StorageArea,
 	key: string,
 	value: T,
 ): ResultAsync<void, Error> {
 	try {
 		const serialized = superjson.stringify(value);
 		return ResultAsync.fromPromise(
-			chrome.storage.local.set({ [key]: serialized }),
+			handle.set({ [key]: serialized }),
 			(error) => {
 				// Check if it's a quota exceeded error
 				if (error instanceof Error && error.message.includes("quota")) {
@@ -39,19 +51,20 @@ export function setStorageData<T>(
  * Automatically restores Date objects and other complex types
  */
 export function getStorageData<T>(
+	handle: chrome.storage.StorageArea,
 	key: string,
-): ResultAsync<{ type: "found"; data: T } | { type: "not-found" }, Error> {
+): ResultAsync<T | null, Error> {
 	return ResultAsync.fromPromise(
-		chrome.storage.local.get(key),
+		handle.get(key),
 		(error) => new Error(`Failed to access storage`, { cause: error }),
 	).andThen((result) => {
 		if (!result[key]) {
-			return ok({ type: "not-found" as const });
+			return ok(null);
 		}
 
 		try {
-			const data = superjson.parse(result[key]) as T;
-			return ok({ type: "found" as const, data });
+			const data = superjson.parse<T>(result[key]);
+			return ok(data);
 		} catch (error) {
 			console.warn(`Failed to deserialize storage data for key "${key}"`);
 			return err(new Error(`Failed to parse storage data`, { cause: error }));
@@ -62,10 +75,28 @@ export function getStorageData<T>(
 /**
  * Remove data from Chrome storage
  */
-export function removeStorageData(key: string): ResultAsync<void, Error> {
+export function removeStorageData(
+	handle: chrome.storage.StorageArea,
+	key: string,
+): ResultAsync<void, Error> {
 	return ResultAsync.fromPromise(
-		chrome.storage.local.remove(key),
+		handle.remove(key),
 		(error) =>
 			new Error(`Failed to remove storage key ${key}`, { cause: error }),
 	);
+}
+
+/**
+ * Check if raw data exists in storage (without deserialization)
+ * Useful for detecting corrupted data
+ */
+export function hasStorageData(
+	handle: chrome.storage.StorageArea,
+	key: string,
+): ResultAsync<boolean, Error> {
+	return ResultAsync.fromPromise(
+		handle.get(key),
+		(error) =>
+			new Error(`Failed to check storage key ${key}`, { cause: error }),
+	).map((result) => result[key] !== undefined);
 }

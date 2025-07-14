@@ -8,6 +8,7 @@ import { match } from "ts-pattern";
 import { backgroundToOffscreenClient } from "./trpc/client";
 import type { AIStatus, AnalysisProgress } from "./trpc/schemas";
 import type { AnalysisMemory } from "./types";
+import { loadAIConfigFromStorage } from "./utils/ai-config";
 import type { AIProviderConfig } from "./utils/ai-interface";
 import {
 	loadAutoAnalysisSettings,
@@ -26,6 +27,8 @@ import {
 import { broadcast } from "./utils/broadcast";
 import * as chromeAPI from "./utils/chrome-api";
 import { loadMemoryFromStorage, saveMemoryToStorage } from "./utils/memory";
+import { loadMemorySettings } from "./utils/memory-settings";
+import { createChromeStorage, getStorageData } from "./utils/storage";
 
 // Track analysis state
 let isAnalysisRunning = false;
@@ -230,28 +233,7 @@ export async function handleInitializeAI() {
 }
 
 export async function handleGetAIConfig(): Promise<AIProviderConfig> {
-	// Directly load config here to avoid import issues
-	try {
-		const AI_CONFIG_KEY = "ai_provider_config";
-		const result = await chrome.storage.local.get(AI_CONFIG_KEY);
-		const stored = result[AI_CONFIG_KEY];
-
-		if (
-			stored?.provider &&
-			["chrome", "claude", "gemini"].includes(stored.provider)
-		) {
-			console.log("[Background] Loaded AI config for offscreen:", {
-				provider: stored.provider,
-			});
-			return stored as AIProviderConfig;
-		}
-
-		console.log("[Background] No valid AI config found, using default");
-		return { provider: "chrome" } as AIProviderConfig;
-	} catch (error) {
-		console.error("[Background] Failed to load AI config:", error);
-		return { provider: "chrome" } as AIProviderConfig;
-	}
+	return loadAIConfigFromStorage();
 }
 
 export async function handleReadMemory() {
@@ -524,10 +506,7 @@ export async function triggerAnalysis(trigger: "manual" | "alarm") {
 			historyItems = historyResult.value;
 		} else {
 			// For alarm trigger, get history since last analysis
-			const memoryResult = await chrome.storage.local.get(
-				"history_analysis_memory",
-			);
-			const memory = memoryResult.history_analysis_memory;
+			const memory = await loadMemoryFromStorage();
 			const lastTimestamp = memory?.lastHistoryTimestamp || 0;
 
 			console.log(
@@ -578,16 +557,25 @@ export async function triggerAnalysis(trigger: "manual" | "alarm") {
 		// Run analysis in service worker
 		console.log("[Analysis] Running analysis in service worker");
 
-		const promptsResult = await chrome.storage.local.get("custom_prompts");
-		const customPrompts = promptsResult.custom_prompts;
+		const storage = createChromeStorage();
+		type CustomPrompts = {
+			systemPrompt?: string;
+			chunkPrompt?: string;
+			mergePrompt?: string;
+		};
+		let customPrompts: CustomPrompts | undefined;
+		if (storage) {
+			const promptsResult = await getStorageData<CustomPrompts>(
+				storage,
+				"custom_prompts",
+			);
+			if (promptsResult.isOk() && promptsResult.value) {
+				customPrompts = promptsResult.value;
+			}
+		}
 
 		// Load memory settings for alarm trigger as well
-		const MEMORY_SETTINGS_KEY = "memory_settings";
-		const memoryResult = await chrome.storage.local.get(MEMORY_SETTINGS_KEY);
-		const memorySettings = {
-			storeWorkflowPatterns: true, // default
-			...(memoryResult[MEMORY_SETTINGS_KEY] || {}),
-		};
+		const memorySettings = await loadMemorySettings();
 
 		const analysisId = `analysis-${Date.now()}`;
 		currentAnalysisId = analysisId;

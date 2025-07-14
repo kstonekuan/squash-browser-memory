@@ -2,7 +2,9 @@
  * AI Provider Configuration Management
  */
 
+import { sidepanelToBackgroundClient } from "../trpc/client";
 import type { AIProviderConfig } from "./ai-interface";
+import { createChromeStorage, getStorageData, setStorageData } from "./storage";
 
 const AI_CONFIG_KEY = "ai_provider_config";
 
@@ -15,8 +17,6 @@ const DEFAULT_CONFIG: AIProviderConfig = {
  */
 export async function loadAIConfigFromServiceWorker(): Promise<AIProviderConfig> {
 	try {
-		// Import tRPC client only when needed to avoid circular dependencies
-		const { sidepanelToBackgroundClient } = await import("../trpc/client");
 		const config = await sidepanelToBackgroundClient.ai.getConfig.query();
 		console.log("Loaded AI config from service worker:", {
 			provider: config.provider,
@@ -33,34 +33,38 @@ export async function loadAIConfigFromServiceWorker(): Promise<AIProviderConfig>
  * Load AI provider configuration from storage
  */
 export async function loadAIConfigFromStorage(): Promise<AIProviderConfig> {
-	try {
-		// Check if we're in an environment with chrome.storage access
-		if (
-			typeof chrome === "undefined" ||
-			!chrome.storage ||
-			!chrome.storage.local
-		) {
-			console.log("Chrome storage API not available, using default config");
-			return DEFAULT_CONFIG;
-		}
-
-		const result = await chrome.storage.local.get(AI_CONFIG_KEY);
-		const stored = result[AI_CONFIG_KEY];
-
-		if (
-			stored?.provider &&
-			["chrome", "claude", "gemini"].includes(stored.provider)
-		) {
-			console.log("Loaded AI config:", { provider: stored.provider });
-			return stored;
-		}
-
-		console.log("No valid AI config found, using default");
-		return DEFAULT_CONFIG;
-	} catch (error) {
-		console.error("Failed to load AI config:", error);
+	// Create storage handle
+	const storage = createChromeStorage();
+	if (!storage) {
+		console.log("Chrome storage API not available, using default config");
 		return DEFAULT_CONFIG;
 	}
+
+	const result = await getStorageData<AIProviderConfig>(storage, AI_CONFIG_KEY);
+
+	return result.match(
+		(data) => {
+			if (!data) {
+				console.log("No AI config found, using default");
+				return DEFAULT_CONFIG;
+			}
+
+			if (
+				data?.provider &&
+				["chrome", "claude", "gemini"].includes(data.provider)
+			) {
+				console.log("Loaded AI config:", { provider: data.provider });
+				return data;
+			}
+
+			console.log("Invalid AI config found, using default");
+			return DEFAULT_CONFIG;
+		},
+		(error) => {
+			console.error("Failed to load AI config:", error);
+			return DEFAULT_CONFIG;
+		},
+	);
 }
 
 /**
@@ -69,12 +73,18 @@ export async function loadAIConfigFromStorage(): Promise<AIProviderConfig> {
 export async function saveAIConfigToStorage(
 	config: AIProviderConfig,
 ): Promise<void> {
-	try {
-		await chrome.storage.local.set({ [AI_CONFIG_KEY]: config });
-		console.log("Saved AI config:", { provider: config.provider });
-	} catch (error) {
-		console.error("Failed to save AI config:", error);
+	const storage = createChromeStorage();
+	if (!storage) {
+		console.log("Chrome storage API not available, cannot save AI config");
+		return;
 	}
+
+	const saveResult = await setStorageData(storage, AI_CONFIG_KEY, config);
+
+	saveResult.match(
+		() => console.log("Saved AI config:", { provider: config.provider }),
+		(error) => console.error("Failed to save AI config:", error),
+	);
 }
 
 /**

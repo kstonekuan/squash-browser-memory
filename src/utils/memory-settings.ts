@@ -1,4 +1,5 @@
 import type { MemorySettings } from "../types";
+import { createChromeStorage, getStorageData, setStorageData } from "./storage";
 
 // Settings key for memory management configuration
 const MEMORY_SETTINGS_KEY = "memory_settings";
@@ -10,34 +11,56 @@ const defaultMemorySettings: MemorySettings = {
 
 // Load memory settings
 export async function loadMemorySettings(): Promise<MemorySettings> {
-	try {
-		const result = await chrome.storage.local.get(MEMORY_SETTINGS_KEY);
-		const loaded = {
-			...defaultMemorySettings,
-			...(result[MEMORY_SETTINGS_KEY] || {}),
-		};
-		console.log(
-			"🔧 Loading memory settings from storage:",
-			result[MEMORY_SETTINGS_KEY],
-		);
-		console.log("🔧 Final loaded settings:", loaded);
-		return loaded;
-	} catch (error) {
-		console.error("Failed to load memory settings:", error);
+	const storage = createChromeStorage();
+	if (!storage) {
+		console.log("🔧 Chrome storage not available, using defaults");
 		return defaultMemorySettings;
 	}
+
+	const result = await getStorageData<MemorySettings>(
+		storage,
+		MEMORY_SETTINGS_KEY,
+	);
+
+	return result.match(
+		(data) => {
+			if (!data) {
+				console.log("🔧 No memory settings found, using defaults");
+				return defaultMemorySettings;
+			}
+
+			const loaded = {
+				...defaultMemorySettings,
+				...data,
+			};
+			console.log("🔧 Loaded memory settings:", loaded);
+			return loaded;
+		},
+		(error) => {
+			console.error("Failed to load memory settings:", error);
+			return defaultMemorySettings;
+		},
+	);
 }
 
 // Save memory settings
 export async function saveMemorySettings(
 	settings: MemorySettings,
 ): Promise<void> {
-	try {
-		await chrome.storage.local.set({
-			[MEMORY_SETTINGS_KEY]: settings,
-		});
-		console.log("Memory settings saved:", settings);
-	} catch (error) {
-		console.error("Failed to save memory settings:", error);
+	const storage = createChromeStorage();
+	if (!storage) {
+		console.log("🔧 Chrome storage not available, cannot save settings");
+		return;
 	}
+
+	const saveResult = await setStorageData(
+		storage,
+		MEMORY_SETTINGS_KEY,
+		settings,
+	);
+
+	saveResult.match(
+		() => console.log("Memory settings saved:", settings),
+		(error) => console.error("Failed to save memory settings:", error),
+	);
 }

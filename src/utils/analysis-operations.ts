@@ -77,7 +77,7 @@ export async function queryNextAlarmLogic(
 			);
 			await alarms.clear(alarmName);
 			await alarms.create(alarmName, {
-				delayInMinutes: 60, // Next run in 1 hour
+				delayInMinutes: 1, // Next run in 1 minute
 			});
 
 			// Get the newly created alarm

@@ -21,12 +21,12 @@ loadAutoAnalysisSettings().then((settings) => {
 // Listen for storage changes to keep the state in sync
 chrome.storage.onChanged.addListener((changes, areaName) => {
 	if (areaName === "local" && changes[AUTO_ANALYSIS_SETTINGS_KEY]) {
-		const newSettings = changes[AUTO_ANALYSIS_SETTINGS_KEY].newValue;
-		if (newSettings) {
-			isUpdatingFromStorage = true;
-			ambientSettingsState = newSettings;
+		// Re-load settings using the proper deserialization
+		isUpdatingFromStorage = true;
+		loadAutoAnalysisSettings().then((settings) => {
+			ambientSettingsState = settings;
 			isUpdatingFromStorage = false;
-		}
+		});
 	}
 });
 

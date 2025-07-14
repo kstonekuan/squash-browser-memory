@@ -110,7 +110,7 @@ function getStatusMessage(status: AIProviderStatus): string {
 			</ul>
 			<p class="mt-2">
 				Get a free API key from 
-				<a href="https://makersuite.google.com/app/apikey" target="_blank" class="text-blue-600 hover:text-blue-800 underline" rel="noopener">Google AI Studio</a>
+				<a href="https://aistudio.google.com/apikey" target="_blank" class="text-blue-600 hover:text-blue-800 underline" rel="noopener">Google AI Studio</a>
 			</p>
 			{#if onRefresh}
 				<button

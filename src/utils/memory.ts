@@ -1,6 +1,11 @@
 import { offscreenToBackgroundClient } from "../trpc/client";
 import type { AnalysisMemory } from "../types";
-import { getStorageData, removeStorageData, setStorageData } from "./storage";
+import {
+	createChromeStorage,
+	getStorageData,
+	removeStorageData,
+	setStorageData,
+} from "./storage";
 
 // Chunk of history for processing
 export interface HistoryChunk {
@@ -57,43 +62,41 @@ export async function loadMemoryFromServiceWorker(): Promise<AnalysisMemory | nu
  * Load memory from Chrome storage using SuperJSON
  */
 export async function loadMemoryFromStorage(): Promise<AnalysisMemory | null> {
-	// Check if we're in an environment with chrome.storage access
-	if (
-		typeof chrome === "undefined" ||
-		!chrome.storage ||
-		!chrome.storage.local
-	) {
+	// Create storage instance
+	const storage = createChromeStorage();
+	if (!storage) {
 		console.log("Chrome storage API not available for memory, returning null");
 		return null;
 	}
 
-	const storageResult = await getStorageData<AnalysisMemory>(MEMORY_KEY);
+	const storageResult = await getStorageData<AnalysisMemory>(
+		storage,
+		MEMORY_KEY,
+	);
 
 	return storageResult.match(
-		(result) => {
-			if (result.type === "not-found") {
+		(data) => {
+			if (!data) {
 				console.log("No existing memory found in chrome.storage.local");
 				return null;
 			}
 
-			const stored = result.data;
-
 			// Check version compatibility
-			if (stored.version !== MEMORY_VERSION) {
+			if (data.version !== MEMORY_VERSION) {
 				console.log(
-					`Memory version mismatch (${stored.version} !== ${MEMORY_VERSION}), creating new memory`,
+					`Memory version mismatch (${data.version} !== ${MEMORY_VERSION}), creating new memory`,
 				);
 				return null;
 			}
 
 			console.log("Loaded memory from chrome.storage.local:", {
-				patterns: stored.patterns.length,
-				lastAnalyzed: stored.lastAnalyzedDate,
-				lastAnalyzedType: typeof stored.lastAnalyzedDate,
-				lastAnalyzedIsDate: stored.lastAnalyzedDate instanceof Date,
-				lastHistoryTimestamp: stored.lastHistoryTimestamp,
+				patterns: data.patterns.length,
+				lastAnalyzed: data.lastAnalyzedDate,
+				lastAnalyzedType: typeof data.lastAnalyzedDate,
+				lastAnalyzedIsDate: data.lastAnalyzedDate instanceof Date,
+				lastHistoryTimestamp: data.lastHistoryTimestamp,
 			});
-			return stored;
+			return data;
 		},
 		(error) => {
 			console.error("Failed to load memory from storage:", error);
@@ -121,18 +124,15 @@ export async function saveMemoryToServiceWorker(
 export async function saveMemoryToStorage(
 	memory: AnalysisMemory,
 ): Promise<void> {
-	// Check if we're in an environment with chrome.storage access
-	if (
-		typeof chrome === "undefined" ||
-		!chrome.storage ||
-		!chrome.storage.local
-	) {
+	// Create storage instance
+	const storage = createChromeStorage();
+	if (!storage) {
 		console.log("Chrome storage API not available for saving memory, skipping");
 		return;
 	}
 
 	// SuperJSON handles Date serialization automatically
-	const saveResult = await setStorageData(MEMORY_KEY, memory);
+	const saveResult = await setStorageData(storage, MEMORY_KEY, memory);
 
 	saveResult.match(
 		() => {
@@ -162,19 +162,16 @@ export async function saveMemoryToStorage(
  * Clear memory from Chrome storage using SuperJSON storage utilities
  */
 export async function clearMemoryFromStorage(): Promise<void> {
-	// Check if we're in an environment with chrome.storage access
-	if (
-		typeof chrome === "undefined" ||
-		!chrome.storage ||
-		!chrome.storage.local
-	) {
+	// Create storage instance
+	const storage = createChromeStorage();
+	if (!storage) {
 		console.log(
 			"Chrome storage API not available for clearing memory, skipping",
 		);
 		return;
 	}
 
-	const removeResult = await removeStorageData(MEMORY_KEY);
+	const removeResult = await removeStorageData(storage, MEMORY_KEY);
 
 	removeResult.match(
 		() => console.log("Analysis memory cleared from chrome.storage.local"),

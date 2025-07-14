@@ -269,7 +269,7 @@ function formatLastRunTime(): string {
 								class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
 							/>
 							<p class="mt-1 text-xs text-gray-600">
-								Get your API key from <a href="https://makersuite.google.com/app/apikey" target="_blank" class="text-blue-600 hover:text-blue-800" rel="noopener">Google AI Studio</a>
+								Get your API key from <a href="https://aistudio.google.com/apikey" target="_blank" class="text-blue-600 hover:text-blue-800" rel="noopener">Google AI Studio</a>
 							</p>
 						</div>
 					{/if}
