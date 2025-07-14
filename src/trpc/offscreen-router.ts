@@ -7,16 +7,11 @@ import { initTRPC } from "@trpc/server";
 import superjson from "superjson";
 import { z } from "zod";
 import {
-	handleApiKeyChange,
 	handleCancelAnalysis,
-	handleCheckAllProvidersStatus,
 	handleInitializeAI,
 	handleStartAnalysis,
 } from "../offscreen-handlers";
-import {
-	providerStatusResultSchema,
-	startAnalysisInputSchema,
-} from "./schemas";
+import { startAnalysisInputSchema } from "./schemas";
 
 // Context available to all procedures
 interface Context {
@@ -48,18 +43,6 @@ export const offscreenRouter = t.router({
 		initializeAI: t.procedure.mutation(async () => {
 			return handleInitializeAI();
 		}),
-
-		checkAllProvidersStatus: t.procedure
-			.output(providerStatusResultSchema)
-			.query(async () => {
-				return handleCheckAllProvidersStatus();
-			}),
-
-		clearProviderCache: t.procedure
-			.input(z.object({ provider: z.enum(["chrome", "claude", "gemini"]) }))
-			.mutation(async ({ input }) => {
-				return handleApiKeyChange(input.provider);
-			}),
 	}),
 });
 

@@ -12,7 +12,6 @@ import HistoryFetcher from "./lib/HistoryFetcher.svelte";
 import MemoryViewer from "./lib/MemoryViewer.svelte";
 import { disableAmbientAnalysis } from "./state/ambient-settings.svelte";
 import { createTRPCMessageHandler } from "./trpc/chrome-adapter";
-// All messaging now handled via tRPC
 import { sidepanelToBackgroundClient } from "./trpc/client";
 import { createSidepanelRouter } from "./trpc/sidepanel-router";
 import type { FullAnalysisResult, MemorySettings } from "./types";

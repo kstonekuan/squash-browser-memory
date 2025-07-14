@@ -5,7 +5,6 @@ import {
 	toggleAmbientAnalysis,
 	updateAmbientSettings,
 } from "../state/ambient-settings.svelte";
-import { sidepanelToBackgroundClient } from "../trpc/client";
 import type { AIProviderStatus } from "../types/ui-types";
 import {
 	getClaudeApiKey,
@@ -73,13 +72,6 @@ let autoAnalysisSettings = $state<AutoAnalysisSettings>(
 	defaultAutoAnalysisSettings,
 );
 
-// Provider status cache for non-current providers
-let providerStatuses = $state<Record<AIProviderType, string>>({
-	chrome: "Unknown",
-	claude: "Unknown",
-	gemini: "Unknown",
-});
-
 // Remote provider configurations
 const remoteProviderConfigs = {
 	claude: {
@@ -130,52 +122,13 @@ function formatProviderStatus(status: AIProviderStatus): string {
 	}
 }
 
-// Load API keys and check provider statuses on mount
-(async () => {
-	claudeApiKey = (await getClaudeApiKey()) || "";
-	geminiApiKey = (await getGeminiApiKey()) || "";
-
-	// Check status of non-current providers
-	checkProviderStatuses();
-})();
-
-// Check the status of all providers
-async function checkProviderStatuses() {
-	try {
-		// Query all provider statuses from the offscreen document
-		const client = sidepanelToBackgroundClient;
-		const result = await client.ai.checkAllProvidersStatus.query();
-
-		if (result.type === "success" && "statuses" in result) {
-			// Update the statuses for non-current providers
-			for (const [provider, status] of Object.entries(result.statuses) as [
-				AIProviderType,
-				AIProviderStatus,
-			][]) {
-				if (provider !== currentProvider) {
-					providerStatuses[provider] = formatProviderStatus(status);
-				}
-			}
-		} else if (result.type === "error" && "message" in result) {
-			console.error("Failed to check provider statuses:", result.message);
-			throw new Error(result.message);
-		}
-	} catch (error) {
-		console.error("Failed to check provider statuses:", error);
-		// Fallback to checking API keys
-		if (currentProvider !== "claude") {
-			const key = await getClaudeApiKey();
-			providerStatuses.claude = key ? "Ready" : "Needs API Key";
-		}
-		if (currentProvider !== "gemini") {
-			const key = await getGeminiApiKey();
-			providerStatuses.gemini = key ? "Ready" : "Needs API Key";
-		}
-		if (currentProvider !== "chrome") {
-			providerStatuses.chrome = "Check availability";
-		}
-	}
-}
+// Load API keys on mount
+$effect(() => {
+	(async () => {
+		claudeApiKey = (await getClaudeApiKey()) || "";
+		geminiApiKey = (await getGeminiApiKey()) || "";
+	})();
+});
 
 async function handleProviderChange(provider: AIProviderType) {
 	currentProvider = provider;
@@ -194,51 +147,39 @@ async function handleProviderChange(provider: AIProviderType) {
 }
 
 async function handleClaudeApiKeyChange() {
+	const newKey = claudeApiKey.trim() || null;
+	const oldKey = await getClaudeApiKey();
+
+	// Only proceed if the key actually changed
+	if (newKey === oldKey) {
+		return;
+	}
+
 	// Save the key even if it's empty (to clear it)
-	await setClaudeApiKey(claudeApiKey.trim() || null);
+	await setClaudeApiKey(newKey);
 
-	// Clear the provider cache when key changes
-	try {
-		await sidepanelToBackgroundClient.ai.clearProviderCache.mutate({
-			provider: "claude",
-		});
-	} catch (error) {
-		console.error("Failed to clear provider cache:", error);
+	// If Claude is the current provider, trigger provider change to update status
+	if (currentProvider === "claude") {
+		onProviderChange?.();
 	}
-
-	// Update status for Claude if it's not the current provider
-	if (currentProvider !== "claude") {
-		providerStatuses.claude = claudeApiKey.trim() ? "Ready" : "Needs API Key";
-	}
-
-	// Re-check all provider statuses after key change
-	checkProviderStatuses();
-
-	onProviderChange?.();
 }
 
 async function handleGeminiApiKeyChange() {
+	const newKey = geminiApiKey.trim() || null;
+	const oldKey = await getGeminiApiKey();
+
+	// Only proceed if the key actually changed
+	if (newKey === oldKey) {
+		return;
+	}
+
 	// Save the key even if it's empty (to clear it)
-	await setGeminiApiKey(geminiApiKey.trim() || null);
+	await setGeminiApiKey(newKey);
 
-	// Clear the provider cache when key changes
-	try {
-		await sidepanelToBackgroundClient.ai.clearProviderCache.mutate({
-			provider: "gemini",
-		});
-	} catch (error) {
-		console.error("Failed to clear provider cache:", error);
+	// If Gemini is the current provider, trigger provider change to update status
+	if (currentProvider === "gemini") {
+		onProviderChange?.();
 	}
-
-	// Update status for Gemini if it's not the current provider
-	if (currentProvider !== "gemini") {
-		providerStatuses.gemini = geminiApiKey.trim() ? "Ready" : "Needs API Key";
-	}
-
-	// Re-check all provider statuses after key change
-	checkProviderStatuses();
-
-	onProviderChange?.();
 }
 
 function handlePromptChange() {
@@ -254,29 +195,6 @@ function resetPrompts() {
 	editableChunkPrompt = CHUNK_SYSTEM_PROMPT;
 	editableMergePrompt = MERGE_SYSTEM_PROMPT;
 	handlePromptChange();
-}
-
-function getProviderStatus(provider: AIProviderType): string {
-	// For the current provider, use the unified status
-	if (provider === currentProvider) {
-		switch (aiStatus) {
-			case "available":
-				return "Available";
-			case "needs-configuration":
-				return "Needs API Key";
-			case "rate-limited":
-				return "Rate Limited";
-			case "error":
-				return "Error";
-			case "loading":
-				return "Loading...";
-			case "unavailable":
-			default:
-				return "Unavailable";
-		}
-	}
-	// For other providers, use the cached status
-	return providerStatuses[provider];
 }
 
 function getStatusColor(status: string): string {
@@ -356,9 +274,6 @@ function formatLastRunTime(): string {
 											</div>
 										</div>
 									</div>
-									<span class={`text-xs font-medium ${getStatusColor(getProviderStatus(provider))}`}>
-										{getProviderStatus(provider)}
-									</span>
 								</label>
 							{/each}
 						</div>
@@ -388,8 +303,8 @@ function formatLastRunTime(): string {
 						<div class="text-sm">
 							<span class="font-medium text-gray-700">Current Provider: </span>
 							<span class="text-gray-900">{getProviderDisplayName(currentProvider)}</span>
-							<span class={`ml-2 text-xs font-medium ${getStatusColor(getProviderStatus(currentProvider))}`}>
-								({getProviderStatus(currentProvider)})
+							<span class={`ml-2 text-xs font-medium ${getStatusColor(formatProviderStatus(aiStatus))}`}>
+								({formatProviderStatus(aiStatus)})
 							</span>
 						</div>
 					</div>

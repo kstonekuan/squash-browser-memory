@@ -214,14 +214,6 @@ export class ClaudeProvider implements AIProvider {
 		return this.isAvailable();
 	}
 
-	setApiKey(apiKey: string): void {
-		this.apiKey = apiKey;
-		this.client = new Anthropic({
-			apiKey: apiKey,
-			dangerouslyAllowBrowser: true,
-		});
-	}
-
 	getCapabilities(): AIProviderCapabilities {
 		return {
 			maxInputTokens: 200000, // Claude 3.5 Haiku supports 200K input tokens

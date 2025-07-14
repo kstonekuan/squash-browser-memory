@@ -9,9 +9,7 @@ import { z } from "zod";
 import {
 	handleAIStatusReport,
 	handleCancelAnalysis,
-	handleCheckAllProvidersStatus,
 	handleClearPatterns,
-	handleClearProviderCache,
 	handleCompleteReport,
 	handleErrorReport,
 	handleGetAIConfig,
@@ -31,7 +29,6 @@ import type { AIProviderConfig } from "../utils/ai-interface";
 import {
 	aiStatusSchema,
 	analysisProgressSchema,
-	providerStatusResultSchema,
 	startManualAnalysisInputSchema,
 } from "./schemas";
 
@@ -102,18 +99,6 @@ export const backgroundRouter = t.router({
 		getConfig: t.procedure.query(async (): Promise<AIProviderConfig> => {
 			return handleGetAIConfig();
 		}),
-
-		checkAllProvidersStatus: t.procedure
-			.output(providerStatusResultSchema)
-			.query(async () => {
-				return handleCheckAllProvidersStatus();
-			}),
-
-		clearProviderCache: t.procedure
-			.input(z.object({ provider: z.enum(["chrome", "claude", "gemini"]) }))
-			.mutation(async ({ input }) => {
-				return handleClearProviderCache(input);
-			}),
 	}),
 
 	// Memory operations

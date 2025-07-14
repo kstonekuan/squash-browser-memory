@@ -219,13 +219,6 @@ export class GeminiProvider implements AIProvider {
 		return this.isAvailable();
 	}
 
-	setApiKey(apiKey: string): void {
-		this.apiKey = apiKey;
-		this.client = new GoogleGenAI({
-			apiKey: apiKey,
-		});
-	}
-
 	getCapabilities(): AIProviderCapabilities {
 		return {
 			maxInputTokens: 2000000, // Gemini 2.5 Flash supports 2M input tokens
