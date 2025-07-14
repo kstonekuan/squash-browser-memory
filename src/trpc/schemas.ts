@@ -61,7 +61,6 @@ export const startAnalysisInputSchema = z.object({
 	historyItems: z.array(historyItemSchema),
 	customPrompts: customPromptsSchema.optional(),
 	analysisId: z.string(),
-	trigger: z.enum(["manual", "alarm"]),
 	memorySettings: memorySettingsSchema.optional(),
 });
 

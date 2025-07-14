@@ -135,9 +135,7 @@ export const backgroundRouter = t.router({
 				}),
 			)
 			.mutation(async ({ input }) => {
-				return handleCompleteReport(
-					input as { analysisId: string; result: unknown },
-				);
+				return handleCompleteReport(input);
 			}),
 
 		reportError: t.procedure

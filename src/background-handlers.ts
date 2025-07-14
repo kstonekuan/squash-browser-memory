@@ -353,7 +353,6 @@ async function runAnalysis(
 				historyItems,
 				customPrompts,
 				analysisId,
-				trigger,
 				memorySettings,
 			});
 

@@ -76,7 +76,6 @@ export async function handleStartAnalysis(input: {
 		mergePrompt?: string;
 	};
 	analysisId: string;
-	trigger: "manual" | "alarm";
 	memorySettings?: { storeWorkflowPatterns: boolean };
 }) {
 	const { historyItems, customPrompts, analysisId, memorySettings } = input;
