@@ -6,7 +6,7 @@ import { sidepanelToBackgroundClient } from "../trpc/client";
 import type { AIProviderConfig } from "./ai-interface";
 import { createChromeStorage, getStorageData, setStorageData } from "./storage";
 
-const AI_CONFIG_KEY = "ai_provider_config";
+import { AI_CONFIG_KEY } from "./storage-keys";
 
 const DEFAULT_CONFIG: AIProviderConfig = {
 	provider: "chrome",
@@ -40,7 +40,7 @@ export async function loadAIConfigFromStorage(): Promise<AIProviderConfig> {
 		return DEFAULT_CONFIG;
 	}
 
-	const result = await getStorageData<AIProviderConfig>(storage, AI_CONFIG_KEY);
+	const result = await getStorageData(storage, AI_CONFIG_KEY);
 
 	return result.match(
 		(data) => {

@@ -5,6 +5,7 @@
 
 import { err, ok, ResultAsync } from "neverthrow";
 import superjson from "superjson";
+import type { StorageKey, StorageSchema } from "./storage-keys";
 
 /**
  * Create a Chrome storage instance if available
@@ -21,10 +22,10 @@ export function createChromeStorage(): chrome.storage.StorageArea | null {
  * Store data in Chrome storage with SuperJSON serialization
  * Automatically handles Date objects and other complex types
  */
-export function setStorageData<T>(
+export function setStorageData<K extends StorageKey>(
 	handle: chrome.storage.StorageArea,
-	key: string,
-	value: T,
+	key: K,
+	value: StorageSchema[K],
 ): ResultAsync<void, Error> {
 	try {
 		const serialized = superjson.stringify(value);
@@ -50,10 +51,10 @@ export function setStorageData<T>(
  * Retrieve data from Chrome storage with SuperJSON deserialization
  * Automatically restores Date objects and other complex types
  */
-export function getStorageData<T>(
+export function getStorageData<K extends StorageKey>(
 	handle: chrome.storage.StorageArea,
-	key: string,
-): ResultAsync<T | null, Error> {
+	key: K,
+): ResultAsync<StorageSchema[K] | null, Error> {
 	return ResultAsync.fromPromise(
 		handle.get(key),
 		(error) => new Error(`Failed to access storage`, { cause: error }),
@@ -63,7 +64,7 @@ export function getStorageData<T>(
 		}
 
 		try {
-			const data = superjson.parse<T>(result[key]);
+			const data = superjson.parse<StorageSchema[K]>(result[key]);
 			return ok(data);
 		} catch (error) {
 			console.warn(`Failed to deserialize storage data for key "${key}"`);

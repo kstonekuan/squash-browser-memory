@@ -29,6 +29,7 @@ import * as chromeAPI from "./utils/chrome-api";
 import { loadMemoryFromStorage, saveMemoryToStorage } from "./utils/memory";
 import { loadMemorySettings } from "./utils/memory-settings";
 import { createChromeStorage, getStorageData } from "./utils/storage";
+import { CUSTOM_PROMPTS_KEY } from "./utils/storage-keys";
 
 // Track analysis state
 let isAnalysisRunning = false;
@@ -565,10 +566,7 @@ export async function triggerAnalysis(trigger: "manual" | "alarm") {
 		};
 		let customPrompts: CustomPrompts | undefined;
 		if (storage) {
-			const promptsResult = await getStorageData<CustomPrompts>(
-				storage,
-				"custom_prompts",
-			);
+			const promptsResult = await getStorageData(storage, CUSTOM_PROMPTS_KEY);
 			if (promptsResult.isOk() && promptsResult.value) {
 				customPrompts = promptsResult.value;
 			}
