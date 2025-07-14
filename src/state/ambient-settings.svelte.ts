@@ -1,11 +1,11 @@
 import { sidepanelToBackgroundClient } from "../trpc/client";
 import type { AutoAnalysisSettings } from "../utils/ambient";
 import {
-	AUTO_ANALYSIS_SETTINGS_KEY,
 	defaultAutoAnalysisSettings,
 	loadAutoAnalysisSettings,
 	saveAutoAnalysisSettings,
 } from "../utils/ambient";
+import { AUTO_ANALYSIS_SETTINGS_KEY } from "../utils/storage-keys";
 
 // Create reactive state using runes
 let ambientSettingsState = $state<AutoAnalysisSettings>(

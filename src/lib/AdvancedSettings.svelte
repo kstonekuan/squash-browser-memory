@@ -84,6 +84,14 @@ async function handleProviderChange(provider: AIProviderType) {
 	const config = await loadAIConfigFromStorage();
 	config.provider = provider;
 	await saveAIConfigToStorage(config);
+
+	// Load the API key for the selected provider if it exists
+	if (provider === "claude") {
+		claudeApiKey = (await getClaudeApiKey()) || "";
+	} else if (provider === "gemini") {
+		geminiApiKey = (await getGeminiApiKey()) || "";
+	}
+
 	onProviderChange?.();
 }
 
