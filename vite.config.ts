@@ -15,6 +15,7 @@ export default defineConfig({
 		outDir: "dist",
 		emptyOutDir: true,
 		modulePreload: false,
+		sourcemap: true,
 		rollupOptions: {
 			input: {
 				sidepanel: "sidepanel.html",
