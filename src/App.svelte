@@ -140,10 +140,12 @@ let previousAIStatus = $state<AIProviderStatus | null>(null);
 
 // Effect to disable ambient analysis when AI becomes unavailable
 // Only disable if it was previously available (not on initial load)
+// Don't disable during loading state (provider switching)
 $effect(() => {
 	if (
 		previousAIStatus === "available" &&
 		currentAIStatus !== "available" &&
+		currentAIStatus !== "loading" &&
 		currentAIStatus !== null
 	) {
 		console.log("[App] AI became unavailable, disabling ambient analysis");
@@ -234,14 +236,23 @@ async function checkInitialAIStatus() {
 		const config = await loadAIConfigFromStorage();
 		currentProvider = config.provider;
 
+		// Set loading state while initializing the provider
+		currentAIStatus = "loading";
+
 		// Always rely on offscreen document for AI status, regardless of provider
-		currentAIStatus = "unavailable"; // Default until we hear from offscreen
 		await sidepanelToBackgroundClient.ai.initialize.mutate().catch((error) => {
 			console.log("[App] Error initializing AI:", error);
+			// Only set to unavailable if we're still in loading state
+			if (currentAIStatus === "loading") {
+				currentAIStatus = "unavailable";
+			}
 		});
 	} catch (error) {
 		console.error("Error checking initial AI status:", error);
-		currentAIStatus = "unavailable";
+		// Only set to unavailable if we're still in loading state
+		if (currentAIStatus === "loading") {
+			currentAIStatus = "unavailable";
+		}
 	}
 }
 

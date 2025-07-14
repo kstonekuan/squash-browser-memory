@@ -6,7 +6,11 @@
 import { format } from "date-fns";
 import { match } from "ts-pattern";
 import { backgroundToOffscreenClient } from "./trpc/client";
-import type { AIStatus, AnalysisProgress } from "./trpc/schemas";
+import type {
+	AIStatus,
+	AnalysisProgress,
+	ProviderStatusResult,
+} from "./trpc/schemas";
 import type { AnalysisMemory } from "./types";
 import { loadAIConfigFromStorage } from "./utils/ai-config";
 import type { AIProviderConfig } from "./utils/ai-interface";
@@ -235,6 +239,33 @@ export async function handleInitializeAI() {
 
 export async function handleGetAIConfig(): Promise<AIProviderConfig> {
 	return loadAIConfigFromStorage();
+}
+
+export async function handleCheckAllProvidersStatus(): Promise<ProviderStatusResult> {
+	console.log("[Background] Checking all providers status");
+	const result = await chromeAPI.ensureOffscreenDocument();
+	if (result.isErr()) {
+		return {
+			type: "error" as const,
+			message: `Failed to create offscreen document: ${result.error.message}`,
+		};
+	}
+	// Forward the message to the offscreen document
+	return await backgroundToOffscreenClient.offscreen.checkAllProvidersStatus.query();
+}
+
+export async function handleClearProviderCache(input: {
+	provider: "chrome" | "claude" | "gemini";
+}) {
+	console.log("[Background] Clearing provider cache for:", input.provider);
+	const result = await chromeAPI.ensureOffscreenDocument();
+	if (result.isErr()) {
+		throw result.error;
+	}
+	// Forward the message to the offscreen document
+	return await backgroundToOffscreenClient.offscreen.clearProviderCache.mutate(
+		input,
+	);
 }
 
 export async function handleReadMemory() {

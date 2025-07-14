@@ -80,7 +80,30 @@ export const statusUpdateSchema = z.object({
 	error: z.string().optional(),
 });
 
+// Provider status result schema
+export const providerStatusResultSchema = z.discriminatedUnion("type", [
+	z.object({
+		type: z.literal("success"),
+		statuses: z.record(
+			z.string(),
+			z.enum([
+				"available",
+				"unavailable",
+				"needs-configuration",
+				"rate-limited",
+				"error",
+				"loading",
+			]),
+		),
+	}),
+	z.object({
+		type: z.literal("error"),
+		message: z.string(),
+	}),
+]);
+
 // Helper type exports
 export type AnalysisProgress = z.infer<typeof analysisProgressSchema>;
 export type StatusUpdate = z.infer<typeof statusUpdateSchema>;
 export type AIStatus = z.infer<typeof aiStatusSchema>;
+export type ProviderStatusResult = z.infer<typeof providerStatusResultSchema>;

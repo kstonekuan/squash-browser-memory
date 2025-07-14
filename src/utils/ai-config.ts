@@ -90,10 +90,17 @@ export async function saveAIConfigToStorage(
 /**
  * Set Claude API key
  */
-export async function setClaudeApiKey(apiKey: string): Promise<void> {
+export async function setClaudeApiKey(apiKey: string | null): Promise<void> {
 	const config = await loadAIConfigFromStorage();
+
 	if (config.provider === "claude") {
-		await saveAIConfigToStorage({ ...config, claudeApiKey: apiKey });
+		if (apiKey) {
+			// Update the key
+			await saveAIConfigToStorage({ ...config, claudeApiKey: apiKey });
+		} else {
+			// Remove the key by saving config without it
+			await saveAIConfigToStorage({ provider: "claude" });
+		}
 	}
 }
 
@@ -111,10 +118,17 @@ export async function getClaudeApiKey(): Promise<string | undefined> {
 /**
  * Set Gemini API key
  */
-export async function setGeminiApiKey(apiKey: string): Promise<void> {
+export async function setGeminiApiKey(apiKey: string | null): Promise<void> {
 	const config = await loadAIConfigFromStorage();
+
 	if (config.provider === "gemini") {
-		await saveAIConfigToStorage({ ...config, geminiApiKey: apiKey });
+		if (apiKey) {
+			// Update the key
+			await saveAIConfigToStorage({ ...config, geminiApiKey: apiKey });
+		} else {
+			// Remove the key by saving config without it
+			await saveAIConfigToStorage({ provider: "gemini" });
+		}
 	}
 }
 

@@ -5,6 +5,7 @@ import {
 	toggleAmbientAnalysis,
 	updateAmbientSettings,
 } from "../state/ambient-settings.svelte";
+import { sidepanelToBackgroundClient } from "../trpc/client";
 import type { AIProviderStatus } from "../types/ui-types";
 import {
 	getClaudeApiKey,
@@ -22,12 +23,21 @@ import {
 import type { AutoAnalysisSettings } from "../utils/ambient";
 import { defaultAutoAnalysisSettings } from "../utils/ambient";
 import {
+	CLAUDE_CONSOLE_NAME,
+	CLAUDE_CONSOLE_URL,
+} from "../utils/claude-provider";
+import {
 	ANALYSIS_SYSTEM_PROMPT,
 	CHUNK_SYSTEM_PROMPT,
 	MERGE_SYSTEM_PROMPT,
 } from "../utils/constants";
+import {
+	GEMINI_CONSOLE_NAME,
+	GEMINI_CONSOLE_URL,
+} from "../utils/gemini-provider";
 import { ANALYSIS_SCHEMA, CHUNK_SCHEMA } from "../utils/schemas";
 import CollapsibleSection from "./CollapsibleSection.svelte";
+import RemoteAIProviderSettings from "./RemoteAIProviderSettings.svelte";
 
 let {
 	onPromptsChange,
@@ -63,6 +73,33 @@ let autoAnalysisSettings = $state<AutoAnalysisSettings>(
 	defaultAutoAnalysisSettings,
 );
 
+// Provider status cache for non-current providers
+let providerStatuses = $state<Record<AIProviderType, string>>({
+	chrome: "Unknown",
+	claude: "Unknown",
+	gemini: "Unknown",
+});
+
+// Remote provider configurations
+const remoteProviderConfigs = {
+	claude: {
+		type: "claude" as AIProviderType,
+		name: "Claude",
+		placeholder: "sk-ant-api...",
+		consoleUrl: CLAUDE_CONSOLE_URL,
+		consoleName: CLAUDE_CONSOLE_NAME,
+		colorClass: "bg-yellow-50 border-yellow-200",
+	},
+	gemini: {
+		type: "gemini" as AIProviderType,
+		name: "Gemini",
+		placeholder: "AIza...",
+		consoleUrl: GEMINI_CONSOLE_URL,
+		consoleName: GEMINI_CONSOLE_NAME,
+		colorClass: "bg-blue-50 border-blue-200",
+	},
+};
+
 // Sync with the store state
 $effect(() => {
 	autoAnalysisSettings = getAmbientSettings();
@@ -73,11 +110,72 @@ $effect(() => {
 	currentProvider = currentProviderType;
 });
 
-// Load API keys on mount
+// Format provider status for display
+function formatProviderStatus(status: AIProviderStatus): string {
+	switch (status) {
+		case "available":
+			return "Available";
+		case "unavailable":
+			return "Not available";
+		case "needs-configuration":
+			return "Needs API Key";
+		case "rate-limited":
+			return "Rate limited";
+		case "error":
+			return "Error";
+		case "loading":
+			return "Checking...";
+		default:
+			return "Unknown";
+	}
+}
+
+// Load API keys and check provider statuses on mount
 (async () => {
 	claudeApiKey = (await getClaudeApiKey()) || "";
 	geminiApiKey = (await getGeminiApiKey()) || "";
+
+	// Check status of non-current providers
+	checkProviderStatuses();
 })();
+
+// Check the status of all providers
+async function checkProviderStatuses() {
+	try {
+		// Query all provider statuses from the offscreen document
+		const client = sidepanelToBackgroundClient;
+		const result = await client.ai.checkAllProvidersStatus.query();
+
+		if (result.type === "success" && "statuses" in result) {
+			// Update the statuses for non-current providers
+			for (const [provider, status] of Object.entries(result.statuses) as [
+				AIProviderType,
+				AIProviderStatus,
+			][]) {
+				if (provider !== currentProvider) {
+					providerStatuses[provider] = formatProviderStatus(status);
+				}
+			}
+		} else if (result.type === "error" && "message" in result) {
+			console.error("Failed to check provider statuses:", result.message);
+			throw new Error(result.message);
+		}
+	} catch (error) {
+		console.error("Failed to check provider statuses:", error);
+		// Fallback to checking API keys
+		if (currentProvider !== "claude") {
+			const key = await getClaudeApiKey();
+			providerStatuses.claude = key ? "Ready" : "Needs API Key";
+		}
+		if (currentProvider !== "gemini") {
+			const key = await getGeminiApiKey();
+			providerStatuses.gemini = key ? "Ready" : "Needs API Key";
+		}
+		if (currentProvider !== "chrome") {
+			providerStatuses.chrome = "Check availability";
+		}
+	}
+}
 
 async function handleProviderChange(provider: AIProviderType) {
 	currentProvider = provider;
@@ -96,16 +194,50 @@ async function handleProviderChange(provider: AIProviderType) {
 }
 
 async function handleClaudeApiKeyChange() {
-	if (claudeApiKey.trim()) {
-		await setClaudeApiKey(claudeApiKey.trim());
+	// Save the key even if it's empty (to clear it)
+	await setClaudeApiKey(claudeApiKey.trim() || null);
+
+	// Clear the provider cache when key changes
+	try {
+		await sidepanelToBackgroundClient.ai.clearProviderCache.mutate({
+			provider: "claude",
+		});
+	} catch (error) {
+		console.error("Failed to clear provider cache:", error);
 	}
+
+	// Update status for Claude if it's not the current provider
+	if (currentProvider !== "claude") {
+		providerStatuses.claude = claudeApiKey.trim() ? "Ready" : "Needs API Key";
+	}
+
+	// Re-check all provider statuses after key change
+	checkProviderStatuses();
+
 	onProviderChange?.();
 }
 
 async function handleGeminiApiKeyChange() {
-	if (geminiApiKey.trim()) {
-		await setGeminiApiKey(geminiApiKey.trim());
+	// Save the key even if it's empty (to clear it)
+	await setGeminiApiKey(geminiApiKey.trim() || null);
+
+	// Clear the provider cache when key changes
+	try {
+		await sidepanelToBackgroundClient.ai.clearProviderCache.mutate({
+			provider: "gemini",
+		});
+	} catch (error) {
+		console.error("Failed to clear provider cache:", error);
 	}
+
+	// Update status for Gemini if it's not the current provider
+	if (currentProvider !== "gemini") {
+		providerStatuses.gemini = geminiApiKey.trim() ? "Ready" : "Needs API Key";
+	}
+
+	// Re-check all provider statuses after key change
+	checkProviderStatuses();
+
 	onProviderChange?.();
 }
 
@@ -136,23 +268,31 @@ function getProviderStatus(provider: AIProviderType): string {
 				return "Rate Limited";
 			case "error":
 				return "Error";
+			case "loading":
+				return "Loading...";
 			case "unavailable":
 			default:
 				return "Unavailable";
 		}
 	}
-	// For other providers, show as unknown
-	return "Unknown";
+	// For other providers, use the cached status
+	return providerStatuses[provider];
 }
 
 function getStatusColor(status: string): string {
 	switch (status) {
 		case "Available":
+		case "Ready":
 			return "text-green-600";
 		case "Needs API Key":
 			return "text-yellow-600";
 		case "Rate Limited":
 			return "text-orange-600";
+		case "Loading...":
+		case "Check availability":
+			return "text-blue-600";
+		case "Unknown":
+			return "text-gray-500";
 		default:
 			return "text-red-600";
 	}
@@ -224,62 +364,23 @@ function formatLastRunTime(): string {
 						</div>
 					</fieldset>
 
-					<!-- Claude API Key Input -->
+					<!-- Remote AI Provider Settings -->
 					{#if currentProvider === "claude"}
-						<div class="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-							<div class="flex items-center justify-between mb-2">
-								<label for="claude-api-key" class="block text-sm font-medium text-gray-700">
-									Claude API Key
-								</label>
-								<button
-									type="button"
-									onclick={() => showApiKey = !showApiKey}
-									class="text-xs text-blue-600 hover:text-blue-800"
-								>
-									{showApiKey ? 'Hide' : 'Show'}
-								</button>
-							</div>
-							<input
-								id="claude-api-key"
-								type={showApiKey ? "text" : "password"}
-								bind:value={claudeApiKey}
-								onblur={handleClaudeApiKeyChange}
-								placeholder="sk-ant-api..."
-								class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-							/>
-							<p class="mt-1 text-xs text-gray-600">
-								Get your API key from <a href="https://console.anthropic.com/" target="_blank" class="text-blue-600 hover:text-blue-800" rel="noopener">Anthropic Console</a>
-							</p>
-						</div>
+						<RemoteAIProviderSettings
+							provider={remoteProviderConfigs.claude}
+							bind:apiKey={claudeApiKey}
+							bind:showApiKey
+							onApiKeyChange={handleClaudeApiKeyChange}
+						/>
 					{/if}
 
-					<!-- Gemini API Key Input -->
 					{#if currentProvider === "gemini"}
-						<div class="p-3 bg-blue-50 border border-blue-200 rounded-lg">
-							<div class="flex items-center justify-between mb-2">
-								<label for="gemini-api-key" class="block text-sm font-medium text-gray-700">
-									Gemini API Key
-								</label>
-								<button
-									type="button"
-									onclick={() => showApiKey = !showApiKey}
-									class="text-xs text-blue-600 hover:text-blue-800"
-								>
-									{showApiKey ? 'Hide' : 'Show'}
-								</button>
-							</div>
-							<input
-								id="gemini-api-key"
-								type={showApiKey ? "text" : "password"}
-								bind:value={geminiApiKey}
-								onblur={handleGeminiApiKeyChange}
-								placeholder="AIza..."
-								class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-							/>
-							<p class="mt-1 text-xs text-gray-600">
-								Get your API key from <a href="https://aistudio.google.com/apikey" target="_blank" class="text-blue-600 hover:text-blue-800" rel="noopener">Google AI Studio</a>
-							</p>
-						</div>
+						<RemoteAIProviderSettings
+							provider={remoteProviderConfigs.gemini}
+							bind:apiKey={geminiApiKey}
+							bind:showApiKey
+							onApiKeyChange={handleGeminiApiKeyChange}
+						/>
 					{/if}
 
 					<!-- Current Status -->

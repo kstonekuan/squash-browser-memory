@@ -11,7 +11,7 @@ import type {
 	WorkflowPattern,
 } from "../types";
 import type { AIProviderConfig } from "./ai-interface";
-import { getProvider } from "./ai-provider-factory";
+import { createProvider } from "./ai-provider-factory";
 import { getInitializedProvider, promptAI } from "./ai-provider-utils";
 import { createHistoryChunks, identifyChunks } from "./chunking";
 import {
@@ -744,7 +744,7 @@ async function analyzeChunkWithSubdivision(
 				error.name === "QuotaExceededError"
 			) {
 				// Get provider capabilities for better error messaging
-				const provider = getProvider(aiConfig);
+				const provider = createProvider(aiConfig);
 				console.log(
 					`Chunk with ${items.length} items exceeds token limit for ${provider.getProviderName()}, subdividing...`,
 				);
@@ -758,7 +758,7 @@ async function analyzeChunkWithSubdivision(
 		console.log("Chunk too large, calculating optimal subdivision size...");
 
 		// Get provider capabilities for optimal chunking
-		const providerForCapabilities = getProvider(aiConfig);
+		const providerForCapabilities = createProvider(aiConfig);
 		const capabilities = providerForCapabilities.getCapabilities();
 
 		// Initialize provider for token measurement

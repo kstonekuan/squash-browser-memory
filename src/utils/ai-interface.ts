@@ -78,7 +78,8 @@ export type AIProviderStatus =
 	| "unavailable"
 	| "needs-configuration"
 	| "rate-limited"
-	| "error";
+	| "error"
+	| "loading";
 
 export type AIProviderType = "chrome" | "claude" | "gemini";
 

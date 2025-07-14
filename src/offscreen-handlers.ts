@@ -4,9 +4,19 @@
  */
 
 import { offscreenToBackgroundClient } from "./trpc/client";
-import type { AnalysisProgress } from "./trpc/schemas";
-import { loadAIConfigFromServiceWorker } from "./utils/ai-config";
-import { getProvider } from "./utils/ai-provider-factory";
+import type { AnalysisProgress, ProviderStatusResult } from "./trpc/schemas";
+import {
+	getClaudeApiKey,
+	getGeminiApiKey,
+	loadAIConfigFromServiceWorker,
+} from "./utils/ai-config";
+import type {
+	AIProvider,
+	AIProviderConfig,
+	AIProviderStatus,
+	AIProviderType,
+} from "./utils/ai-interface";
+import { createProvider } from "./utils/ai-provider-factory";
 import {
 	cleanupAnalysis,
 	handleCancelLogic,
@@ -23,6 +33,9 @@ import {
 // Track active analyses
 const activeAnalyses = new Map<string, AbortController>();
 let currentAnalysisId: string | null = null;
+
+// Track initialized AI providers
+const initializedProviders = new Map<AIProviderType, AIProvider>();
 
 // Keepalive interval
 let keepaliveInterval: number | null = null;
@@ -177,10 +190,29 @@ export async function handleInitializeAI() {
 			status: "initializing",
 		});
 
-		// Get the provider from the factory
-		const provider = getProvider(config);
+		// Check if we already have this provider initialized
+		let provider = initializedProviders.get(config.provider);
 
-		// Initialize the provider
+		if (!provider) {
+			// Create a new provider instance from the factory
+			provider = createProvider(config);
+			// Store it for reuse
+			initializedProviders.set(config.provider, provider);
+		}
+
+		// Check status before initialization
+		const preInitStatus = await provider.getStatus();
+
+		if (preInitStatus === "needs-configuration") {
+			// Report needs configuration status
+			await offscreenToBackgroundClient._internal.reportAIStatus.mutate({
+				status: "error",
+				error: `${provider.getProviderName()} requires API key configuration`,
+			});
+			return { success: false };
+		}
+
+		// Try to initialize the provider
 		await provider.initialize();
 
 		// Check status after initialization
@@ -204,5 +236,113 @@ export async function handleInitializeAI() {
 			error: error instanceof Error ? error.message : "Unknown error",
 		});
 		throw error;
+	}
+}
+
+// Handle API key changes by clearing the affected provider
+export async function handleApiKeyChange(providerType: AIProviderType) {
+	console.log(
+		`[Offscreen] API key changed for ${providerType}, clearing from cache`,
+	);
+	initializedProviders.delete(providerType);
+	return { success: true };
+}
+
+export async function handleCheckAllProvidersStatus(): Promise<ProviderStatusResult> {
+	try {
+		const results = new Map<AIProviderType, AIProviderStatus>();
+		const providerTypes: AIProviderType[] = ["chrome", "claude", "gemini"];
+
+		console.log("[Offscreen] Checking status for all providers");
+
+		for (const providerType of providerTypes) {
+			try {
+				// First check if we have an existing initialized provider
+				const existingProvider = initializedProviders.get(providerType);
+
+				if (existingProvider) {
+					// Use the existing provider's status
+					const status = await existingProvider.getStatus();
+					results.set(providerType, status);
+					console.log(
+						`[Offscreen] Using existing ${providerType} provider, status: ${status}`,
+					);
+				} else {
+					// Only create new instance if we don't have one
+					// For API-based providers, we need to load their specific keys
+					let config = await loadAIConfigFromServiceWorker();
+
+					if (providerType === "claude") {
+						const claudeKey = await getClaudeApiKey();
+						if (!claudeKey) {
+							results.set(providerType, "needs-configuration");
+							continue;
+						}
+						// Create config with the key
+						config = { provider: "claude", claudeApiKey: claudeKey };
+					} else if (providerType === "gemini") {
+						const geminiKey = await getGeminiApiKey();
+						if (!geminiKey) {
+							results.set(providerType, "needs-configuration");
+							continue;
+						}
+						// Create config with the key
+						config = { provider: "gemini", geminiApiKey: geminiKey };
+					}
+
+					// Create a test config for this provider type
+					const testConfig: AIProviderConfig = {
+						...config,
+						provider: providerType,
+					} as AIProviderConfig;
+
+					const provider = createProvider(testConfig);
+
+					// For Chrome AI, try to initialize to check availability
+					if (providerType === "chrome") {
+						try {
+							await provider.initialize();
+							const status = await provider.getStatus();
+							results.set(providerType, status);
+							// Don't store this test instance
+						} catch (error) {
+							console.log(`[Offscreen] Chrome AI not available:`, error);
+							results.set(providerType, "unavailable");
+						}
+					} else {
+						// For API providers, just check status
+						const status = await provider.getStatus();
+						results.set(providerType, status);
+					}
+				}
+
+				console.log(
+					`[Offscreen] Provider ${providerType} status: ${results.get(providerType)}`,
+				);
+			} catch (error) {
+				console.error(
+					`[Offscreen] Failed to check ${providerType} status:`,
+					error,
+				);
+				results.set(providerType, "error");
+			}
+		}
+
+		return {
+			type: "success",
+			statuses: Object.fromEntries(results),
+		};
+	} catch (error) {
+		console.error(
+			"[Offscreen] Critical error checking provider statuses:",
+			error,
+		);
+		return {
+			type: "error",
+			message:
+				error instanceof Error
+					? error.message
+					: "Unknown error checking provider statuses",
+		};
 	}
 }
