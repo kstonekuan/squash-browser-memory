@@ -14,7 +14,6 @@ export default defineConfig({
 	build: {
 		outDir: "dist",
 		emptyOutDir: true,
-		modulePreload: false,
 		sourcemap: true, // Only for development, set to false for production
 		rollupOptions: {
 			input: {
