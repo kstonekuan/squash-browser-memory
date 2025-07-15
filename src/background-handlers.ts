@@ -279,9 +279,43 @@ export async function handleReadMemory() {
 	return { memory };
 }
 
-export async function handleWriteMemory(input: AnalysisMemory) {
-	await saveMemoryToStorage(input);
-	return { success: true };
+export async function handleWriteMemory(
+	input: { memory: AnalysisMemory },
+	ctx?: TRPCContext,
+) {
+	try {
+		// Ensure the memory object has the required structure
+		const memory: AnalysisMemory = {
+			patterns: input.memory?.patterns || [],
+			lastAnalyzedDate: input.memory?.lastAnalyzedDate || new Date(),
+			lastHistoryTimestamp: input.memory?.lastHistoryTimestamp || 0,
+			userProfile: input.memory?.userProfile || {
+				stableTraits: {
+					coreIdentities: [],
+					professionalDomains: [],
+					personalInterests: [],
+					values: [],
+				},
+				dynamicContext: {
+					currentTasks: [],
+					currentInterests: [],
+				},
+				summary: "",
+				goals: [],
+			},
+			version: input.memory?.version || "1",
+		};
+
+		await saveMemoryToStorage(memory);
+		return { success: true };
+	} catch (error) {
+		console.error("[Background] Failed to write memory:", {
+			error: error instanceof Error ? error.message : String(error),
+			context: ctx,
+			inputMemory: input,
+		});
+		throw error; // Re-throw to maintain error propagation
+	}
 }
 
 export async function handleClearPatterns() {

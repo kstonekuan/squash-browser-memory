@@ -104,9 +104,9 @@ export const backgroundRouter = t.router({
 		}),
 
 		write: t.procedure
-			.input(z.any() as z.ZodType<AnalysisMemory>)
-			.mutation(async ({ input }) => {
-				return handleWriteMemory(input);
+			.input(z.object({ memory: z.any() as z.ZodType<AnalysisMemory> }))
+			.mutation(async ({ input, ctx }) => {
+				return handleWriteMemory(input, ctx);
 			}),
 
 		clearPatterns: t.procedure.mutation(async () => {
