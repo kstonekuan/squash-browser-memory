@@ -7,7 +7,11 @@ import { format } from "date-fns";
 import { match } from "ts-pattern";
 import { backgroundToOffscreenClient } from "./trpc/client";
 import type { AIStatus, AnalysisProgress } from "./trpc/schemas";
-import type { AnalysisMemory, FullAnalysisResult } from "./types";
+import type {
+	AnalysisMemory,
+	CustomPrompts,
+	FullAnalysisResult,
+} from "./types";
 import { loadAIConfigFromStorage } from "./utils/ai-config";
 import type { AIProviderConfig } from "./utils/ai-interface";
 import {
@@ -582,11 +586,6 @@ export async function triggerAnalysis(trigger: "manual" | "alarm") {
 		console.log("[Analysis] Running analysis in service worker");
 
 		const storage = createChromeStorage();
-		type CustomPrompts = {
-			systemPrompt?: string;
-			chunkPrompt?: string;
-			mergePrompt?: string;
-		};
 		let customPrompts: CustomPrompts | undefined;
 		if (storage) {
 			const promptsResult = await getStorageData(storage, CUSTOM_PROMPTS_KEY);

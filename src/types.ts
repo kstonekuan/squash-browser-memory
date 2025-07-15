@@ -33,6 +33,14 @@ export interface ChunkingResult {
 	isFallback: boolean;
 }
 
+// Custom prompts for AI analysis
+export interface CustomPrompts {
+	userProfilePrompt?: string;
+	workflowPatternsPrompt?: string;
+	chunkPrompt?: string;
+	mergePrompt?: string;
+}
+
 // Memory management settings
 export interface MemorySettings {
 	storeWorkflowPatterns: boolean;

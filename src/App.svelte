@@ -14,7 +14,11 @@ import { disableAmbientAnalysis } from "./state/ambient-settings.svelte";
 import { createTRPCMessageHandler } from "./trpc/chrome-adapter";
 import { sidepanelToBackgroundClient } from "./trpc/client";
 import { createSidepanelRouter } from "./trpc/sidepanel-router";
-import type { FullAnalysisResult, MemorySettings } from "./types";
+import type {
+	CustomPrompts,
+	FullAnalysisResult,
+	MemorySettings,
+} from "./types";
 import type { AIProviderStatus, AnalysisStatus } from "./types/ui-types";
 import { loadAIConfigFromStorage } from "./utils/ai-config";
 import type { AIProviderType } from "./utils/ai-interface";
@@ -29,12 +33,7 @@ import { LAST_ANALYSIS_RESULT_KEY } from "./utils/storage-keys";
 let analysisResult: FullAnalysisResult | null = $state(null);
 let memoryAutoExpand = $state(false);
 let memorySettings = $state<MemorySettings>({ storeWorkflowPatterns: false });
-let customPrompts = $state<{
-	systemPrompt?: string;
-	workflowPrompt?: string;
-	chunkPrompt?: string;
-	mergePrompt?: string;
-}>({});
+let customPrompts = $state<CustomPrompts>({});
 let currentAIStatus = $state<AIProviderStatus>("unavailable");
 let currentProvider = $state<AIProviderType>("chrome");
 
@@ -132,8 +131,8 @@ function handlePromptsChange(prompts: {
 	merge: string;
 }) {
 	customPrompts = {
-		systemPrompt: prompts.system || undefined,
-		workflowPrompt: prompts.workflow || undefined,
+		userProfilePrompt: prompts.system || undefined,
+		workflowPatternsPrompt: prompts.workflow || undefined,
 		chunkPrompt: prompts.chunk || undefined,
 		mergePrompt: prompts.merge || undefined,
 	};

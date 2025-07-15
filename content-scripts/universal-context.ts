@@ -1,6 +1,6 @@
 // Universal content script for context button injection across platforms
 
-import type { AnalysisMemory } from "../src/types";
+import type { AnalysisMemory, WorkflowPattern } from "../src/types";
 import { loadMemoryFromStorage } from "../src/utils/memory";
 
 interface PlatformConfig {
@@ -21,16 +21,6 @@ interface ChatInputInfo {
 	getCurrentText(): string;
 	insertText(text: string): void;
 	addInputListener(callback: (text: string) => void): void;
-}
-
-interface WorkflowPattern {
-	pattern: string;
-	description: string;
-	frequency: number;
-	urls: string[];
-	timePattern?: string;
-	suggestion: string;
-	automationPotential: "high" | "medium" | "low";
 }
 
 interface ContextSuggestion {

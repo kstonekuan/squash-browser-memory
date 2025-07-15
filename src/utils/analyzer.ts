@@ -4,6 +4,7 @@ import { format } from "date-fns";
 import type {
 	AnalysisMemory,
 	ChunkInfo,
+	CustomPrompts,
 	FullAnalysisResult,
 	HistoryStats,
 	MemoryData,
@@ -103,13 +104,6 @@ export type ProgressCallback = (info: {
 		description: string;
 	};
 }) => void;
-
-// Custom prompts interface
-interface CustomPrompts {
-	systemPrompt?: string;
-	chunkPrompt?: string;
-	mergePrompt?: string;
-}
 
 // Analyze Chrome history items with memory and chunking
 export async function analyzeHistoryItems(
@@ -673,7 +667,7 @@ async function analyzeChunkWithSubdivision(
 			const chunkResults = await analyzeChunk(
 				items,
 				aiConfig,
-				customPrompts?.systemPrompt,
+				customPrompts,
 				onProgress,
 				abortSignal,
 				shouldAnalyzePatterns,
@@ -722,7 +716,7 @@ async function analyzeChunkWithSubdivision(
 		// Initialize provider for token measurement
 		const provider = await getInitializedProvider(
 			aiConfig,
-			customPrompts?.systemPrompt || USER_PROFILE_SYSTEM_PROMPT,
+			customPrompts?.userProfilePrompt || USER_PROFILE_SYSTEM_PROMPT,
 		);
 		if (!provider) {
 			throw new Error("AI is not available for measuring tokens.");
@@ -800,7 +794,7 @@ async function analyzeChunkWithSubdivision(
 			const subResults = await analyzeChunk(
 				subItems,
 				aiConfig,
-				customPrompts?.systemPrompt,
+				customPrompts,
 				undefined, // Don't pass onProgress to avoid duplicate updates
 				abortSignal,
 				shouldAnalyzePatterns,
@@ -987,7 +981,7 @@ async function analyzeWorkflowPatterns(
 async function analyzeChunk(
 	items: chrome.history.HistoryItem[],
 	aiConfig: AIProviderConfig,
-	customSystemPrompt?: string,
+	customPrompts?: CustomPrompts,
 	onProgress?: ProgressCallback,
 	abortSignal?: AbortSignal,
 	shouldAnalyzePatterns: boolean = true,
@@ -1004,7 +998,7 @@ async function analyzeChunk(
 		const userProfile = await analyzeUserProfile(
 			items,
 			aiConfig,
-			customSystemPrompt,
+			customPrompts?.userProfilePrompt,
 			onProgress,
 			abortSignal,
 		);
@@ -1016,7 +1010,7 @@ async function analyzeChunk(
 			patterns = await analyzeWorkflowPatterns(
 				items,
 				aiConfig,
-				customSystemPrompt,
+				customPrompts?.workflowPatternsPrompt,
 				onProgress,
 				abortSignal,
 			);

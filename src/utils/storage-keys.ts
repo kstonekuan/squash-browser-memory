@@ -1,16 +1,11 @@
 import type {
 	AnalysisMemory,
+	CustomPrompts,
 	FullAnalysisResult,
 	MemorySettings,
 } from "../types";
 import type { AIProviderConfig } from "./ai-interface";
 import type { AutoAnalysisSettings } from "./ambient";
-
-interface CustomPrompts {
-	systemPrompt?: string;
-	chunkPrompt?: string;
-	mergePrompt?: string;
-}
 
 export const MEMORY_KEY = "history_analysis_memory";
 export const MEMORY_SETTINGS_KEY = "memory_settings";
