@@ -1,14 +1,49 @@
-// Structured output schemas for Chrome AI and runtime validation
+// Structured output schemas for AI and runtime validation
 
 import { toJSONSchema, z } from "zod/v4";
 
-// Zod schemas for runtime validation
+export const ChunkSchema = z
+	.object({
+		chunks: z
+			.object({
+				startIndex: z
+					.number()
+					.describe(
+						"Index of the first timestamp in this session from the provided data array (e.g., 0, 5, 12). IMPORTANT: Use the index shown in brackets [n] from the input data",
+					),
+				endIndex: z
+					.number()
+					.describe(
+						"Index of the last timestamp in this session from the provided data array (e.g., 4, 11, 23). IMPORTANT: Use the index shown in brackets [n] from the input data",
+					),
+				description: z
+					.string()
+					.describe(
+						"Provide a descriptive label for the session based on its timing and content (e.g., 'Morning Work Session', 'Evening Research').",
+					),
+			})
+			.array()
+			.nonempty()
+			.describe(
+				"An array of distinct browsing sessions. A new session begins after a >30 minute gap in activity. Sessions can span multiple days if activity is continuous.",
+			),
+	})
+	.describe(
+		"Browsing sessions grouped by natural time gaps (>30min gap = new session)",
+	);
 const WorkflowPatternSchema = z.object({
-	pattern: z.string().max(100).describe("Short name for the workflow pattern"),
+	pattern: z
+		.string()
+		.max(100)
+		.describe(
+			"Short, descriptive name for the identified workflow (e.g., 'Morning News Review', 'Daily Standup Prep')",
+		),
 	description: z
 		.string()
 		.max(200)
-		.describe("Detailed description of what this workflow involves"),
+		.describe(
+			"1-2 sentence summary of the user's goal and the steps in this recurring workflow",
+		),
 	frequency: z
 		.number()
 		.describe(
@@ -29,21 +64,28 @@ const WorkflowPatternSchema = z.object({
 		.string()
 		.max(200)
 		.describe(
-			"Actionable suggestion for optimizing or automating this workflow",
+			"Concrete, actionable suggestion to optimize or automate this workflow (e.g., 'Bookmark this set of URLs in a folder').",
 		),
 	automationPotential: z
 		.enum(["high", "medium", "low"])
-		.describe("How suitable this workflow is for automation"),
+		.describe("Classify the automation potential for this workflow"),
 });
+// Schema for workflow patterns only (no user profile)
+export const WorkflowPatternsOnlySchema = z
+	.array(WorkflowPatternSchema)
+	.max(15)
+	.describe(
+		"Workflow patterns discovered in browsing history with URLs, frequencies, and automation opportunities",
+	);
 
-const UserProfileSchema = z.object({
+export const UserProfileSchema = z.object({
 	stableTraits: z
 		.object({
 			coreIdentities: z
 				.array(z.string().max(80))
 				.max(5)
 				.describe(
-					"Roles someone would claim as part of their identity. Examples: Senior UX Designer, Parent of two, Weekend volunteer firefighter, Dancer, Marathon runner",
+					"List the user's core roles and identities based on strong, repeated evidence (e.g., 'Software Developer', 'Language Learner', 'Hobbyist Photographer').",
 				),
 			personalPreferences: z
 				.array(
@@ -63,7 +105,9 @@ const UserProfileSchema = z.object({
 					}),
 				)
 				.max(8)
-				.describe("Enduring personal choices and preferences"),
+				.describe(
+					"List the user's enduring preferences, each with a category and specific detail, based on consistent browsing signals.",
+				),
 		})
 		.describe(
 			"Stable traits that require high evidence (2+ distinct browsing signals) to establish or modify",
@@ -74,13 +118,13 @@ const UserProfileSchema = z.object({
 				.array(z.string().max(80))
 				.max(10)
 				.describe(
-					"Active goals and tasks the user is working on. Examples: Land 6-month retainer, Redesign app onboarding, Reach B2 Portuguese, Cycle Camino de Santiago, Publish UX case-study, Build Notion templates",
+					"List the user's active, short-to-medium term goals or projects based on recent, focused activity (e.g., 'Plan a vacation', 'Learn a new technology').",
 				),
 			currentInterests: z
 				.array(z.string().max(60))
 				.max(8)
 				.describe(
-					"Recent areas of focus and interest. Examples: Figma micro-interactions, Zero-waste travel, EU Digital Services Act, Watercolor journaling, Figma variables beta, Interrail pricing, AI ethics, Lisbon coworking",
+					"List topics of recent, sustained interest based on browsing patterns (e.g., 'AI Ethics', 'European travel', 'Watercolor techniques').",
 				),
 		})
 		.describe(
@@ -90,77 +134,19 @@ const UserProfileSchema = z.object({
 		.string()
 		.max(500)
 		.describe(
-			"A vivid sentence combining the person's identities, preferences, and current focus",
+			"1-2 sentence narrative summary that synthesizes the user's core identity, primary interests, and current focus into a coherent picture.",
 		),
 });
 
 export const AnalysisResultSchema = z.object({
-	patterns: z
-		.array(WorkflowPatternSchema)
-		.max(15)
-		.describe(
-			"Workflow patterns discovered in browsing history with URLs, frequencies, and automation opportunities",
-		),
+	patterns: WorkflowPatternsOnlySchema,
 	userProfile: UserProfileSchema,
-});
-
-export const ChunkSchema = z
-	.object({
-		chunks: z
-			.array(
-				z.object({
-					startIndex: z
-						.number()
-						.describe(
-							"Index of the first timestamp in this session from the provided data array (e.g., 0, 5, 12). IMPORTANT: Use the index shown in brackets [n] from the input data",
-						),
-					endIndex: z
-						.number()
-						.describe(
-							"Index of the last timestamp in this session from the provided data array (e.g., 4, 11, 23). IMPORTANT: Use the index shown in brackets [n] from the input data",
-						),
-					description: z
-						.string()
-						.describe(
-							"Descriptive label for this session (e.g., 'Morning work session', 'Evening research', 'Weekend browsing')",
-						),
-				}),
-			)
-			.describe(
-				"Array of browsing sessions. Rules: Gap >30min = new session, Sessions can span days if continuous, Return at least 1 chunk",
-			),
-	})
-	.describe(
-		"Browsing sessions grouped by natural time gaps (>30min gap = new session)",
-	);
-
-// Schema for user profile only (no patterns)
-const UserProfileOnlySchema = z.object({
-	userProfile: UserProfileSchema,
-});
-
-// Schema for workflow patterns only (no user profile)
-const WorkflowPatternsOnlySchema = z.object({
-	patterns: z
-		.array(WorkflowPatternSchema)
-		.max(15)
-		.describe(
-			"Workflow patterns discovered in browsing history with URLs, frequencies, and automation opportunities",
-		),
 });
 
 // Generate JSON schemas from Zod schemas for Chrome AI
-export const ANALYSIS_SCHEMA = toJSONSchema(AnalysisResultSchema);
-const ANALYSIS_SCHEMA_NO_PATTERNS = toJSONSchema(UserProfileOnlySchema);
-const WORKFLOW_PATTERNS_ONLY_SCHEMA = toJSONSchema(WorkflowPatternsOnlySchema);
 export const CHUNK_SCHEMA = toJSONSchema(ChunkSchema);
-
-// Function to get appropriate schema based on settings
-export function getAnalysisSchema(includePatterns: boolean) {
-	return includePatterns ? ANALYSIS_SCHEMA : ANALYSIS_SCHEMA_NO_PATTERNS;
-}
-
-// Export workflow patterns schema
-export function getWorkflowPatternsSchema() {
-	return WORKFLOW_PATTERNS_ONLY_SCHEMA;
-}
+export const ANALYSIS_SCHEMA = toJSONSchema(AnalysisResultSchema);
+export const USER_PROFILE_SCHEMA = toJSONSchema(UserProfileSchema);
+export const WORKFLOW_PATTERNS_ONLY_SCHEMA = toJSONSchema(
+	WorkflowPatternsOnlySchema,
+);

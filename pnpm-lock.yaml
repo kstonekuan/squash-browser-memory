@@ -12,7 +12,7 @@ importers:
         specifier: 0.56.0
         version: 0.56.0
       '@google/genai':
-        specifier: ^1.9.0
+        specifier: 1.9.0
         version: 1.9.0
       '@trpc/client':
         specifier: 11.4.3
@@ -27,7 +27,7 @@ importers:
         specifier: 3.13.0
         version: 3.13.0
       neverthrow:
-        specifier: ^8.2.0
+        specifier: 8.2.0
         version: 8.2.0
       simple-chromium-ai:
         specifier: 0.1.1

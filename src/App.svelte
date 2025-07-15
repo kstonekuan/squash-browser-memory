@@ -31,6 +31,7 @@ let memoryAutoExpand = $state(false);
 let memorySettings = $state<MemorySettings>({ storeWorkflowPatterns: false });
 let customPrompts = $state<{
 	systemPrompt?: string;
+	workflowPrompt?: string;
 	chunkPrompt?: string;
 	mergePrompt?: string;
 }>({});
@@ -126,11 +127,13 @@ async function handleAnalysis(data: { items: chrome.history.HistoryItem[] }) {
 
 function handlePromptsChange(prompts: {
 	system: string;
+	workflow: string;
 	chunk: string;
 	merge: string;
 }) {
 	customPrompts = {
 		systemPrompt: prompts.system || undefined,
+		workflowPrompt: prompts.workflow || undefined,
 		chunkPrompt: prompts.chunk || undefined,
 		mergePrompt: prompts.merge || undefined,
 	};

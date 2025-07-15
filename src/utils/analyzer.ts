@@ -15,15 +15,21 @@ import { createProvider } from "./ai-provider-factory";
 import { getInitializedProvider, promptAI } from "./ai-provider-utils";
 import { createHistoryChunks, identifyChunks } from "./chunking";
 import {
-	ANALYSIS_SYSTEM_PROMPT_NO_PATTERNS,
 	buildAnalysisPrompt,
 	buildMergePrompt,
 	MERGE_SYSTEM_PROMPT,
+	USER_PROFILE_SYSTEM_PROMPT,
 	WORKFLOW_PATTERNS_SYSTEM_PROMPT,
 } from "./constants";
 import { createEmptyMemory } from "./memory";
 import { loadMemorySettings } from "./memory-settings";
-import { getAnalysisSchema, getWorkflowPatternsSchema } from "./schemas";
+import {
+	ANALYSIS_SCHEMA,
+	USER_PROFILE_SCHEMA,
+	UserProfileSchema,
+	WORKFLOW_PATTERNS_ONLY_SCHEMA,
+	WorkflowPatternsOnlySchema,
+} from "./schemas";
 import {
 	calculateOptimalChunkSize,
 	extractJSONFromResponse,
@@ -352,48 +358,60 @@ export async function analyzeHistoryItems(
 	};
 }
 
-// Merge user profiles using LLM
-async function mergeUserProfiles(
-	existingProfile: UserProfile,
-	newProfile: UserProfile,
+// Generic merge function to handle both user profiles and workflow patterns
+async function mergeWithAI<T>(
+	mergeType: "userProfile" | "patterns",
+	existing: T,
+	newData: T,
 	aiConfig: AIProviderConfig,
+	responseConstraint: Record<string, unknown>,
+	parseResponse: (parsed: unknown) => T,
 	customSystemPrompt?: string,
 	abortSignal?: AbortSignal,
 	onProgress?: ProgressCallback,
-): Promise<UserProfile> {
+	mergeDetails?: {
+		existingCount: number;
+		newCount: number;
+		description: string;
+	},
+): Promise<T> {
 	// Check if aborted
 	if (abortSignal?.aborted) {
 		throw new Error("Analysis cancelled");
 	}
 
-	// If existing profile is empty, just return the new profile
-	if (
-		existingProfile.stableTraits.coreIdentities.length === 0 &&
-		existingProfile.stableTraits.personalPreferences.length === 0 &&
-		existingProfile.dynamicContext.currentTasks.length === 0 &&
-		existingProfile.dynamicContext.currentInterests.length === 0
-	) {
-		return newProfile;
+	// Build merge prompt based on type
+	let mergePrompt: string;
+	if (mergeType === "userProfile") {
+		mergePrompt = buildMergePrompt(
+			{ userProfile: existing as UserProfile, patterns: [] },
+			{ userProfile: newData as UserProfile, patterns: [] },
+			false,
+		);
+	} else {
+		// For patterns, we need to create empty profile
+		const emptyProfile: UserProfile = {
+			stableTraits: { coreIdentities: [], personalPreferences: [] },
+			dynamicContext: { currentTasks: [], currentInterests: [] },
+			summary: "",
+		};
+		mergePrompt = buildMergePrompt(
+			{ userProfile: emptyProfile, patterns: existing as WorkflowPattern[] },
+			{ userProfile: emptyProfile, patterns: newData as WorkflowPattern[] },
+			true,
+		);
 	}
 
-	const mergePrompt = buildMergePrompt(
-		{
-			userProfile: existingProfile,
-			patterns: [],
-		},
-		{
-			userProfile: newProfile,
-			patterns: [],
-		},
-		false, // Don't include patterns in merge
-	);
-
-	console.log("\n=== Starting User Profile Merge ===");
-	console.log("Merging user profiles:", {
-		promptLength: mergePrompt.length,
-		existingIdentities: existingProfile.stableTraits.coreIdentities.length,
-		newIdentities: newProfile.stableTraits.coreIdentities.length,
-	});
+	const typeName =
+		mergeType === "userProfile" ? "User Profile" : "Workflow Patterns";
+	console.log(`\n=== Starting ${typeName} Merge ===`);
+	if (mergeDetails) {
+		console.log(`Merging ${mergeType}:`, {
+			promptLength: mergePrompt.length,
+			existingCount: mergeDetails.existingCount,
+			newCount: mergeDetails.newCount,
+		});
+	}
 
 	const provider = await getInitializedProvider(
 		aiConfig,
@@ -405,65 +423,99 @@ async function mergeUserProfiles(
 	}
 
 	try {
-		console.log("Sending user profile merge prompt to AI...");
+		console.log(`Sending ${mergeType} merge prompt to AI...`);
 
 		// Notify progress that we're sending merge prompt
 		if (onProgress) {
 			onProgress({
 				phase: "analyzing",
 				subPhase: "sending-merge",
-				chunkDescription: `Merging user profiles`,
+				chunkDescription: mergeDetails?.description || `Merging ${mergeType}`,
 			});
 		}
 
 		const startTime = performance.now();
 		const response = await promptAI(provider, mergePrompt, {
-			responseConstraint: getAnalysisSchema(false), // false = no patterns
+			responseConstraint: responseConstraint,
 			signal: abortSignal,
 		});
 		const endTime = performance.now();
 		const duration = ((endTime - startTime) / 1000).toFixed(2);
 
-		console.log(`User profile merge completed in ${duration}s`);
-		console.log("=== User Profile Merge Complete ===");
+		console.log(`${typeName} merge completed in ${duration}s`);
+		console.log(`=== ${typeName} Merge Complete ===`);
 
 		// Notify that merge is complete
 		if (onProgress) {
 			onProgress({
 				phase: "analyzing",
 				subPhase: "processing",
-				chunkDescription: `Processing user profile merge results (${duration}s)`,
+				chunkDescription: `Processing ${mergeType} merge results (${duration}s)`,
 			});
 		}
 
 		try {
 			// Clean the response to extract JSON from markdown if needed
 			const cleanedResponse = extractJSONFromResponse(response);
-			console.log("[UserProfileMerge] Attempting to parse cleaned response");
+			console.log(`[${typeName}Merge] Attempting to parse cleaned response`);
 			const parsed = JSON.parse(cleanedResponse);
 			console.log(
-				"[UserProfileMerge] Parsed object keys:",
+				`[${typeName}Merge] Parsed object keys:`,
 				Object.keys(parsed),
 			);
 
-			// For user profile only schema, we only expect userProfile
-			const validated = parsed as { userProfile: UserProfile };
-			return validated.userProfile;
+			const validated = parseResponse(parsed);
+			return validated;
 		} catch (parseError) {
-			console.error("Failed to parse user profile merge response:", parseError);
+			console.error(`Failed to parse ${mergeType} merge response:`, parseError);
 			console.error("Response length:", response.length);
-			// For merge failures, return the new profile as-is
-			console.log("Falling back to new profile without merging");
-			return newProfile;
+			throw parseError;
 		}
 	} catch (error) {
-		console.error(
-			"Failed to merge user profiles, returning new profile:",
-			error,
-		);
+		console.error(`Failed to merge ${mergeType}:`, error);
+		throw error;
+	}
+}
+
+// Merge user profiles using LLM
+async function mergeUserProfiles(
+	existingProfile: UserProfile,
+	newProfile: UserProfile,
+	aiConfig: AIProviderConfig,
+	customSystemPrompt?: string,
+	abortSignal?: AbortSignal,
+	onProgress?: ProgressCallback,
+): Promise<UserProfile> {
+	// If existing profile is empty, just return the new profile
+	if (
+		existingProfile.stableTraits.coreIdentities.length === 0 &&
+		existingProfile.stableTraits.personalPreferences.length === 0 &&
+		existingProfile.dynamicContext.currentTasks.length === 0 &&
+		existingProfile.dynamicContext.currentInterests.length === 0
+	) {
 		return newProfile;
-	} finally {
-		// No cleanup needed with stateless providers
+	}
+
+	try {
+		return await mergeWithAI(
+			"userProfile",
+			existingProfile,
+			newProfile,
+			aiConfig,
+			USER_PROFILE_SCHEMA,
+			UserProfileSchema.parse,
+			customSystemPrompt,
+			abortSignal,
+			onProgress,
+			{
+				existingCount: existingProfile.stableTraits.coreIdentities.length,
+				newCount: newProfile.stableTraits.coreIdentities.length,
+				description: "Merging user profiles",
+			},
+		);
+	} catch (error) {
+		console.error("Falling back to new profile without merging", error);
+		return newProfile;
 	}
 }
 
@@ -476,11 +528,6 @@ async function mergeWorkflowPatterns(
 	abortSignal?: AbortSignal,
 	onProgress?: ProgressCallback,
 ): Promise<WorkflowPattern[]> {
-	// Check if aborted
-	if (abortSignal?.aborted) {
-		throw new Error("Analysis cancelled");
-	}
-
 	// If no existing patterns, just return the new patterns
 	if (existingPatterns.length === 0) {
 		return newPatterns;
@@ -491,118 +538,29 @@ async function mergeWorkflowPatterns(
 		return existingPatterns;
 	}
 
-	// Create minimal user profile for merge prompt (required by buildMergePrompt)
-	const emptyProfile: UserProfile = {
-		stableTraits: {
-			coreIdentities: [],
-			personalPreferences: [],
-		},
-		dynamicContext: {
-			currentTasks: [],
-			currentInterests: [],
-		},
-		summary: "",
-	};
-
-	const mergePrompt = buildMergePrompt(
-		{
-			userProfile: emptyProfile,
-			patterns: existingPatterns,
-		},
-		{
-			userProfile: emptyProfile,
-			patterns: newPatterns,
-		},
-		true, // Include patterns in merge
-	);
-
-	console.log("\n=== Starting Workflow Patterns Merge ===");
-	console.log("Merging workflow patterns:", {
-		promptLength: mergePrompt.length,
-		existingPatterns: existingPatterns.length,
-		newPatterns: newPatterns.length,
-	});
-
-	const provider = await getInitializedProvider(
-		aiConfig,
-		customSystemPrompt || MERGE_SYSTEM_PROMPT,
-	);
-
-	if (!provider) {
-		throw new Error("AI is not available for merging.");
-	}
-
 	try {
-		console.log("Sending workflow patterns merge prompt to AI...");
-
-		// Notify progress that we're sending merge prompt
-		if (onProgress) {
-			onProgress({
-				phase: "analyzing",
-				subPhase: "sending-merge",
-				chunkDescription: `Merging ${newPatterns.length} new patterns with ${existingPatterns.length} existing patterns`,
-			});
-		}
-
-		const startTime = performance.now();
-		const response = await promptAI(provider, mergePrompt, {
-			responseConstraint: getWorkflowPatternsSchema(),
-			signal: abortSignal,
-		});
-		const endTime = performance.now();
-		const duration = ((endTime - startTime) / 1000).toFixed(2);
-
-		console.log(`Workflow patterns merge completed in ${duration}s`);
-		console.log("=== Workflow Patterns Merge Complete ===");
-
-		// Notify that merge is complete
-		if (onProgress) {
-			onProgress({
-				phase: "analyzing",
-				subPhase: "processing",
-				chunkDescription: `Processing workflow patterns merge results (${duration}s)`,
-			});
-		}
-
-		try {
-			// Clean the response to extract JSON from markdown if needed
-			const cleanedResponse = extractJSONFromResponse(response);
-			console.log("[PatternsMerge] Attempting to parse cleaned response");
-			const parsed = JSON.parse(cleanedResponse);
-			console.log("[PatternsMerge] Parsed object keys:", Object.keys(parsed));
-
-			// For workflow patterns only schema, we only expect patterns
-			const validated = parsed as { patterns: WorkflowPattern[] };
-
-			// Log merge results for debugging
-			console.log("Pattern merge operation:", {
-				beforePatterns: existingPatterns.length,
-				newPatterns: newPatterns.length,
-				afterPatterns: validated.patterns.length,
-				sampleBefore: existingPatterns.slice(0, 3).map((p) => p.description),
-				sampleNew: newPatterns.slice(0, 3).map((p) => p.description),
-				sampleAfter: validated.patterns.slice(0, 3).map((p) => p.description),
-			});
-
-			return validated.patterns;
-		} catch (parseError) {
-			console.error(
-				"Failed to parse workflow patterns merge response:",
-				parseError,
-			);
-			console.error("Response length:", response.length);
-			// For merge failures, combine both arrays as-is
-			console.log("Falling back to concatenating patterns without merging");
-			return [...existingPatterns, ...newPatterns];
-		}
+		return await mergeWithAI(
+			"patterns",
+			existingPatterns,
+			newPatterns,
+			aiConfig,
+			WORKFLOW_PATTERNS_ONLY_SCHEMA,
+			WorkflowPatternsOnlySchema.parse,
+			customSystemPrompt,
+			abortSignal,
+			onProgress,
+			{
+				existingCount: existingPatterns.length,
+				newCount: newPatterns.length,
+				description: `Merging ${newPatterns.length} new patterns with ${existingPatterns.length} existing patterns`,
+			},
+		);
 	} catch (error) {
 		console.error(
-			"Failed to merge workflow patterns, returning concatenated patterns:",
+			"Falling back to concatenating patterns without merging",
 			error,
 		);
 		return [...existingPatterns, ...newPatterns];
-	} finally {
-		// No cleanup needed with stateless providers
 	}
 }
 
@@ -764,7 +722,7 @@ async function analyzeChunkWithSubdivision(
 		// Initialize provider for token measurement
 		const provider = await getInitializedProvider(
 			aiConfig,
-			customPrompts?.systemPrompt || ANALYSIS_SYSTEM_PROMPT_NO_PATTERNS,
+			customPrompts?.systemPrompt || USER_PROFILE_SYSTEM_PROMPT,
 		);
 		if (!provider) {
 			throw new Error("AI is not available for measuring tokens.");
@@ -795,7 +753,7 @@ async function analyzeChunkWithSubdivision(
 				const testData = testHistoryData.slice(0, testItems.length);
 				const testPrompt = buildAnalysisPrompt(testItems, testData);
 				return await provider.measureInputUsage(testPrompt, {
-					responseConstraint: getAnalysisSchema(shouldAnalyzePatterns),
+					responseConstraint: ANALYSIS_SCHEMA,
 					signal: abortSignal,
 				});
 			},
@@ -926,66 +884,62 @@ async function analyzeWithAI<T>(
 		throw new Error("AI is not available.");
 	}
 
-	try {
-		console.log(`Analyzing ${analysisType} for ${items.length} items`);
+	console.log(`Analyzing ${analysisType} for ${items.length} items`);
 
-		// Check abort before making request
-		if (abortSignal?.aborted) {
-			throw new Error("Analysis cancelled");
-		}
-		console.log(`Sending ${analysisType} analysis prompt to AI...`);
+	// Check abort before making request
+	if (abortSignal?.aborted) {
+		throw new Error("Analysis cancelled");
+	}
+	console.log(`Sending ${analysisType} analysis prompt to AI...`);
 
-		// Notify progress that we're sending analysis prompt
-		if (onProgress) {
-			onProgress({
-				phase: "analyzing",
-				subPhase: "sending-analysis",
-				chunkDescription: `Analyzing ${analysisType} for ${items.length} items`,
-			});
-		}
-
-		const startTime = performance.now();
-		const response = await promptAI(provider, prompt, {
-			responseConstraint: responseConstraint,
-			signal: abortSignal,
+	// Notify progress that we're sending analysis prompt
+	if (onProgress) {
+		onProgress({
+			phase: "analyzing",
+			subPhase: "sending-analysis",
+			chunkDescription: `Analyzing ${analysisType} for ${items.length} items`,
 		});
-		const endTime = performance.now();
-		const duration = ((endTime - startTime) / 1000).toFixed(2);
+	}
 
-		console.log(
-			`${analysisType} analysis completed in ${duration}s for ${items.length} items`,
+	const startTime = performance.now();
+	const response = await promptAI(provider, prompt, {
+		responseConstraint: responseConstraint,
+		signal: abortSignal,
+	});
+	const endTime = performance.now();
+	const duration = ((endTime - startTime) / 1000).toFixed(2);
+
+	console.log(
+		`${analysisType} analysis completed in ${duration}s for ${items.length} items`,
+	);
+
+	// Notify that we received response
+	if (onProgress) {
+		onProgress({
+			phase: "analyzing",
+			subPhase: "processing",
+			chunkDescription: `Processing ${analysisType} response (${duration}s)`,
+		});
+	}
+	console.log(`=== ${analysisType} Analysis Complete ===`);
+
+	try {
+		// Clean the response to extract JSON from markdown if needed
+		const cleanedResponse = extractJSONFromResponse(response);
+		console.log(`[${analysisType}] Attempting to parse cleaned response`);
+		const parsed = JSON.parse(cleanedResponse);
+		console.log(`[${analysisType}] Parsed object keys:`, Object.keys(parsed));
+
+		return parseResponse(parsed);
+	} catch (error) {
+		// Failed to parse AI analysis response
+		console.error(`Failed to parse ${analysisType} response:`, error);
+		console.error("Raw response length:", response.length);
+		console.error(
+			`[${analysisType}] First 1000 chars of raw response:`,
+			response.substring(0, 1000),
 		);
-
-		// Notify that we received response
-		if (onProgress) {
-			onProgress({
-				phase: "analyzing",
-				subPhase: "processing",
-				chunkDescription: `Processing ${analysisType} response (${duration}s)`,
-			});
-		}
-		console.log(`=== ${analysisType} Analysis Complete ===`);
-
-		try {
-			// Clean the response to extract JSON from markdown if needed
-			const cleanedResponse = extractJSONFromResponse(response);
-			console.log(`[${analysisType}] Attempting to parse cleaned response`);
-			const parsed = JSON.parse(cleanedResponse);
-			console.log(`[${analysisType}] Parsed object keys:`, Object.keys(parsed));
-
-			return parseResponse(parsed);
-		} catch (error) {
-			// Failed to parse AI analysis response
-			console.error(`Failed to parse ${analysisType} response:`, error);
-			console.error("Raw response length:", response.length);
-			console.error(
-				`[${analysisType}] First 1000 chars of raw response:`,
-				response.substring(0, 1000),
-			);
-			throw error;
-		}
-	} finally {
-		// No cleanup needed with stateless providers
+		throw error;
 	}
 }
 
@@ -1000,13 +954,10 @@ async function analyzeUserProfile(
 	return analyzeWithAI(
 		items,
 		aiConfig,
-		customSystemPrompt || ANALYSIS_SYSTEM_PROMPT_NO_PATTERNS,
-		getAnalysisSchema(false), // false = no patterns
+		customSystemPrompt || USER_PROFILE_SYSTEM_PROMPT,
+		USER_PROFILE_SCHEMA,
 		"user profile",
-		(parsed) => {
-			const validated = parsed as { userProfile: UserProfile };
-			return validated.userProfile;
-		},
+		UserProfileSchema.parse,
 		onProgress,
 		abortSignal,
 	);
@@ -1024,12 +975,9 @@ async function analyzeWorkflowPatterns(
 		items,
 		aiConfig,
 		customSystemPrompt || WORKFLOW_PATTERNS_SYSTEM_PROMPT,
-		getWorkflowPatternsSchema(),
+		WORKFLOW_PATTERNS_ONLY_SCHEMA,
 		"workflow patterns",
-		(parsed) => {
-			const validated = parsed as { patterns: WorkflowPattern[] };
-			return validated.patterns;
-		},
+		WorkflowPatternsOnlySchema.parse,
 		onProgress,
 		abortSignal,
 	);

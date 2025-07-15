@@ -26,9 +26,10 @@ import {
 	CLAUDE_CONSOLE_URL,
 } from "../utils/claude-provider";
 import {
-	ANALYSIS_SYSTEM_PROMPT,
 	CHUNK_SYSTEM_PROMPT,
 	MERGE_SYSTEM_PROMPT,
+	USER_PROFILE_SYSTEM_PROMPT,
+	WORKFLOW_PATTERNS_SYSTEM_PROMPT,
 } from "../utils/constants";
 import {
 	GEMINI_CONSOLE_NAME,
@@ -41,6 +42,7 @@ import RemoteAIProviderSettings from "./RemoteAIProviderSettings.svelte";
 type Props = {
 	onPromptsChange?: (prompts: {
 		system: string;
+		workflow: string;
 		chunk: string;
 		merge: string;
 	}) => void;
@@ -56,10 +58,12 @@ let {
 	currentProviderType = "chrome",
 }: Props = $props();
 
-let editableSystemPrompt = $state(ANALYSIS_SYSTEM_PROMPT);
+let editableProfilePrompt = $state(USER_PROFILE_SYSTEM_PROMPT);
+let editableWorkflowPrompt = $state(WORKFLOW_PATTERNS_SYSTEM_PROMPT);
 let editableChunkPrompt = $state(CHUNK_SYSTEM_PROMPT);
 let editableMergePrompt = $state(MERGE_SYSTEM_PROMPT);
 let showAnalysisSchema = $state(false);
+let showWorkflowSchema = $state(false);
 let showChunkSchema = $state(false);
 let showMergeSchema = $state(false);
 
@@ -186,14 +190,16 @@ async function handleGeminiApiKeyChange() {
 
 function handlePromptChange() {
 	onPromptsChange?.({
-		system: editableSystemPrompt,
+		system: editableProfilePrompt,
+		workflow: editableWorkflowPrompt,
 		chunk: editableChunkPrompt,
 		merge: editableMergePrompt,
 	});
 }
 
 function resetPrompts() {
-	editableSystemPrompt = ANALYSIS_SYSTEM_PROMPT;
+	editableProfilePrompt = USER_PROFILE_SYSTEM_PROMPT;
+	editableWorkflowPrompt = WORKFLOW_PATTERNS_SYSTEM_PROMPT;
 	editableChunkPrompt = CHUNK_SYSTEM_PROMPT;
 	editableMergePrompt = MERGE_SYSTEM_PROMPT;
 	handlePromptChange();
@@ -332,7 +338,7 @@ function formatLastRunTime(): string {
 						</div>
 						<textarea
 							id="system-prompt"
-							bind:value={editableSystemPrompt}
+							bind:value={editableProfilePrompt}
 							oninput={handlePromptChange}
 							rows="4"
 							class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
@@ -342,6 +348,39 @@ function formatLastRunTime(): string {
 							This prompt guides the AI when analyzing browsing patterns to identify workflows and create user profiles.
 						</p>
 						{#if showAnalysisSchema}
+							<div class="mt-2 p-3 bg-gray-100 rounded-md">
+								<p class="text-xs font-medium text-gray-700 mb-1">Expected Output Schema:</p>
+								<pre class="text-xs text-gray-600 overflow-x-auto">{JSON.stringify(ANALYSIS_SCHEMA, null, 2)}</pre>
+							</div>
+						{/if}
+					</div>
+					
+					<!-- Workflow Patterns Prompt -->
+					<div>
+						<div class="flex items-center justify-between mb-2">
+							<label for="workflow-prompt" class="block text-sm font-medium text-gray-700">
+								Workflow Patterns System Prompt
+							</label>
+							<button
+								type="button"
+								onclick={() => showWorkflowSchema = !showWorkflowSchema}
+								class="text-xs text-blue-600 hover:text-blue-800"
+							>
+								{showWorkflowSchema ? 'Hide' : 'Show'} Expected Output Schema
+							</button>
+						</div>
+						<textarea
+							id="workflow-prompt"
+							bind:value={editableWorkflowPrompt}
+							oninput={handlePromptChange}
+							rows="4"
+							class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+							placeholder="Enter custom workflow patterns prompt..."
+						></textarea>
+						<p class="mt-1 text-xs text-gray-500">
+							This prompt guides the AI when analyzing browsing history to identify recurring workflow patterns and automation opportunities.
+						</p>
+						{#if showWorkflowSchema}
 							<div class="mt-2 p-3 bg-gray-100 rounded-md">
 								<p class="text-xs font-medium text-gray-700 mb-1">Expected Output Schema:</p>
 								<pre class="text-xs text-gray-600 overflow-x-auto">{JSON.stringify(ANALYSIS_SCHEMA, null, 2)}</pre>

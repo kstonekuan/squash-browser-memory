@@ -26,6 +26,7 @@ import {
 } from "./utils/analysis-operations";
 import { broadcast } from "./utils/broadcast";
 import * as chromeAPI from "./utils/chrome-api";
+import { MIN_HISTORY_ITEMS_FOR_ANALYSIS } from "./utils/constants";
 import { loadMemoryFromStorage, saveMemoryToStorage } from "./utils/memory";
 import { loadMemorySettings } from "./utils/memory-settings";
 import {
@@ -553,8 +554,10 @@ export async function triggerAnalysis(trigger: "manual" | "alarm") {
 			`[Analysis] Found ${historyItems.length} history items to analyze`,
 		);
 
-		if (historyItems.length === 0) {
-			console.log("[Analysis] No history to analyze");
+		if (historyItems.length < MIN_HISTORY_ITEMS_FOR_ANALYSIS) {
+			console.log(
+				`[Analysis] Insufficient history items (${historyItems.length} < ${MIN_HISTORY_ITEMS_FOR_ANALYSIS})`,
+			);
 
 			await saveAutoAnalysisSettings({
 				...settings,
@@ -565,8 +568,12 @@ export async function triggerAnalysis(trigger: "manual" | "alarm") {
 			isAnalysisRunning = false;
 			await broadcast.analysisStatus({
 				status: "skipped",
-				reason: "no-new-history",
-				message: "No browsing history to analyze",
+				reason:
+					historyItems.length === 0 ? "no-new-history" : "insufficient-history",
+				message:
+					historyItems.length === 0
+						? "No browsing history to analyze"
+						: `Need at least ${MIN_HISTORY_ITEMS_FOR_ANALYSIS} history items for meaningful analysis (found ${historyItems.length})`,
 			});
 			return;
 		}
