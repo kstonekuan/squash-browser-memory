@@ -98,4 +98,4 @@ export function chromeLinkWithSuperjson<TRouter extends AnyRouter>(
 }
 
 // Re-export the message handler creation utility
-export { createTRPCMessageHandler } from "../utils/trpc-chrome-transport";
+export { createTRPCMessageHandler } from "./transport";

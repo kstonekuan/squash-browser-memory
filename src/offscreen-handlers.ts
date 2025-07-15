@@ -4,7 +4,7 @@
  */
 
 import { offscreenToBackgroundClient } from "./trpc/client";
-import type { AnalysisProgress } from "./trpc/schemas";
+import type { AnalysisProgress, TRPCContext } from "./trpc/schemas";
 import { loadAIConfigFromServiceWorker } from "./utils/ai-config";
 import { createProvider } from "./utils/ai-provider-factory";
 import {
@@ -68,17 +68,27 @@ function createProgressCallback(): ProgressCallback {
 	};
 }
 
-export async function handleStartAnalysis(input: {
-	historyItems: chrome.history.HistoryItem[];
-	customPrompts?: {
-		systemPrompt?: string;
-		chunkPrompt?: string;
-		mergePrompt?: string;
-	};
-	analysisId: string;
-	memorySettings?: { storeWorkflowPatterns: boolean };
-}) {
+export async function handleStartAnalysis(
+	input: {
+		historyItems: chrome.history.HistoryItem[];
+		customPrompts?: {
+			systemPrompt?: string;
+			chunkPrompt?: string;
+			mergePrompt?: string;
+		};
+		analysisId: string;
+		memorySettings?: { storeWorkflowPatterns: boolean };
+	},
+	ctx?: TRPCContext,
+) {
 	const { historyItems, customPrompts, analysisId, memorySettings } = input;
+
+	console.log(`[Offscreen] Starting analysis`, {
+		analysisId,
+		itemCount: historyItems.length,
+		sender: ctx?.sender?.tab?.id ? `tab:${ctx.sender.tab.id}` : "background",
+		timestamp: ctx?.timestamp,
+	});
 
 	// Cancel any existing analysis
 	prepareForNewAnalysis(currentAnalysisId, activeAnalyses);
@@ -147,8 +157,17 @@ export async function handleStartAnalysis(input: {
 	}
 }
 
-export async function handleCancelAnalysis(input: { analysisId: string }) {
+export async function handleCancelAnalysis(
+	input: { analysisId: string },
+	ctx?: TRPCContext,
+) {
 	const { analysisId } = input;
+
+	console.log(`[Offscreen] Cancelling analysis`, {
+		analysisId,
+		sender: ctx?.sender?.tab?.id ? `tab:${ctx.sender.tab.id}` : "background",
+		timestamp: ctx?.timestamp,
+	});
 
 	const result = handleCancelLogic(
 		analysisId,
@@ -165,11 +184,14 @@ export async function handleCancelAnalysis(input: { analysisId: string }) {
 	return { success: result.success, error: result.error };
 }
 
-export async function handleInitializeAI() {
+export async function handleInitializeAI(ctx?: TRPCContext) {
 	try {
 		// Load the AI config to determine which provider to use
 		const config = await loadAIConfigFromServiceWorker();
-		console.log("[Offscreen] Initializing AI provider:", config.provider);
+		console.log("[Offscreen] Initializing AI provider:", config.provider, {
+			sender: ctx?.sender?.tab?.id ? `tab:${ctx.sender.tab.id}` : "background",
+			timestamp: ctx?.timestamp,
+		});
 
 		// Report initializing status
 		await offscreenToBackgroundClient._internal.reportAIStatus.mutate({

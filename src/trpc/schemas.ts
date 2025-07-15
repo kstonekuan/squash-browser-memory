@@ -5,6 +5,12 @@
 
 import { z } from "zod";
 
+// Shared context type for tRPC routers
+export interface TRPCContext {
+	timestamp: number;
+	sender?: chrome.runtime.MessageSender;
+}
+
 // Base schemas
 const memorySettingsSchema = z.object({
 	storeWorkflowPatterns: z.boolean(),

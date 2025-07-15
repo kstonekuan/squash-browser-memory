@@ -30,16 +30,11 @@ import {
 	aiStatusSchema,
 	analysisProgressSchema,
 	startManualAnalysisInputSchema,
+	type TRPCContext,
 } from "./schemas";
 
-// Context available to all procedures
-interface Context {
-	timestamp: number;
-	sender?: chrome.runtime.MessageSender;
-}
-
 // Initialize tRPC with SuperJSON transformer
-const t = initTRPC.context<Context>().create({
+const t = initTRPC.context<TRPCContext>().create({
 	isServer: false,
 	allowOutsideOfServer: true,
 	transformer: superjson,
@@ -51,14 +46,14 @@ export const backgroundRouter = t.router({
 	analysis: t.router({
 		startManual: t.procedure
 			.input(startManualAnalysisInputSchema)
-			.mutation(async ({ input }) => {
-				return handleStartManualAnalysis(input);
+			.mutation(async ({ input, ctx }) => {
+				return handleStartManualAnalysis(input, ctx);
 			}),
 
 		cancel: t.procedure
 			.input(z.object({ analysisId: z.string() }))
-			.mutation(async ({ input }) => {
-				return handleCancelAnalysis(input);
+			.mutation(async ({ input, ctx }) => {
+				return handleCancelAnalysis(input, ctx);
 			}),
 
 		getState: t.procedure.query(async () => {
@@ -70,8 +65,8 @@ export const backgroundRouter = t.router({
 	settings: t.router({
 		toggleAutoAnalysis: t.procedure
 			.input(z.object({ enabled: z.boolean() }))
-			.mutation(async ({ input }) => {
-				return handleToggleAutoAnalysis(input);
+			.mutation(async ({ input, ctx }) => {
+				return handleToggleAutoAnalysis(input, ctx);
 			}),
 	}),
 
@@ -109,7 +104,7 @@ export const backgroundRouter = t.router({
 		}),
 
 		write: t.procedure
-			.input(z.object({ memory: z.any() as z.ZodType<AnalysisMemory> }))
+			.input(z.any() as z.ZodType<AnalysisMemory>)
 			.mutation(async ({ input }) => {
 				return handleWriteMemory(input);
 			}),

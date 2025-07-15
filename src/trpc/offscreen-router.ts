@@ -11,15 +11,10 @@ import {
 	handleInitializeAI,
 	handleStartAnalysis,
 } from "../offscreen-handlers";
-import { startAnalysisInputSchema } from "./schemas";
-
-// Context available to all procedures
-interface Context {
-	timestamp: number;
-}
+import { startAnalysisInputSchema, type TRPCContext } from "./schemas";
 
 // Initialize tRPC with SuperJSON transformer
-const t = initTRPC.context<Context>().create({
+const t = initTRPC.context<TRPCContext>().create({
 	isServer: false,
 	allowOutsideOfServer: true,
 	transformer: superjson,
@@ -30,18 +25,18 @@ export const offscreenRouter = t.router({
 	offscreen: t.router({
 		startAnalysis: t.procedure
 			.input(startAnalysisInputSchema)
-			.mutation(async ({ input }) => {
-				return handleStartAnalysis(input);
+			.mutation(async ({ input, ctx }) => {
+				return handleStartAnalysis(input, ctx);
 			}),
 
 		cancelAnalysis: t.procedure
 			.input(z.object({ analysisId: z.string() }))
-			.mutation(async ({ input }) => {
-				return handleCancelAnalysis(input);
+			.mutation(async ({ input, ctx }) => {
+				return handleCancelAnalysis(input, ctx);
 			}),
 
-		initializeAI: t.procedure.mutation(async () => {
-			return handleInitializeAI();
+		initializeAI: t.procedure.mutation(async ({ ctx }) => {
+			return handleInitializeAI(ctx);
 		}),
 	}),
 });

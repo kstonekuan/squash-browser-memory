@@ -6,7 +6,7 @@
 import { format } from "date-fns";
 import { match } from "ts-pattern";
 import { backgroundToOffscreenClient } from "./trpc/client";
-import type { AIStatus, AnalysisProgress } from "./trpc/schemas";
+import type { AIStatus, AnalysisProgress, TRPCContext } from "./trpc/schemas";
 import type {
 	AnalysisMemory,
 	CustomPrompts,
@@ -114,7 +114,14 @@ const chromeAlarmAPI: AlarmAPI = {
 };
 
 // Handler functions for tRPC procedures
-export async function handleToggleAutoAnalysis(input: { enabled: boolean }) {
+export async function handleToggleAutoAnalysis(
+	input: { enabled: boolean },
+	ctx?: TRPCContext,
+) {
+	console.log(`[Background] Auto-analysis toggle: ${input.enabled}`, {
+		sender: ctx?.sender?.tab?.id ? `tab:${ctx.sender.tab.id}` : "unknown",
+		timestamp: ctx?.timestamp,
+	});
 	return handleAutoAnalysisToggleLogic(
 		input.enabled,
 		ALARM_NAME,
@@ -122,18 +129,27 @@ export async function handleToggleAutoAnalysis(input: { enabled: boolean }) {
 	);
 }
 
-export async function handleStartManualAnalysis(input: {
-	historyItems: chrome.history.HistoryItem[];
-	customPrompts?: {
-		systemPrompt?: string;
-		chunkPrompt?: string;
-		mergePrompt?: string;
-	};
-	memorySettings?: { storeWorkflowPatterns: boolean };
-}): Promise<
+export async function handleStartManualAnalysis(
+	input: {
+		historyItems: chrome.history.HistoryItem[];
+		customPrompts?: {
+			systemPrompt?: string;
+			chunkPrompt?: string;
+			mergePrompt?: string;
+		};
+		memorySettings?: { storeWorkflowPatterns: boolean };
+	},
+	ctx?: TRPCContext,
+): Promise<
 	{ success: true; analysisId: string } | { success: false; error: string }
 > {
 	const { historyItems, customPrompts, memorySettings } = input;
+
+	console.log(`[Background] Manual analysis requested`, {
+		itemCount: historyItems.length,
+		sender: ctx?.sender?.tab?.id ? `tab:${ctx.sender.tab.id}` : "unknown",
+		timestamp: ctx?.timestamp,
+	});
 
 	// Check if analysis is already running
 	const { canStart, error } = checkAnalysisRunningLogic(isAnalysisRunning);
@@ -181,9 +197,18 @@ export async function handleStartManualAnalysis(input: {
 	}
 }
 
-export async function handleCancelAnalysis(input: {
-	analysisId: string;
-}): Promise<{ success: boolean; error?: string }> {
+export async function handleCancelAnalysis(
+	input: {
+		analysisId: string;
+	},
+	ctx?: TRPCContext,
+): Promise<{ success: boolean; error?: string }> {
+	console.log(`[Background] Cancel analysis requested`, {
+		analysisId: input.analysisId,
+		sender: ctx?.sender?.tab?.id ? `tab:${ctx.sender.tab.id}` : "unknown",
+		timestamp: ctx?.timestamp,
+	});
+
 	const { shouldCancel, error } = cancelAnalysisLogic(
 		currentAnalysisId,
 		input.analysisId,
@@ -254,8 +279,8 @@ export async function handleReadMemory() {
 	return { memory };
 }
 
-export async function handleWriteMemory(input: { memory: unknown }) {
-	await saveMemoryToStorage(input.memory as AnalysisMemory);
+export async function handleWriteMemory(input: AnalysisMemory) {
+	await saveMemoryToStorage(input);
 	return { success: true };
 }
 
