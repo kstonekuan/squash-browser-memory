@@ -56,10 +56,9 @@ export class ChromeAIProvider implements AIProvider {
 		);
 
 		return result.match(
-			(response) => {
-				console.log("Response received", response);
-				return response;
-			},
+			(response) => 
+				{console.log("Response received (trimmed)", response.trim());
+				return response},
 			(error) => {
 				console.error("Chrome AI Error:", error);
 				throw error;
