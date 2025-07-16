@@ -28,7 +28,7 @@ export function setStorageData<K extends StorageKey>(
 	value: StorageSchema[K],
 ): ResultAsync<void, Error> {
 	try {
-		const serialized = superjson.stringify(value);
+		const serialized = superjson.serialize(value);
 		return ResultAsync.fromPromise(
 			handle.set({ [key]: serialized }),
 			(error) => {
@@ -64,7 +64,7 @@ export function getStorageData<K extends StorageKey>(
 		}
 
 		try {
-			const data = superjson.parse<StorageSchema[K]>(result[key]);
+			const data = superjson.deserialize<StorageSchema[K]>(result[key]);
 			return ok(data);
 		} catch (error) {
 			console.warn(`Failed to deserialize storage data for key "${key}"`);
