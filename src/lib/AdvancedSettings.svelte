@@ -1,5 +1,6 @@
 <script lang="ts">
 import { formatDistanceToNow } from "date-fns";
+import { toJSONSchema } from "zod/v4";
 import {
 	getAmbientSettings,
 	toggleAmbientAnalysis,
@@ -35,7 +36,11 @@ import {
 	GEMINI_CONSOLE_NAME,
 	GEMINI_CONSOLE_URL,
 } from "../utils/gemini-provider";
-import { ANALYSIS_SCHEMA, CHUNK_SCHEMA } from "../utils/schemas";
+import {
+	ChunkSchema,
+	UserProfileSchema,
+	WorkflowPatternsOnlySchema,
+} from "../utils/schemas";
 import CollapsibleSection from "./CollapsibleSection.svelte";
 import RemoteAIProviderSettings from "./RemoteAIProviderSettings.svelte";
 
@@ -242,7 +247,7 @@ function formatLastRunTime(): string {
 		return "Never";
 	}
 
-	const date = new Date(autoAnalysisSettings.lastRunTimestamp);
+	const date = autoAnalysisSettings.lastRunTimestamp;
 	return formatDistanceToNow(date, { addSuffix: true });
 }
 </script>
@@ -350,7 +355,7 @@ function formatLastRunTime(): string {
 						{#if showAnalysisSchema}
 							<div class="mt-2 p-3 bg-gray-100 rounded-md">
 								<p class="text-xs font-medium text-gray-700 mb-1">Expected Output Schema:</p>
-								<pre class="text-xs text-gray-600 overflow-x-auto">{JSON.stringify(ANALYSIS_SCHEMA, null, 2)}</pre>
+								<pre class="text-xs text-gray-600 overflow-x-auto">{JSON.stringify(toJSONSchema(UserProfileSchema), null, 2)}</pre>
 							</div>
 						{/if}
 					</div>
@@ -383,7 +388,7 @@ function formatLastRunTime(): string {
 						{#if showWorkflowSchema}
 							<div class="mt-2 p-3 bg-gray-100 rounded-md">
 								<p class="text-xs font-medium text-gray-700 mb-1">Expected Output Schema:</p>
-								<pre class="text-xs text-gray-600 overflow-x-auto">{JSON.stringify(ANALYSIS_SCHEMA, null, 2)}</pre>
+								<pre class="text-xs text-gray-600 overflow-x-auto">{JSON.stringify(toJSONSchema(WorkflowPatternsOnlySchema), null, 2)}</pre>
 							</div>
 						{/if}
 					</div>
@@ -416,7 +421,7 @@ function formatLastRunTime(): string {
 						{#if showChunkSchema}
 							<div class="mt-2 p-3 bg-gray-100 rounded-md">
 								<p class="text-xs font-medium text-gray-700 mb-1">Expected Output Schema:</p>
-								<pre class="text-xs text-gray-600 overflow-x-auto">{JSON.stringify(CHUNK_SCHEMA, null, 2)}</pre>
+								<pre class="text-xs text-gray-600 overflow-x-auto">{JSON.stringify(toJSONSchema(ChunkSchema), null, 2)}</pre>
 							</div>
 						{/if}
 					</div>
@@ -449,8 +454,8 @@ function formatLastRunTime(): string {
 						{#if showMergeSchema}
 							<div class="mt-2 p-3 bg-gray-100 rounded-md">
 								<p class="text-xs font-medium text-gray-700 mb-1">Expected Output Schema:</p>
-								<pre class="text-xs text-gray-600 overflow-x-auto">{JSON.stringify(ANALYSIS_SCHEMA, null, 2)}</pre>
-								<p class="mt-2 text-xs text-gray-500">Note: The merge operation uses the same schema as the analysis.</p>
+								<pre class="text-xs text-gray-600 overflow-x-auto">{JSON.stringify(toJSONSchema(UserProfileSchema), null, 2)}</pre>
+								<p class="mt-2 text-xs text-gray-500">Note: The merge operation typically uses the UserProfile schema.</p>
 							</div>
 						{/if}
 					</div>

@@ -6,13 +6,13 @@ import {
 	setSeconds,
 	startOfDay,
 } from "date-fns";
-import type { z } from "zod/v4";
+import { toJSONSchema, type z } from "zod/v4";
 import type { ChunkingResult, ChunkTimeRange } from "../types";
 import type { AIProviderConfig } from "./ai-interface";
 import { getInitializedProvider, promptAI } from "./ai-provider-utils";
 import { buildChunkingPrompt, CHUNK_SYSTEM_PROMPT } from "./constants";
 import type { HistoryChunk } from "./memory";
-import { CHUNK_SCHEMA, ChunkSchema } from "./schemas";
+import { ChunkSchema } from "./schemas";
 import { extractJSONFromResponse } from "./shared-utils";
 
 // Analyze timestamps to identify natural browsing sessions
@@ -75,7 +75,7 @@ export async function identifyChunks(
 	try {
 		const startTime = performance.now();
 		const response = await promptAI(provider, prompt, {
-			responseConstraint: CHUNK_SCHEMA,
+			responseConstraint: toJSONSchema(ChunkSchema),
 		});
 		const endTime = performance.now();
 		const duration = ((endTime - startTime) / 1000).toFixed(2);
@@ -255,7 +255,7 @@ async function identifyChunksForBatch(
 	try {
 		const startTime = performance.now();
 		const response = await promptAI(provider, prompt, {
-			responseConstraint: CHUNK_SCHEMA,
+			responseConstraint: toJSONSchema(ChunkSchema),
 		});
 		const endTime = performance.now();
 		const duration = ((endTime - startTime) / 1000).toFixed(2);

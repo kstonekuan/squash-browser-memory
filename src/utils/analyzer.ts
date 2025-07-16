@@ -1,6 +1,7 @@
 /// <reference types="@types/dom-chromium-ai" />
 
 import { format } from "date-fns";
+import { prettifyError, toJSONSchema, ZodError, type ZodType } from "zod/v4";
 import type {
 	AnalysisMemory,
 	ChunkInfo,
@@ -25,10 +26,8 @@ import {
 import { createEmptyMemory } from "./memory";
 import { loadMemorySettings } from "./memory-settings";
 import {
-	ANALYSIS_SCHEMA,
-	USER_PROFILE_SCHEMA,
+	AnalysisResultSchema,
 	UserProfileSchema,
-	WORKFLOW_PATTERNS_ONLY_SCHEMA,
 	WorkflowPatternsOnlySchema,
 } from "./schemas";
 import {
@@ -358,8 +357,7 @@ async function mergeWithAI<T>(
 	existing: T,
 	newData: T,
 	aiConfig: AIProviderConfig,
-	responseConstraint: Record<string, unknown>,
-	parseResponse: (parsed: unknown) => T,
+	zodSchema: ZodType<T, unknown>,
 	customSystemPrompt?: string,
 	abortSignal?: AbortSignal,
 	onProgress?: ProgressCallback,
@@ -430,7 +428,7 @@ async function mergeWithAI<T>(
 
 		const startTime = performance.now();
 		const response = await promptAI(provider, mergePrompt, {
-			responseConstraint: responseConstraint,
+			responseConstraint: toJSONSchema(zodSchema),
 			signal: abortSignal,
 		});
 		const endTime = performance.now();
@@ -448,22 +446,36 @@ async function mergeWithAI<T>(
 			});
 		}
 
+		let parsed: object;
+
 		try {
 			// Clean the response to extract JSON from markdown if needed
 			const cleanedResponse = extractJSONFromResponse(response);
 			console.log(`[${typeName}Merge] Attempting to parse cleaned response`);
-			const parsed = JSON.parse(cleanedResponse);
+			parsed = JSON.parse(cleanedResponse);
 			console.log(
 				`[${typeName}Merge] Parsed object keys:`,
 				Object.keys(parsed),
 			);
+		} catch (error) {
+			console.error(
+				`Failed to parse ${mergeType} merge response to JSON:`,
+				error,
+			);
+			throw error;
+		}
 
-			const validated = parseResponse(parsed);
-			return validated;
-		} catch (parseError) {
-			console.error(`Failed to parse ${mergeType} merge response:`, parseError);
-			console.error("Response length:", response.length);
-			throw parseError;
+		try {
+			const res = zodSchema.parse(parsed);
+			return res;
+		} catch (error) {
+			if (error instanceof ZodError) {
+				const pretty = prettifyError(error);
+				console.error(`Failed to parse ${mergeType} merge JSON to T:`, pretty);
+			}
+
+			console.error(`Failed to parse ${mergeType} merge JSON to T:`, error);
+			throw error;
 		}
 	} catch (error) {
 		console.error(`Failed to merge ${mergeType}:`, error);
@@ -496,8 +508,7 @@ async function mergeUserProfiles(
 			existingProfile,
 			newProfile,
 			aiConfig,
-			USER_PROFILE_SCHEMA,
-			UserProfileSchema.parse,
+			UserProfileSchema,
 			customSystemPrompt,
 			abortSignal,
 			onProgress,
@@ -538,8 +549,7 @@ async function mergeWorkflowPatterns(
 			existingPatterns,
 			newPatterns,
 			aiConfig,
-			WORKFLOW_PATTERNS_ONLY_SCHEMA,
-			WorkflowPatternsOnlySchema.parse,
+			WorkflowPatternsOnlySchema,
 			customSystemPrompt,
 			abortSignal,
 			onProgress,
@@ -747,7 +757,7 @@ async function analyzeChunkWithSubdivision(
 				const testData = testHistoryData.slice(0, testItems.length);
 				const testPrompt = buildAnalysisPrompt(testItems, testData);
 				return await provider.measureInputUsage(testPrompt, {
-					responseConstraint: ANALYSIS_SCHEMA,
+					responseConstraint: toJSONSchema(AnalysisResultSchema),
 					signal: abortSignal,
 				});
 			},
@@ -853,9 +863,8 @@ async function analyzeWithAI<T>(
 	items: chrome.history.HistoryItem[],
 	aiConfig: AIProviderConfig,
 	systemPrompt: string,
-	responseConstraint: Record<string, unknown> | undefined,
 	analysisType: string,
-	parseResponse: (parsed: unknown) => T,
+	zodSchema: ZodType<T, unknown>,
 	onProgress?: ProgressCallback,
 	abortSignal?: AbortSignal,
 ): Promise<T> {
@@ -897,7 +906,7 @@ async function analyzeWithAI<T>(
 
 	const startTime = performance.now();
 	const response = await promptAI(provider, prompt, {
-		responseConstraint: responseConstraint,
+		responseConstraint: toJSONSchema(zodSchema),
 		signal: abortSignal,
 	});
 	const endTime = performance.now();
@@ -917,22 +926,29 @@ async function analyzeWithAI<T>(
 	}
 	console.log(`=== ${analysisType} Analysis Complete ===`);
 
+	let parsed: object;
+
 	try {
 		// Clean the response to extract JSON from markdown if needed
 		const cleanedResponse = extractJSONFromResponse(response);
 		console.log(`[${analysisType}] Attempting to parse cleaned response`);
-		const parsed = JSON.parse(cleanedResponse);
+		parsed = JSON.parse(cleanedResponse);
 		console.log(`[${analysisType}] Parsed object keys:`, Object.keys(parsed));
-
-		return parseResponse(parsed);
 	} catch (error) {
-		// Failed to parse AI analysis response
-		console.error(`Failed to parse ${analysisType} response:`, error);
-		console.error("Raw response length:", response.length);
-		console.error(
-			`[${analysisType}] First 1000 chars of raw response:`,
-			response.substring(0, 1000),
-		);
+		console.error(`Failed to parse ${analysisType} response to JSON:`, error);
+		throw error;
+	}
+
+	try {
+		const res = zodSchema.parse(parsed);
+		return res;
+	} catch (error) {
+		if (error instanceof ZodError) {
+			const pretty = prettifyError(error);
+			console.error(`Failed to parse ${analysisType} JSON to T:`, pretty);
+		}
+
+		console.error(`Failed to parse ${analysisType} JSON to T:`, error);
 		throw error;
 	}
 }
@@ -949,9 +965,8 @@ async function analyzeUserProfile(
 		items,
 		aiConfig,
 		customSystemPrompt || USER_PROFILE_SYSTEM_PROMPT,
-		USER_PROFILE_SCHEMA,
 		"user profile",
-		UserProfileSchema.parse,
+		UserProfileSchema,
 		onProgress,
 		abortSignal,
 	);
@@ -969,9 +984,8 @@ async function analyzeWorkflowPatterns(
 		items,
 		aiConfig,
 		customSystemPrompt || WORKFLOW_PATTERNS_SYSTEM_PROMPT,
-		WORKFLOW_PATTERNS_ONLY_SCHEMA,
 		"workflow patterns",
-		WorkflowPatternsOnlySchema.parse,
+		WorkflowPatternsOnlySchema,
 		onProgress,
 		abortSignal,
 	);
