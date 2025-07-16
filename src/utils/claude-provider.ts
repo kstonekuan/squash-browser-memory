@@ -114,10 +114,7 @@ export class ClaudeProvider implements AIProvider {
 		}
 
 		try {
-			console.log(
-				"Request content:",
-				`${userContent.toString()}...`,
-			);
+			console.log("Request content:", `${userContent.toString()}...`);
 
 			const message = await this.client.messages.create(
 				{
@@ -137,6 +134,7 @@ export class ClaudeProvider implements AIProvider {
 			);
 
 			console.log("Response received");
+			console.log("Response content:", message.content);
 
 			// Handle the response content array
 			const content = message.content[0];

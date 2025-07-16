@@ -115,10 +115,7 @@ export class GeminiProvider implements AIProvider {
 		}
 
 		try {
-			console.log(
-				"Request content:",
-				`${userContent.toString()}...`,
-			);
+			console.log("Request content:", `${userContent.toString()}...`);
 
 			// Prepare the full prompt with system prompt if available
 			let fullPrompt = userContent;
@@ -138,6 +135,7 @@ export class GeminiProvider implements AIProvider {
 			});
 
 			console.log("Response received");
+			console.log("Response content:", response.text);
 
 			const text = response.text;
 			if (!text) {
