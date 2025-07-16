@@ -9,10 +9,10 @@ export interface AutoAnalysisSettings {
 	enabled: boolean;
 	notifyOnSuccess: boolean;
 	notifyOnError: boolean;
-	lastRunTimestamp?: number;
+	lastRunTimestamp?: Date;
 	lastRunStatus?: "success" | "error";
 	lastRunError?: string;
-	nextAlarmTime?: number; // Actual scheduled Chrome alarm time
+	nextAlarmTime?: Date; // Actual scheduled Chrome alarm time
 }
 
 // Default settings

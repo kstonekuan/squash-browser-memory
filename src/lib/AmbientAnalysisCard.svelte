@@ -74,7 +74,7 @@ function formatLastRunTime(): string {
 		return "Never";
 	}
 
-	const date = new Date(settings.lastRunTimestamp);
+	const date = settings.lastRunTimestamp;
 	const now = new Date();
 	const diffMs = now.getTime() - date.getTime();
 
@@ -133,7 +133,7 @@ function getNextAnalysisTime(): string {
 		return format(nextTime, "p");
 	} else {
 		// Calculate next hourly run
-		const lastRun = new Date(settings.lastRunTimestamp);
+		const lastRun = settings.lastRunTimestamp;
 		const nextRun = new Date(lastRun.getTime() + 3600000); // Add 1 hour
 
 		// If next run is in the past, calculate the next future slot

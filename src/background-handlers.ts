@@ -449,7 +449,7 @@ async function runAnalysis(
 		const settings = await loadAutoAnalysisSettings();
 		await saveAutoAnalysisSettings({
 			...settings,
-			lastRunTimestamp: Date.now(),
+			lastRunTimestamp: new Date(),
 			lastRunStatus: "success",
 			lastRunError: undefined, // Clear any previous error
 		});
@@ -487,7 +487,7 @@ async function runAnalysis(
 				const settings = await loadAutoAnalysisSettings();
 				await saveAutoAnalysisSettings({
 					...settings,
-					lastRunTimestamp: Date.now(),
+					lastRunTimestamp: new Date(),
 					lastRunStatus: "error",
 					lastRunError: errorMessage,
 				});
@@ -624,7 +624,7 @@ export async function triggerAnalysis(trigger: "manual" | "alarm") {
 
 			await saveAutoAnalysisSettings({
 				...settings,
-				lastRunTimestamp: Date.now(),
+				lastRunTimestamp: new Date(),
 				lastRunStatus: "success",
 			});
 

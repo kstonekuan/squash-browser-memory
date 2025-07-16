@@ -82,6 +82,9 @@ export async function clearCorruptedStorage(): Promise<{
 	if (errors.length > 0) {
 		console.error("[Storage] Errors during cleanup:", errors);
 	}
+	if (cleaned.length === 0 && errors.length === 0) {
+		console.log("[Storage] No corrupted data found");
+	}
 
 	return { cleaned, errors };
 }
