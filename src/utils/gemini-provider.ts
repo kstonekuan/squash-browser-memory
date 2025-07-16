@@ -116,8 +116,8 @@ export class GeminiProvider implements AIProvider {
 
 		try {
 			console.log(
-				"Request content (truncated):",
-				`${userContent.substring(0, 200)}...`,
+				"Request content:",
+				`${userContent.toString()}...`,
 			);
 
 			// Prepare the full prompt with system prompt if available

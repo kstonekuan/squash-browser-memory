@@ -115,8 +115,8 @@ export class ClaudeProvider implements AIProvider {
 
 		try {
 			console.log(
-				"Request content (truncated):",
-				`${userContent.substring(0, 200)}...`,
+				"Request content:",
+				`${userContent.toString()}...`,
 			);
 
 			const message = await this.client.messages.create(
