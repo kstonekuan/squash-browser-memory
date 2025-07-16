@@ -44,7 +44,7 @@ const WorkflowPatternSchema = z.object({
 		),
 	frequency: z.number().describe("How often this pattern occured"),
 	urls: z
-		.array(z.url())
+		.array(z.string().describe("Website URL (max 100 chars)"))
 		.describe("Example URLs that are part of this workflow (max 5 URLs)"),
 	timePattern: z
 		.string()
