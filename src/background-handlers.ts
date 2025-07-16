@@ -31,17 +31,19 @@ import {
 import { broadcast } from "./utils/broadcast";
 import * as chromeAPI from "./utils/chrome-api";
 import { MIN_HISTORY_ITEMS_FOR_ANALYSIS } from "./utils/constants";
-import { loadMemoryFromStorage, saveMemoryToStorage } from "./utils/memory";
+import {
+	createEmptyMemory,
+	loadMemoryFromStorage,
+	saveMemoryToStorage,
+} from "./utils/memory";
 import { loadMemorySettings } from "./utils/memory-settings";
 import {
+	CUSTOM_PROMPTS_KEY,
 	createChromeStorage,
 	getStorageData,
+	LAST_ANALYSIS_RESULT_KEY,
 	setStorageData,
 } from "./utils/storage";
-import {
-	CUSTOM_PROMPTS_KEY,
-	LAST_ANALYSIS_RESULT_KEY,
-} from "./utils/storage-keys";
 
 // Track analysis state
 let isAnalysisRunning = false;
@@ -285,25 +287,10 @@ export async function handleWriteMemory(
 ) {
 	try {
 		// Ensure the memory object has the required structure
+		const emptyMemory = createEmptyMemory();
 		const memory: AnalysisMemory = {
-			patterns: input.memory?.patterns || [],
-			lastAnalyzedDate: input.memory?.lastAnalyzedDate || new Date(),
-			lastHistoryTimestamp: input.memory?.lastHistoryTimestamp || 0,
-			userProfile: input.memory?.userProfile || {
-				stableTraits: {
-					coreIdentities: [],
-					professionalDomains: [],
-					personalInterests: [],
-					values: [],
-				},
-				dynamicContext: {
-					currentTasks: [],
-					currentInterests: [],
-				},
-				summary: "",
-				goals: [],
-			},
-			version: input.memory?.version || "1",
+			...emptyMemory,
+			...input.memory,
 		};
 
 		await saveMemoryToStorage(memory);

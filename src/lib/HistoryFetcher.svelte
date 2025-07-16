@@ -4,6 +4,7 @@ import { onMount } from "svelte";
 import { match } from "ts-pattern";
 import type { AIProviderStatus } from "../types/ui-types";
 import type { AIProviderType } from "../utils/ai-interface";
+import { searchHistory } from "../utils/chrome-api";
 import { loadMemoryFromStorage } from "../utils/memory";
 
 type Props = {
@@ -83,10 +84,6 @@ function getStartTime(): number {
 		.exhaustive();
 }
 
-function getEndTime(): number {
-	return Date.now();
-}
-
 async function fetchHistory() {
 	if (isFetching || isAnalyzing || isAmbientAnalysisRunning) return;
 
@@ -96,7 +93,7 @@ async function fetchHistory() {
 
 	try {
 		const startTime = getStartTime();
-		const endTime = getEndTime();
+		const endTime = Date.now();
 
 		// Check if we're in an extension context
 		if (!chrome?.history?.search) {
@@ -105,14 +102,20 @@ async function fetchHistory() {
 			);
 		}
 
-		// Fetch history in batches for progress indication
+		// Fetch history using the wrapper for better error handling
 		const maxResults = 5000;
-		const results = await chrome.history.search({
+		const historyResult = await searchHistory({
 			text: "",
 			startTime,
 			endTime,
 			maxResults,
 		});
+
+		if (historyResult.isErr()) {
+			throw historyResult.error;
+		}
+
+		const results = historyResult.value;
 
 		if (!results || results.length === 0) {
 			if (onlyNewHistory) {

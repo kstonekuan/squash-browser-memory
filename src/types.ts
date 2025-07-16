@@ -50,7 +50,7 @@ export interface AnalysisMemory {
 	userProfile: UserProfile;
 	patterns: WorkflowPattern[];
 	lastAnalyzedDate: Date;
-	lastHistoryTimestamp: number; // Timestamp of the most recent history item analyzed
+	lastHistoryTimestamp: number;
 	version: string;
 }
 

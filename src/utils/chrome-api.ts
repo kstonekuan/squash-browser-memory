@@ -88,8 +88,6 @@ export function setAlarm(
 export function getAlarm(
 	name: string,
 ): ResultAsync<chrome.alarms.Alarm | undefined, Error> {
-	// Note: @types/chrome incorrectly types this as Promise<Alarm>
-	// but runtime returns undefined when alarm doesn't exist
 	return ResultAsync.fromPromise(
 		chrome.alarms.get(name),
 		(error) => new Error(`Failed to get alarm`, { cause: error }),

@@ -8,9 +8,8 @@ import {
 	getStorageData,
 	hasStorageData,
 	removeStorageData,
+	storageKeys,
 } from "./storage";
-
-import { storageKeys } from "./storage-keys";
 
 /**
  * Check and clear all corrupted storage data

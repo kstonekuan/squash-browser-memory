@@ -1,9 +1,12 @@
 /// <reference types="@types/dom-chromium-ai" />
 
-import { createChromeStorage, getStorageData, setStorageData } from "./storage";
-
 // Settings key for auto-analysis configuration
-import { AUTO_ANALYSIS_SETTINGS_KEY } from "./storage-keys";
+import {
+	AUTO_ANALYSIS_SETTINGS_KEY,
+	createChromeStorage,
+	getStorageData,
+	setStorageData,
+} from "./storage";
 
 export interface AutoAnalysisSettings {
 	enabled: boolean;
@@ -12,7 +15,6 @@ export interface AutoAnalysisSettings {
 	lastRunTimestamp?: Date;
 	lastRunStatus?: "success" | "error";
 	lastRunError?: string;
-	nextAlarmTime?: Date; // Actual scheduled Chrome alarm time
 }
 
 // Default settings

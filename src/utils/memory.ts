@@ -3,6 +3,7 @@ import type { AnalysisMemory } from "../types";
 import {
 	createChromeStorage,
 	getStorageData,
+	MEMORY_KEY,
 	removeStorageData,
 	setStorageData,
 } from "./storage";
@@ -16,8 +17,6 @@ export interface HistoryChunk {
 	totalChunks: number;
 	isFallback?: boolean;
 }
-
-import { MEMORY_KEY } from "./storage-keys";
 
 const MEMORY_VERSION = "2.0.0"; // Clean version without legacy support
 
@@ -54,7 +53,7 @@ export async function loadMemoryFromServiceWorker(): Promise<AnalysisMemory | nu
 		// SuperJSON via tRPC automatically handles Date deserialization
 		return memory;
 	} catch (error) {
-		console.error("[Memory] Failed to load memory via service worker:", error);
+		console.error("[Memory] Failed to load via service worker:", error);
 		return null;
 	}
 }
@@ -66,7 +65,7 @@ export async function loadMemoryFromStorage(): Promise<AnalysisMemory | null> {
 	// Create storage instance
 	const storage = createChromeStorage();
 	if (!storage) {
-		console.log("Chrome storage API not available for memory, returning null");
+		console.log("[Memory] Chrome storage API not available, returning null");
 		return null;
 	}
 
@@ -75,29 +74,29 @@ export async function loadMemoryFromStorage(): Promise<AnalysisMemory | null> {
 	return storageResult.match(
 		(data) => {
 			if (!data) {
-				console.log("No existing memory found in chrome.storage.local");
+				console.log(
+					"[Memory] No existing memory found in chrome.storage.local",
+				);
 				return null;
 			}
 
 			// Check version compatibility
 			if (data.version !== MEMORY_VERSION) {
 				console.log(
-					`Memory version mismatch (${data.version} !== ${MEMORY_VERSION}), creating new memory`,
+					`[Memory] version mismatch (${data.version} !== ${MEMORY_VERSION}), creating new memory`,
 				);
 				return null;
 			}
 
-			console.log("Loaded memory from chrome.storage.local:", {
+			console.log("[Memory] Loaded from chrome.storage.local:", {
 				patterns: data.patterns.length,
 				lastAnalyzed: data.lastAnalyzedDate,
-				lastAnalyzedType: typeof data.lastAnalyzedDate,
-				lastAnalyzedIsDate: data.lastAnalyzedDate instanceof Date,
 				lastHistoryTimestamp: data.lastHistoryTimestamp,
 			});
 			return data;
 		},
 		(error) => {
-			console.error("Failed to load memory from storage:", error);
+			console.error("[Memory] Failed to load from storage:", error);
 			return null;
 		},
 	);
@@ -112,7 +111,7 @@ export async function saveMemoryToServiceWorker(
 	try {
 		await offscreenToBackgroundClient.memory.write.mutate({ memory });
 	} catch (error) {
-		console.error("[Memory] Failed to save memory via service worker:", error);
+		console.error("[Memory] Failed to save via service worker:", error);
 	}
 }
 
@@ -125,7 +124,9 @@ export async function saveMemoryToStorage(
 	// Create storage instance
 	const storage = createChromeStorage();
 	if (!storage) {
-		console.log("Chrome storage API not available for saving memory, skipping");
+		console.log(
+			"[Memory] Chrome storage API not available for saving, skipping",
+		);
 		return;
 	}
 
@@ -138,8 +139,6 @@ export async function saveMemoryToStorage(
 				key: MEMORY_KEY,
 				patterns: memory.patterns.length,
 				lastAnalyzedDate: memory.lastAnalyzedDate,
-				lastAnalyzedType: typeof memory.lastAnalyzedDate,
-				lastAnalyzedIsDate: memory.lastAnalyzedDate instanceof Date,
 				lastHistoryTimestamp: memory.lastHistoryTimestamp,
 				userProfile: {
 					coreIdentities:
@@ -151,7 +150,7 @@ export async function saveMemoryToStorage(
 			});
 		},
 		(error) => {
-			console.error("Failed to save memory:", error);
+			console.error("[Memory] Failed to save:", error);
 		},
 	);
 }
@@ -164,7 +163,7 @@ export async function clearMemoryFromStorage(): Promise<void> {
 	const storage = createChromeStorage();
 	if (!storage) {
 		console.log(
-			"Chrome storage API not available for clearing memory, skipping",
+			"[Memory] Chrome storage API not available for clearing, skipping",
 		);
 		return;
 	}
@@ -172,7 +171,7 @@ export async function clearMemoryFromStorage(): Promise<void> {
 	const removeResult = await removeStorageData(storage, MEMORY_KEY);
 
 	removeResult.match(
-		() => console.log("Analysis memory cleared from chrome.storage.local"),
-		(error) => console.error("Failed to clear memory from storage:", error),
+		() => console.log("[Memory] Cleared from chrome.storage.local"),
+		(error) => console.error("[Memory] Failed to clear from storage:", error),
 	);
 }

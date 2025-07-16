@@ -1,8 +1,11 @@
 import type { MemorySettings } from "../types";
-import { createChromeStorage, getStorageData, setStorageData } from "./storage";
-
 // Settings key for memory management configuration
-import { MEMORY_SETTINGS_KEY } from "./storage-keys";
+import {
+	createChromeStorage,
+	getStorageData,
+	MEMORY_SETTINGS_KEY,
+	setStorageData,
+} from "./storage";
 
 // Default memory settings - workflow patterns disabled by default
 const defaultMemorySettings: MemorySettings = {

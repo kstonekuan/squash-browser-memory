@@ -27,8 +27,11 @@ import {
 	loadMemorySettings,
 	saveMemorySettings,
 } from "./utils/memory-settings";
-import { createChromeStorage, getStorageData } from "./utils/storage";
-import { LAST_ANALYSIS_RESULT_KEY } from "./utils/storage-keys";
+import {
+	createChromeStorage,
+	getStorageData,
+	LAST_ANALYSIS_RESULT_KEY,
+} from "./utils/storage";
 
 let analysisResult: FullAnalysisResult | null = $state(null);
 let memoryAutoExpand = $state(false);

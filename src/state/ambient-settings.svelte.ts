@@ -5,7 +5,7 @@ import {
 	loadAutoAnalysisSettings,
 	saveAutoAnalysisSettings,
 } from "../utils/ambient";
-import { AUTO_ANALYSIS_SETTINGS_KEY } from "../utils/storage-keys";
+import { AUTO_ANALYSIS_SETTINGS_KEY } from "../utils/storage";
 
 // Create reactive state using runes
 let ambientSettingsState = $state<AutoAnalysisSettings>(

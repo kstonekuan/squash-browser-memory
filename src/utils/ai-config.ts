@@ -4,9 +4,12 @@
 
 import { sidepanelToBackgroundClient } from "../trpc/client";
 import type { AIProviderConfig } from "./ai-interface";
-import { createChromeStorage, getStorageData, setStorageData } from "./storage";
-
-import { AI_CONFIG_KEY } from "./storage-keys";
+import {
+	AI_CONFIG_KEY,
+	createChromeStorage,
+	getStorageData,
+	setStorageData,
+} from "./storage";
 
 const DEFAULT_CONFIG: AIProviderConfig = {
 	provider: "chrome",

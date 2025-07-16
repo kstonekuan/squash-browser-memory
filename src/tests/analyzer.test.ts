@@ -1,7 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
 
-// No messaging mocks needed - using tRPC now
-
 // Mock memory operations
 vi.mock("../utils/memory", () => ({
 	loadMemoryFromStorage: vi.fn().mockResolvedValue(null),
