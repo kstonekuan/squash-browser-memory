@@ -4,33 +4,23 @@ import { z } from "zod/v4";
 
 export const ChunkSchema = z
 	.object({
-		chunks: z
-			.object({
-				startIndex: z
-					.number()
-					.describe(
-						"Index of the first timestamp in this session from the provided data array (e.g., 0, 5, 12). IMPORTANT: Use the index shown in brackets [n] from the input data",
-					),
-				endIndex: z
-					.number()
-					.describe(
-						"Index of the last timestamp in this session from the provided data array (e.g., 4, 11, 23). IMPORTANT: Use the index shown in brackets [n] from the input data",
-					),
-				description: z
-					.string()
-					.describe(
-						"Provide a descriptive label for the session based on its timing and content (e.g., 'Morning Work Session', 'Evening Research').",
-					),
-			})
-			.array()
-			.nonempty()
+		startIndex: z
+			.number()
 			.describe(
-				"An array of distinct browsing sessions. A new session begins after a >30 minute gap in activity. Sessions can span multiple days if activity is continuous.",
+				"Index of the first timestamp in this session from the provided data array (e.g., 0, 5, 12). IMPORTANT: Use the index shown in brackets [n] from the input data",
+			),
+		endIndex: z
+			.number()
+			.describe(
+				"Index of the last timestamp in this session from the provided data array (e.g., 4, 11, 23). IMPORTANT: Use the index shown in brackets [n] from the input data",
 			),
 	})
+	.array()
+	.nonempty()
 	.describe(
-		"Browsing sessions grouped by natural time gaps (>30min gap = new session)",
+		"An array of distinct browsing sessions naturally split based on groups of timestamps",
 	);
+
 const WorkflowPatternSchema = z.object({
 	pattern: z
 		.string()

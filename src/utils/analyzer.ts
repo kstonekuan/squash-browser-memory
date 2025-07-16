@@ -204,16 +204,12 @@ export async function analyzeHistoryItems(
 	}
 
 	// Store chunk info for the result
-	const chunkInfos: ChunkInfo[] = chunks.map((chunk, index) => {
+	const chunkInfos: ChunkInfo[] = chunks.map((chunk) => {
 		// Find the corresponding time range for description
-		const timeRange = chunkingResult.timeRanges[index];
 		return {
 			startTime: chunk.startTime,
 			endTime: chunk.endTime,
 			itemCount: chunk.items.length,
-			description: chunk.isFallback
-				? `${format(chunk.startTime, "PP")} ${format(chunk.startTime, "a")} (Fallback)`
-				: timeRange?.description || `Session ${index + 1}`,
 			isFallback: chunk.isFallback,
 		};
 	});

@@ -15,6 +15,8 @@ import type { HistoryChunk } from "./memory";
 import { ChunkSchema } from "./schemas";
 import { extractJSONFromResponse } from "./shared-utils";
 
+const MAX_TIMESTAMPS_PER_BATCH = 80; // Conservative limit to stay under token limits
+
 // Analyze timestamps to identify natural browsing sessions
 export async function identifyChunks(
 	items: chrome.history.HistoryItem[],
@@ -41,22 +43,83 @@ export async function identifyChunks(
 		};
 	}
 
-	// Recursively analyze timestamps in batches if too many
-	const MAX_TIMESTAMPS_PER_BATCH = 80; // Conservative limit to stay under token limits
-	if (timestamps.length > MAX_TIMESTAMPS_PER_BATCH) {
-		return await analyzeTimestampsInBatches(
-			timestamps,
-			aiConfig,
-			customChunkPrompt,
+	// Split timestamps into batches
+	const batches: number[][] = [];
+	for (let i = 0; i < timestamps.length; i += MAX_TIMESTAMPS_PER_BATCH) {
+		batches.push(timestamps.slice(i, i + MAX_TIMESTAMPS_PER_BATCH));
+	}
+
+	console.log(`\n=== Starting Chunking Analysis ===`);
+	console.log(`Total timestamps: ${timestamps.length}`);
+	console.log(
+		`Split into ${batches.length} batch(es) of max ${MAX_TIMESTAMPS_PER_BATCH} timestamps each`,
+	);
+	console.log(`================================\n`);
+
+	// Process each batch
+	const allTimeRanges: ChunkTimeRange[] = [];
+	let hasError = false;
+	let errorMessage = "";
+
+	for (let i = 0; i < batches.length; i++) {
+		const batch = batches[i];
+		console.log(
+			`\nProcessing batch ${i + 1}/${batches.length} (${batch.length} timestamps)`,
 		);
+
+		try {
+			const batchResult = await processSingleBatch(
+				batch,
+				aiConfig,
+				customChunkPrompt,
+			);
+
+			if (batchResult.isFallback) {
+				hasError = true;
+				errorMessage = batchResult.error || "Batch processing failed";
+			}
+
+			allTimeRanges.push(...batchResult.timeRanges);
+		} catch (error) {
+			hasError = true;
+			errorMessage = error instanceof Error ? error.message : String(error);
+			// Use fallback for this batch
+			const fallbackRanges = createHalfDayChunks(batch);
+			allTimeRanges.push(...fallbackRanges);
+		}
+	}
+
+	// Merge adjacent or overlapping time ranges if we have multiple batches
+	const finalRanges =
+		batches.length > 1 ? mergeTimeRanges(allTimeRanges) : allTimeRanges;
+
+	console.log(`\n=== Chunking Complete ===`);
+	console.log(`Total chunks identified: ${finalRanges.length}`);
+	console.log(`========================\n`);
+
+	return {
+		timeRanges: finalRanges,
+		isFallback: hasError,
+		error: hasError ? errorMessage : undefined,
+	};
+}
+
+// Process a single batch of timestamps
+async function processSingleBatch(
+	timestamps: number[],
+	aiConfig: AIProviderConfig,
+	customChunkPrompt?: string,
+): Promise<ChunkingResult> {
+	if (timestamps.length === 0) {
+		return {
+			timeRanges: [],
+			isFallback: false,
+		};
 	}
 
 	const prompt = buildChunkingPrompt(timestamps);
 
-	console.log("\n=== Starting Chunking ===");
 	console.log("Prompt Length:", prompt.length, "characters");
-	console.log("Timestamp count:", timestamps.length);
-	console.log("======================\n");
 
 	const provider = await getInitializedProvider(
 		aiConfig,
@@ -80,10 +143,8 @@ export async function identifyChunks(
 		const endTime = performance.now();
 		const duration = ((endTime - startTime) / 1000).toFixed(2);
 		console.log(
-			`Chunking LLM call completed in ${duration}s for ${items.length} items`,
+			`Chunking LLM call completed in ${duration}s for ${timestamps.length} timestamps`,
 		);
-		console.log("Response Length:", response.length, "characters");
-		console.log("=== Chunking Complete ===");
 
 		let parsed: z.infer<typeof ChunkSchema>;
 		try {
@@ -103,7 +164,7 @@ export async function identifyChunks(
 		}
 
 		// Convert indices to timestamps and validate
-		const validChunks: ChunkTimeRange[] = parsed.chunks
+		const validChunks: ChunkTimeRange[] = parsed
 			.filter(
 				(chunk) =>
 					chunk.startIndex >= 0 &&
@@ -113,17 +174,13 @@ export async function identifyChunks(
 			.map((chunk) => ({
 				startTime: timestamps[chunk.startIndex],
 				endTime: timestamps[chunk.endIndex],
-				description: chunk.description,
 			}))
 			.sort(
 				(a: ChunkTimeRange, b: ChunkTimeRange) => a.startTime - b.startTime,
 			);
 
-		// Chunks identified successfully
-
 		// If AI didn't return any valid chunks, fall back to simple chunking
 		if (validChunks.length === 0) {
-			// AI returned no valid chunks, falling back to half-day chunking
 			return {
 				timeRanges: createHalfDayChunks(timestamps),
 				rawResponse: response,
@@ -144,184 +201,6 @@ export async function identifyChunks(
 			error: error instanceof Error ? error.message : String(error),
 			isFallback: true,
 		};
-	} finally {
-		// No cleanup needed with stateless providers
-	}
-}
-
-// Helper to analyze large timestamp sets in batches
-async function analyzeTimestampsInBatches(
-	timestamps: number[],
-	aiConfig: AIProviderConfig,
-	customChunkPrompt?: string,
-): Promise<ChunkingResult> {
-	const MAX_TIMESTAMPS_PER_BATCH = 80;
-	const allTimeRanges: ChunkTimeRange[] = [];
-	let hasError = false;
-	let errorMessage = "";
-
-	// Process timestamps in batches
-	for (let i = 0; i < timestamps.length; i += MAX_TIMESTAMPS_PER_BATCH) {
-		const batchTimestamps = timestamps.slice(i, i + MAX_TIMESTAMPS_PER_BATCH);
-
-		// Create temporary items for this batch
-		const batchItems: chrome.history.HistoryItem[] = batchTimestamps.map(
-			(ts) => ({
-				lastVisitTime: ts,
-				url: "",
-				id: "",
-			}),
-		);
-
-		try {
-			const batchResult = await identifyChunksForBatch(
-				batchItems,
-				aiConfig,
-				customChunkPrompt,
-			);
-
-			if (batchResult.isFallback) {
-				hasError = true;
-				errorMessage = batchResult.error || "Batch processing failed";
-			}
-
-			allTimeRanges.push(...batchResult.timeRanges);
-		} catch (error) {
-			hasError = true;
-			errorMessage = error instanceof Error ? error.message : String(error);
-			// Use fallback for this batch
-			const fallbackRanges = createHalfDayChunks(batchTimestamps);
-			allTimeRanges.push(...fallbackRanges);
-		}
-	}
-
-	// Merge adjacent or overlapping time ranges
-	const mergedRanges = mergeTimeRanges(allTimeRanges);
-
-	return {
-		timeRanges: mergedRanges,
-		isFallback: hasError,
-		error: hasError ? errorMessage : undefined,
-	};
-}
-
-// Helper to identify chunks for a batch (without recursion)
-async function identifyChunksForBatch(
-	items: chrome.history.HistoryItem[],
-	aiConfig: AIProviderConfig,
-	customChunkPrompt?: string,
-): Promise<ChunkingResult> {
-	if (items.length === 0) {
-		return {
-			timeRanges: [],
-			isFallback: false,
-		};
-	}
-
-	// Extract timestamps and sort them
-	const timestamps = items
-		.map((item) => item.lastVisitTime)
-		.filter((time): time is number => time !== undefined)
-		.sort((a, b) => a - b);
-
-	if (timestamps.length === 0) {
-		return {
-			timeRanges: [],
-			isFallback: false,
-		};
-	}
-
-	const prompt = buildChunkingPrompt(timestamps);
-
-	console.log("\n=== Starting Batch Chunking ===");
-	console.log("Prompt Length:", prompt.length, "characters");
-	console.log("Batch timestamp count:", timestamps.length);
-	console.log("=============================\n");
-
-	const provider = await getInitializedProvider(
-		aiConfig,
-		customChunkPrompt || CHUNK_SYSTEM_PROMPT,
-	);
-
-	if (!provider) {
-		// Fallback to half-day chunking
-		return {
-			timeRanges: createHalfDayChunks(timestamps),
-			error: "Failed to initialize AI provider",
-			isFallback: true,
-		};
-	}
-
-	try {
-		const startTime = performance.now();
-		const response = await promptAI(provider, prompt, {
-			responseConstraint: toJSONSchema(ChunkSchema),
-		});
-		const endTime = performance.now();
-		const duration = ((endTime - startTime) / 1000).toFixed(2);
-		console.log(
-			`Chunking LLM call completed in ${duration}s for ${items.length} items`,
-		);
-		console.log("Response Length:", response.length, "characters");
-		console.log("=== Chunking Complete ===");
-
-		let parsed: z.infer<typeof ChunkSchema>;
-		try {
-			// Clean the response to extract JSON from markdown if needed
-			const cleanedResponse = extractJSONFromResponse(response);
-			const rawParsed = JSON.parse(cleanedResponse);
-
-			// Validate with zod schema
-			parsed = ChunkSchema.parse(rawParsed);
-		} catch (parseError) {
-			return {
-				timeRanges: createHalfDayChunks(timestamps),
-				rawResponse: response,
-				error: `Failed to parse JSON: ${parseError}`,
-				isFallback: true,
-			};
-		}
-
-		// Convert indices to timestamps and validate
-		const validChunks: ChunkTimeRange[] = parsed.chunks
-			.filter(
-				(chunk) =>
-					chunk.startIndex >= 0 &&
-					chunk.endIndex < timestamps.length &&
-					chunk.startIndex <= chunk.endIndex,
-			)
-			.map((chunk) => ({
-				startTime: timestamps[chunk.startIndex],
-				endTime: timestamps[chunk.endIndex],
-				description: chunk.description,
-			}))
-			.sort(
-				(a: ChunkTimeRange, b: ChunkTimeRange) => a.startTime - b.startTime,
-			);
-
-		// If AI didn't return any valid chunks, fall back to simple chunking
-		if (validChunks.length === 0) {
-			return {
-				timeRanges: createHalfDayChunks(timestamps),
-				rawResponse: response,
-				error: "AI returned no valid chunks",
-				isFallback: true,
-			};
-		}
-
-		return {
-			timeRanges: validChunks,
-			rawResponse: response,
-			isFallback: false,
-		};
-	} catch (error) {
-		return {
-			timeRanges: createHalfDayChunks(timestamps),
-			error: error instanceof Error ? error.message : String(error),
-			isFallback: true,
-		};
-	} finally {
-		// No cleanup needed with stateless providers
 	}
 }
 
@@ -342,7 +221,6 @@ function mergeTimeRanges(ranges: ChunkTimeRange[]): ChunkTimeRange[] {
 			current = {
 				startTime: current.startTime,
 				endTime: Math.max(current.endTime, next.endTime),
-				description: `${current.description} + ${next.description}`,
 			};
 		} else {
 			merged.push(current);
@@ -381,15 +259,9 @@ export function createHalfDayChunks(timestamps: number[]): ChunkTimeRange[] {
 	}
 
 	return Array.from(chunks.values()).map(({ startTime, endTime }) => {
-		const startDate = new Date(startTime);
-		const period =
-			startDate.getHours() < 12
-				? "Morning (12am-12pm)"
-				: "Afternoon/Evening (12pm-12am)";
 		return {
 			startTime,
 			endTime,
-			description: `${format(startDate, "PP")} ${period}`,
 		};
 	});
 }

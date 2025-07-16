@@ -5,7 +5,7 @@ import type { MemoryData } from "../types";
 export const MIN_HISTORY_ITEMS_FOR_ANALYSIS = 2; // Minimum number of history items required for meaningful analysis
 
 // System prompts
-export const CHUNK_SYSTEM_PROMPT = `You are an expert data analyst. Your task is to group a list of timestamps into distinct browsing sessions. A new session starts after a time gap of more than 30 minutes.`;
+export const CHUNK_SYSTEM_PROMPT = `You are an expert data analyst. Your task is to group a list of timestamps into distinct browsing sessions.`;
 
 export const USER_PROFILE_SYSTEM_PROMPT = `You are a user behavior analyst. Your goal is to create a rich, evidence-based user profile from the provided browsing history.
 **Rules:**

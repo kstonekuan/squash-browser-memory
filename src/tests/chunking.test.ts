@@ -1,4 +1,3 @@
-import { format } from "date-fns";
 import { describe, expect, it } from "vitest";
 import type { ChunkTimeRange } from "../types";
 import { createHalfDayChunks, createHistoryChunks } from "../utils/chunking";
@@ -63,12 +62,10 @@ describe("createHistoryChunks", () => {
 				{
 					startTime: createDate(2024, 1, 15, 8, 0).getTime(),
 					endTime: createDate(2024, 1, 15, 12, 0).getTime(),
-					description: "Morning session",
 				},
 				{
 					startTime: createDate(2024, 1, 15, 13, 0).getTime(),
 					endTime: createDate(2024, 1, 15, 17, 0).getTime(),
-					description: "Afternoon session",
 				},
 			];
 
@@ -101,7 +98,6 @@ describe("createHistoryChunks", () => {
 				{
 					startTime: createDate(2024, 1, 15, 9, 0).getTime(),
 					endTime: createDate(2024, 1, 15, 11, 0).getTime(),
-					description: "Work session",
 				},
 			];
 
@@ -288,7 +284,6 @@ describe("createHistoryChunks", () => {
 				{
 					startTime: createDate(2024, 1, 15, 0, 0).getTime(),
 					endTime: createDate(2024, 1, 15, 23, 59).getTime(),
-					description: "All day",
 				},
 			];
 
@@ -311,12 +306,10 @@ describe("createHistoryChunks", () => {
 				{
 					startTime: createDate(2024, 1, 14, 0, 0).getTime(),
 					endTime: createDate(2024, 1, 14, 23, 59).getTime(),
-					description: "Previous day",
 				},
 				{
 					startTime: createDate(2024, 1, 16, 0, 0).getTime(),
 					endTime: createDate(2024, 1, 16, 23, 59).getTime(),
-					description: "Next day",
 				},
 			];
 
@@ -340,7 +333,6 @@ describe("createHistoryChunks", () => {
 				{
 					startTime: createDate(2024, 1, 15, 0, 0).getTime(),
 					endTime: createDate(2024, 1, 15, 23, 59).getTime(),
-					description: "Test session",
 				},
 			];
 
@@ -371,7 +363,7 @@ describe("createHalfDayChunks", () => {
 			expect(result[0].endTime).toBe(
 				createDate(2024, 1, 15, 12, 0).getTime() - 1,
 			);
-			expect(result[0].description).toContain("Morning (12am-12pm)");
+			// Morning chunk has hours 0-11
 		});
 
 		it("should create appropriate half-day chunk for afternoon timestamp", () => {
@@ -385,7 +377,7 @@ describe("createHalfDayChunks", () => {
 			expect(result[0].endTime).toBe(
 				createDate(2024, 1, 16, 0, 0).getTime() - 1,
 			);
-			expect(result[0].description).toContain("Afternoon/Evening (12pm-12am)");
+			// Afternoon chunk has hours 12-23
 		});
 	});
 
@@ -402,12 +394,12 @@ describe("createHalfDayChunks", () => {
 			expect(result).toHaveLength(2);
 
 			// Morning chunk
-			expect(result[0].description).toContain("Morning (12am-12pm)");
+			// Morning chunk has hours 0-11
 			expect(new Date(result[0].startTime).getHours()).toBe(0);
 			expect(new Date(result[0].endTime).getHours()).toBe(11);
 
 			// Afternoon chunk
-			expect(result[1].description).toContain("Afternoon/Evening (12pm-12am)");
+			// Afternoon chunk has hours 12-23
 			expect(new Date(result[1].startTime).getHours()).toBe(12);
 			expect(new Date(result[1].endTime).getHours()).toBe(23);
 		});
@@ -421,7 +413,7 @@ describe("createHalfDayChunks", () => {
 			const result = createHalfDayChunks(timestamps);
 
 			expect(result).toHaveLength(1);
-			expect(result[0].description).toContain("Morning (12am-12pm)");
+			// Morning chunk has hours 0-11
 		});
 
 		it("should create only afternoon chunk when all timestamps are after noon", () => {
@@ -433,7 +425,7 @@ describe("createHalfDayChunks", () => {
 			const result = createHalfDayChunks(timestamps);
 
 			expect(result).toHaveLength(1);
-			expect(result[0].description).toContain("Afternoon/Evening (12pm-12am)");
+			// Afternoon chunk has hours 12-23
 		});
 	});
 
@@ -451,19 +443,15 @@ describe("createHalfDayChunks", () => {
 			const result = createHalfDayChunks(timestamps);
 
 			expect(result).toHaveLength(4);
-			// Check dates and periods
-			const date1 = format(new Date(2024, 0, 15), "PP");
-			const date2 = format(new Date(2024, 0, 16), "PP");
-			const date3 = format(new Date(2024, 0, 17), "PP");
-
-			expect(result[0].description).toContain(date1);
-			expect(result[0].description).toContain("Morning");
-			expect(result[1].description).toContain(date2);
-			expect(result[1].description).toContain("Morning");
-			expect(result[2].description).toContain(date2);
-			expect(result[2].description).toContain("Afternoon/Evening");
-			expect(result[3].description).toContain(date3);
-			expect(result[3].description).toContain("Afternoon/Evening");
+			// Check dates and periods by examining the time values
+			expect(new Date(result[0].startTime).getDate()).toBe(15);
+			expect(new Date(result[0].startTime).getHours()).toBe(0); // Morning
+			expect(new Date(result[1].startTime).getDate()).toBe(16);
+			expect(new Date(result[1].startTime).getHours()).toBe(0); // Morning
+			expect(new Date(result[2].startTime).getDate()).toBe(16);
+			expect(new Date(result[2].startTime).getHours()).toBe(12); // Afternoon
+			expect(new Date(result[3].startTime).getDate()).toBe(17);
+			expect(new Date(result[3].startTime).getHours()).toBe(12); // Afternoon
 		});
 
 		it("should skip days with no activity", () => {
@@ -475,10 +463,8 @@ describe("createHalfDayChunks", () => {
 			const result = createHalfDayChunks(timestamps);
 
 			expect(result).toHaveLength(2);
-			const date1 = format(new Date(2024, 0, 15), "PP");
-			const date2 = format(new Date(2024, 0, 17), "PP");
-			expect(result[0].description).toContain(date1);
-			expect(result[1].description).toContain(date2);
+			expect(new Date(result[0].startTime).getDate()).toBe(15);
+			expect(new Date(result[1].startTime).getDate()).toBe(17);
 		});
 	});
 
@@ -494,15 +480,12 @@ describe("createHalfDayChunks", () => {
 
 			expect(result).toHaveLength(3);
 			// Should be sorted: Day 1 morning, Day 1 afternoon, Day 2 morning
-			const date1 = format(new Date(2024, 0, 15), "PP");
-			const date2 = format(new Date(2024, 0, 16), "PP");
-
-			expect(result[0].description).toContain(date1);
-			expect(result[0].description).toContain("Morning");
-			expect(result[1].description).toContain(date1);
-			expect(result[1].description).toContain("Afternoon/Evening");
-			expect(result[2].description).toContain(date2);
-			expect(result[2].description).toContain("Morning");
+			expect(new Date(result[0].startTime).getDate()).toBe(15);
+			expect(new Date(result[0].startTime).getHours()).toBe(0); // Morning
+			expect(new Date(result[1].startTime).getDate()).toBe(15);
+			expect(new Date(result[1].startTime).getHours()).toBe(12); // Afternoon
+			expect(new Date(result[2].startTime).getDate()).toBe(16);
+			expect(new Date(result[2].startTime).getHours()).toBe(0); // Morning
 		});
 	});
 
@@ -513,7 +496,7 @@ describe("createHalfDayChunks", () => {
 
 			expect(result).toHaveLength(1);
 			// 12:00 PM should be in afternoon chunk
-			expect(result[0].description).toContain("Afternoon/Evening (12pm-12am)");
+			expect(new Date(result[0].startTime).getHours()).toBe(12);
 		});
 
 		it("should handle timestamps exactly at midnight", () => {
@@ -522,7 +505,7 @@ describe("createHalfDayChunks", () => {
 
 			expect(result).toHaveLength(1);
 			// 12:00 AM should be in morning chunk
-			expect(result[0].description).toContain("Morning (12am-12pm)");
+			expect(new Date(result[0].startTime).getHours()).toBe(0);
 		});
 
 		it("should handle very close timestamps spanning midnight", () => {
@@ -533,13 +516,10 @@ describe("createHalfDayChunks", () => {
 			const result = createHalfDayChunks(timestamps);
 
 			expect(result).toHaveLength(2);
-			const date1 = format(new Date(2024, 0, 15), "PP");
-			const date2 = format(new Date(2024, 0, 16), "PP");
-
-			expect(result[0].description).toContain(date1);
-			expect(result[0].description).toContain("Afternoon/Evening");
-			expect(result[1].description).toContain(date2);
-			expect(result[1].description).toContain("Morning");
+			expect(new Date(result[0].startTime).getDate()).toBe(15);
+			expect(new Date(result[0].startTime).getHours()).toBe(12); // Afternoon
+			expect(new Date(result[1].startTime).getDate()).toBe(16);
+			expect(new Date(result[1].startTime).getHours()).toBe(0); // Morning
 		});
 
 		it("should handle year boundaries", () => {
@@ -550,13 +530,12 @@ describe("createHalfDayChunks", () => {
 			const result = createHalfDayChunks(timestamps);
 
 			expect(result).toHaveLength(2);
-			const date1 = format(new Date(2023, 11, 31), "PP");
-			const date2 = format(new Date(2024, 0, 1), "PP");
-
-			expect(result[0].description).toContain(date1);
-			expect(result[0].description).toContain("Afternoon/Evening");
-			expect(result[1].description).toContain(date2);
-			expect(result[1].description).toContain("Morning");
+			expect(new Date(result[0].startTime).getDate()).toBe(31);
+			expect(new Date(result[0].startTime).getMonth()).toBe(11); // December
+			expect(new Date(result[0].startTime).getHours()).toBe(12); // Afternoon
+			expect(new Date(result[1].startTime).getDate()).toBe(1);
+			expect(new Date(result[1].startTime).getMonth()).toBe(0); // January
+			expect(new Date(result[1].startTime).getHours()).toBe(0); // Morning
 		});
 
 		it("should handle month boundaries", () => {
@@ -567,11 +546,10 @@ describe("createHalfDayChunks", () => {
 			const result = createHalfDayChunks(timestamps);
 
 			expect(result).toHaveLength(2);
-			const date1 = format(new Date(2024, 0, 31), "PP");
-			const date2 = format(new Date(2024, 1, 1), "PP");
-
-			expect(result[0].description).toContain(date1);
-			expect(result[1].description).toContain(date2);
+			expect(new Date(result[0].startTime).getDate()).toBe(31);
+			expect(new Date(result[0].startTime).getMonth()).toBe(0); // January
+			expect(new Date(result[1].startTime).getDate()).toBe(1);
+			expect(new Date(result[1].startTime).getMonth()).toBe(1); // February
 		});
 
 		it("should handle duplicate timestamps", () => {
@@ -580,7 +558,7 @@ describe("createHalfDayChunks", () => {
 			const result = createHalfDayChunks(timestamps);
 
 			expect(result).toHaveLength(1);
-			expect(result[0].description).toContain("Morning");
+			expect(new Date(result[0].startTime).getHours()).toBe(0); // Morning
 		});
 
 		it("should handle very large date ranges", () => {
@@ -591,11 +569,10 @@ describe("createHalfDayChunks", () => {
 			const result = createHalfDayChunks(timestamps);
 
 			expect(result).toHaveLength(2);
-			const date1 = format(new Date(2024, 0, 1), "PP");
-			const date2 = format(new Date(2024, 11, 31), "PP");
-
-			expect(result[0].description).toContain(date1);
-			expect(result[1].description).toContain(date2);
+			expect(new Date(result[0].startTime).getDate()).toBe(1);
+			expect(new Date(result[0].startTime).getMonth()).toBe(0); // January
+			expect(new Date(result[1].startTime).getDate()).toBe(31);
+			expect(new Date(result[1].startTime).getMonth()).toBe(11); // December
 		});
 	});
 });

@@ -44,7 +44,7 @@ function getDuration(start: Date, end: Date): string {
 									{formatDateRange(chunk.startTime, chunk.endTime)}
 								</p>
 								<p class="text-xs text-gray-500">
-									{chunk.itemCount} items • {chunk.description}
+									{chunk.itemCount} items
 								</p>
 							</div>
 						{/each}

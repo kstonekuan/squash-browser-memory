@@ -16,7 +16,6 @@ export interface ChunkInfo {
 	startTime: Date;
 	endTime: Date;
 	itemCount: number;
-	description: string;
 	isFallback?: boolean;
 }
 
@@ -24,8 +23,8 @@ export interface ChunkInfo {
 export interface ChunkTimeRange {
 	startTime: number; // timestamp
 	endTime: number; // timestamp
-	description: string; // e.g., "Morning work session", "Evening browsing"
 }
+
 export interface ChunkingResult {
 	timeRanges: ChunkTimeRange[];
 	rawResponse?: string;
