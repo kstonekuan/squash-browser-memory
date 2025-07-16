@@ -133,8 +133,7 @@ export class ClaudeProvider implements AIProvider {
 				},
 			);
 
-			console.log("Response received");
-			console.log("Response content:", message.content);
+			console.log("Response received", message.content);
 
 			// Handle the response content array
 			const content = message.content[0];
