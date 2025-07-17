@@ -1600,8 +1600,8 @@ class ContextButtonInjector {
 			// For contentEditable divs, we need platform-specific formatting
 			const platform = this.platformAdapter.getPlatform();
 
-			if (platform === "claude") {
-				// Claude.ai uses <p> tags for paragraphs
+			if (platform === "claude" || platform === "chatgpt") {
+				// Both Claude.ai and ChatGPT use <p> tags for paragraphs
 				element.innerHTML = "";
 
 				// Split text by newlines and create proper paragraph structure
@@ -1621,7 +1621,7 @@ class ContextButtonInjector {
 					}
 				});
 			} else {
-				// ChatGPT and others - use the original approach
+				// Other platforms - use br tags
 				element.innerHTML = "";
 				const lines = text.split(/\r?\n/);
 				lines.forEach((line, index) => {
@@ -1675,8 +1675,11 @@ class ContextButtonInjector {
 
 			const currentText = this.chatInput.getCurrentText();
 			const separator =
-				platform === "claude" ? "\n\n" : String.fromCharCode(0x0d, 0x0a); // Use regular newlines for Claude
-			const contextHeader = platform === "claude" ? "" : "-- Context --"; // No header needed for Claude's markdown
+				platform === "claude" || platform === "chatgpt"
+					? "\n\n"
+					: String.fromCharCode(0x0d, 0x0a); // Use regular newlines for Claude and ChatGPT
+			const contextHeader =
+				platform === "claude" || platform === "chatgpt" ? "" : "-- Context --"; // No header needed for markdown platforms
 			const newText = currentText
 				? currentText +
 					separator +
@@ -1708,8 +1711,8 @@ class ContextButtonInjector {
 	): string {
 		const sections: string[] = [];
 
-		// Use markdown formatting only for Claude
-		if (platform === "claude") {
+		// Use markdown formatting for Claude and ChatGPT
+		if (platform === "claude" || platform === "chatgpt") {
 			// Summary section (if available) - moved to top for better context
 			const summary = contexts.find((c) => c.category === "summary")?.text;
 			if (summary) {
