@@ -11,7 +11,7 @@ import type {
 	AIProviderStatus,
 } from "./ai-interface";
 
-const CLAUDE_MODEL = "claude-3-5-haiku-latest";
+const CLAUDE_MODEL = "claude-sonnet-4-20250514";
 const CLAUDE_MAX_TOKENS = 8192;
 
 export const CLAUDE_CONSOLE_URL = "https://console.anthropic.com/";
