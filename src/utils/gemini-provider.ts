@@ -4,7 +4,12 @@
  * Gemini AI provider implementation using Google GenAI SDK
  */
 
-import { type GenerateContentConfig, GoogleGenAI } from "@google/genai";
+import {
+	type CountTokensConfig,
+	type GenerateContentConfig,
+	type GenerationConfig,
+	GoogleGenAI,
+} from "@google/genai";
 import type {
 	AIProvider,
 	AIProviderCapabilities,
@@ -113,6 +118,7 @@ export class GeminiProvider implements AIProvider {
 				maxOutputTokens: GEMINI_MAX_OUTPUT_TOKENS,
 				thinkingConfig: { thinkingBudget: 2048 },
 				systemInstruction: this.systemPrompt,
+				abortSignal: options?.signal,
 			};
 
 			if (options?.responseConstraint) {
@@ -162,28 +168,38 @@ export class GeminiProvider implements AIProvider {
 
 	async measureInputUsage(
 		prompt: string,
-		_options?: LanguageModelPromptOptions,
+		options?: LanguageModelPromptOptions,
 	): Promise<number> {
 		if (!this.client) {
 			throw new Error("Gemini not initialized. Call initialize() first.");
 		}
 
-		const fullPrompt = this.systemPrompt
-			? `${this.systemPrompt}\n\n${prompt}`
-			: prompt;
+		// Build config with structured output if needed
+		const config: CountTokensConfig = {
+			systemInstruction: this.systemPrompt,
+			abortSignal: options?.signal,
+		};
+
+		if (options?.responseConstraint) {
+			const generationConfig: GenerationConfig = {
+				responseMimeType: "application/json",
+				responseJsonSchema: options.responseConstraint,
+			};
+			config.generationConfig = generationConfig;
+		}
 
 		try {
-			// Note: responseConstraint doesn't count towards input tokens with structured output
 			const result = await this.client.models.countTokens({
 				model: GEMINI_MODEL,
-				contents: [{ parts: [{ text: fullPrompt }], role: "user" }],
+				contents: prompt,
+				config,
 			});
 
 			return result.totalTokens || 0;
 		} catch (error) {
 			console.error("Error counting tokens:", error);
 			// Fall back to estimation: ~4 chars per token
-			return Math.ceil(fullPrompt.length / 4);
+			return Math.ceil((prompt.length + (this.systemPrompt?.length || 0)) / 4);
 		}
 	}
 

@@ -83,7 +83,11 @@ export class ChromeAIProvider implements AIProvider {
 		return result.match(
 			(usage) => usage.promptTokens,
 			(error) => {
-				throw error;
+				console.error("Error counting tokens:", error);
+				// Fall back to estimation: ~4 chars per token
+				return Math.ceil(
+					(prompt.length + (this.aiInstance?.systemPrompt?.length || 0)) / 4,
+				);
 			},
 		);
 	}
