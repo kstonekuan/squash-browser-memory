@@ -532,7 +532,10 @@ const domainKeywords: DomainKeywords = {
 		"sightseeing",
 		"culture",
 		"local",
-		"guide",
+		// "guide", // Removed - too ambiguous, matches "guidelines"
+		"travel guide",
+		"tour guide",
+		"tourist",
 		"map",
 		"transportation",
 		"airport",
@@ -713,8 +716,19 @@ class SimpleContextMatcher {
 					context.domains,
 				);
 
-				// Combine scores (string similarity 60%, domain relevance 40%)
-				let finalScore = stringSimilarity * 0.6 + domainRelevance * 0.4;
+				// Adjust scoring weights based on string similarity
+				// Reduce domain influence when string similarity is very low
+				let finalScore: number;
+				if (stringSimilarity < 0.1) {
+					// Very low string match - reduce domain influence significantly
+					finalScore = stringSimilarity * 0.8 + domainRelevance * 0.2;
+				} else if (stringSimilarity < 0.3) {
+					// Low string match - reduce domain influence moderately
+					finalScore = stringSimilarity * 0.7 + domainRelevance * 0.3;
+				} else {
+					// Normal weighting for good string matches
+					finalScore = stringSimilarity * 0.6 + domainRelevance * 0.4;
+				}
 
 				// Apply identity boost - core identities get lower threshold and score boost
 				const isIdentity = context.category === "identities";
@@ -782,14 +796,69 @@ class SimpleContextMatcher {
 		);
 	}
 
+	private shouldExcludeFromDomain(text: string, domain: string): boolean {
+		const exclusions: Record<string, string[]> = {
+			travel: [
+				"documentation",
+				"development",
+				"security guidelines",
+				"best practices",
+				"API",
+				"chrome extension",
+				"debugging",
+				"json",
+				"formatting",
+				"tools",
+				"programming",
+				"code",
+				"software",
+			],
+			work: [
+				"chrome extension",
+				"json formatter",
+				"json formatting",
+				"json processing",
+				"prettifier",
+				"debugging tools",
+				"development documentation",
+				"data processing and debugging",
+			],
+			tech: [], // No exclusions for tech domain
+			food: [
+				"json",
+				"formatter",
+				"debugging",
+				"chrome",
+				"extension",
+				"documentation",
+			],
+		};
+
+		const textLower = text.toLowerCase();
+		const domainExclusions = exclusions[domain] || [];
+
+		return domainExclusions.some((term) =>
+			textLower.includes(term.toLowerCase()),
+		);
+	}
+
 	private assignDomainsToContext(text: string, category: string): string[] {
 		const domains: string[] = [];
 		const textLower = text.toLowerCase();
 
 		// Check each domain's keywords against the context text
 		for (const [domain, keywords] of Object.entries(domainKeywords)) {
+			// Skip if this context should be excluded from this domain
+			if (this.shouldExcludeFromDomain(text, domain)) {
+				continue;
+			}
+
 			for (const keyword of keywords) {
-				if (textLower.includes(keyword.toLowerCase())) {
+				// Use word boundary matching for better precision
+				const keywordLower = keyword.toLowerCase();
+				const regex = new RegExp(`\\b${keywordLower}\\b`, "i");
+
+				if (regex.test(text)) {
 					if (!domains.includes(domain)) {
 						domains.push(domain);
 					}
