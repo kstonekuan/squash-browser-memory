@@ -1597,27 +1597,46 @@ class ContextButtonInjector {
 		const isContentEditable = element.contentEditable === "true";
 
 		if (isContentEditable) {
-			// For contentEditable divs (like ChatGPT), we need to handle newlines properly
-			// Clear the element first
-			element.innerHTML = "";
+			// For contentEditable divs, we need platform-specific formatting
+			const platform = this.platformAdapter.getPlatform();
 
-			// Split text by newlines (handle both \r\n and \n) and create text nodes with <div> or <br> elements
-			const lines = text.split(/\r?\n/);
-			lines.forEach((line, index) => {
-				if (line.trim() === "") {
-					// Empty line - add a <br> for spacing
-					element.appendChild(document.createElement("br"));
-				} else {
-					// Non-empty line - add as text node
-					const textNode = document.createTextNode(line);
-					element.appendChild(textNode);
-				}
+			if (platform === "claude") {
+				// Claude.ai uses <p> tags for paragraphs
+				element.innerHTML = "";
 
-				// Add line break after each line except the last one
-				if (index < lines.length - 1) {
-					element.appendChild(document.createElement("br"));
-				}
-			});
+				// Split text by newlines and create proper paragraph structure
+				const lines = text.split(/\r?\n/);
+				lines.forEach((line, index) => {
+					if (line.trim() === "") {
+						// Empty line - add an empty paragraph for spacing
+						const p = document.createElement("p");
+						const br = document.createElement("br");
+						p.appendChild(br);
+						element.appendChild(p);
+					} else {
+						// Non-empty line - add as paragraph
+						const p = document.createElement("p");
+						p.textContent = line;
+						element.appendChild(p);
+					}
+				});
+			} else {
+				// ChatGPT and others - use the original approach
+				element.innerHTML = "";
+				const lines = text.split(/\r?\n/);
+				lines.forEach((line, index) => {
+					if (line.trim() === "") {
+						element.appendChild(document.createElement("br"));
+					} else {
+						const textNode = document.createTextNode(line);
+						element.appendChild(textNode);
+					}
+
+					if (index < lines.length - 1) {
+						element.appendChild(document.createElement("br"));
+					}
+				});
+			}
 
 			element.dispatchEvent(new Event("input", { bubbles: true }));
 		} else {
