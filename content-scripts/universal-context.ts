@@ -1667,12 +1667,21 @@ class ContextButtonInjector {
 				return;
 			}
 
-			const formattedProfile = this.formatStructuredProfile(matchingContexts);
+			const platform = this.platformAdapter.getPlatform();
+			const formattedProfile = this.formatStructuredProfile(
+				matchingContexts,
+				platform,
+			);
 
 			const currentText = this.chatInput.getCurrentText();
-			const crlf = String.fromCharCode(0x0d, 0x0a); // CR LF (0x0D 0x0A)
+			const separator =
+				platform === "claude" ? "\n\n" : String.fromCharCode(0x0d, 0x0a); // Use regular newlines for Claude
+			const contextHeader = platform === "claude" ? "" : "-- Context --"; // No header needed for Claude's markdown
 			const newText = currentText
-				? `${currentText}${crlf}${crlf}-- Context --${crlf}${formattedProfile}`
+				? currentText +
+					separator +
+					(contextHeader ? contextHeader + separator : "") +
+					formattedProfile
 				: formattedProfile;
 
 			// Use direct replacement to avoid double-insertion
@@ -1695,65 +1704,142 @@ class ContextButtonInjector {
 			category: string;
 			workflowPattern?: WorkflowPattern;
 		}>,
+		platform: PlatformType,
 	): string {
 		const sections: string[] = [];
 
-		// Core identities section
-		const identities = contexts.filter((c) => c.category === "identities");
-		if (identities.length > 0) {
-			const identityList = identities.map((i) => i.text).join(", ");
-			sections.push(`Core identities: ${identityList}`);
-		}
-
-		// Summary section (if available)
-		const summary = contexts.find((c) => c.category === "summary")?.text;
-		if (summary) {
-			sections.push(`Background: ${summary}`);
-		}
-
-		// Personal preferences section
-		const preferences = contexts.filter((c) => c.category === "preferences");
-		if (preferences.length > 0) {
-			sections.push("Personal preferences:");
-			preferences.forEach((pref) => {
-				sections.push(`  - ${pref.text}`);
-			});
-		}
-
-		// Current tasks section
-		const tasks = contexts.filter((c) => c.category === "tasks");
-		if (tasks.length > 0) {
-			const taskList = tasks.map((t) => t.text).join(", ");
-			sections.push(`Current tasks: ${taskList}`);
-		}
-
-		// Current interests section
-		const interests = contexts.filter((c) => c.category === "interests");
-		if (interests.length > 0) {
-			const interestList = interests.map((i) => i.text).join(", ");
-			sections.push(`Current interests: ${interestList}`);
-		}
-
-		// Workflow patterns section
-		const workflowPatterns = contexts.filter(
-			(c) => c.category === "workflow" && c.workflowPattern,
-		);
-		if (workflowPatterns.length > 0) {
-			sections.push("Workflow Patterns:");
-			for (const context of workflowPatterns) {
-				const pattern = context.workflowPattern!;
-				sections.push(`**${pattern.pattern}**`);
-				sections.push(` - Description: ${pattern.description}`);
-				sections.push(` - Frequency: ${pattern.frequency}x`);
-				sections.push(` - URLs: ${pattern.urls.join(", ")}`);
-				// Removed: ` - Suggestion: ${pattern.suggestion}` to exclude suggestions
-				sections.push(""); // Add spacing between patterns
+		// Use markdown formatting only for Claude
+		if (platform === "claude") {
+			// Summary section (if available) - moved to top for better context
+			const summary = contexts.find((c) => c.category === "summary")?.text;
+			if (summary) {
+				sections.push(`## Context`);
+				sections.push("");
+				sections.push(summary);
+				sections.push("");
 			}
-		}
 
-		// Add a clean separator and join with actual CRLF characters for ChatGPT compatibility
-		const crlf = String.fromCharCode(0x0d, 0x0a); // CR LF (0x0D 0x0A)
-		return sections.join(crlf);
+			// Core identities section
+			const identities = contexts.filter((c) => c.category === "identities");
+			if (identities.length > 0) {
+				sections.push("### Core Identities");
+				identities.forEach((identity) => {
+					sections.push(`- ${identity.text}`);
+				});
+				sections.push("");
+			}
+
+			// Personal preferences section
+			const preferences = contexts.filter((c) => c.category === "preferences");
+			if (preferences.length > 0) {
+				sections.push("### Personal Preferences");
+				preferences.forEach((pref) => {
+					sections.push(`- ${pref.text}`);
+				});
+				sections.push("");
+			}
+
+			// Current tasks section
+			const tasks = contexts.filter((c) => c.category === "tasks");
+			if (tasks.length > 0) {
+				sections.push("### Current Tasks");
+				tasks.forEach((task) => {
+					sections.push(`- ${task.text}`);
+				});
+				sections.push("");
+			}
+
+			// Current interests section
+			const interests = contexts.filter((c) => c.category === "interests");
+			if (interests.length > 0) {
+				sections.push("### Current Interests");
+				interests.forEach((interest) => {
+					sections.push(`- ${interest.text}`);
+				});
+				sections.push("");
+			}
+
+			// Workflow patterns section
+			const workflowPatterns = contexts.filter(
+				(c) => c.category === "workflow" && c.workflowPattern,
+			);
+			if (workflowPatterns.length > 0) {
+				sections.push("### Workflow Patterns");
+				sections.push("");
+				for (const context of workflowPatterns) {
+					const pattern = context.workflowPattern!;
+					sections.push(`**${pattern.pattern}**`);
+					sections.push(`> ${pattern.description}`);
+					sections.push("");
+					sections.push(`- **Frequency**: ${pattern.frequency}x`);
+					sections.push(`- **URLs**:`);
+					pattern.urls.forEach((url) => {
+						sections.push(`  - ${url}`);
+					});
+					sections.push(""); // Add spacing between patterns
+				}
+			}
+
+			// Use regular newlines for markdown formatting
+			return sections.join("\n");
+		} else {
+			// Original simple formatting for other platforms
+			// Core identities section
+			const identities = contexts.filter((c) => c.category === "identities");
+			if (identities.length > 0) {
+				const identityList = identities.map((i) => i.text).join(", ");
+				sections.push(`Core identities: ${identityList}`);
+			}
+
+			// Summary section (if available)
+			const summary = contexts.find((c) => c.category === "summary")?.text;
+			if (summary) {
+				sections.push(`Background: ${summary}`);
+			}
+
+			// Personal preferences section
+			const preferences = contexts.filter((c) => c.category === "preferences");
+			if (preferences.length > 0) {
+				sections.push("Personal preferences:");
+				preferences.forEach((pref) => {
+					sections.push(`  - ${pref.text}`);
+				});
+			}
+
+			// Current tasks section
+			const tasks = contexts.filter((c) => c.category === "tasks");
+			if (tasks.length > 0) {
+				const taskList = tasks.map((t) => t.text).join(", ");
+				sections.push(`Current tasks: ${taskList}`);
+			}
+
+			// Current interests section
+			const interests = contexts.filter((c) => c.category === "interests");
+			if (interests.length > 0) {
+				const interestList = interests.map((i) => i.text).join(", ");
+				sections.push(`Current interests: ${interestList}`);
+			}
+
+			// Workflow patterns section
+			const workflowPatterns = contexts.filter(
+				(c) => c.category === "workflow" && c.workflowPattern,
+			);
+			if (workflowPatterns.length > 0) {
+				sections.push("Workflow Patterns:");
+				for (const context of workflowPatterns) {
+					const pattern = context.workflowPattern!;
+					sections.push(`**${pattern.pattern}**`);
+					sections.push(` - Description: ${pattern.description}`);
+					sections.push(` - Frequency: ${pattern.frequency}x`);
+					sections.push(` - URLs: ${pattern.urls.join(", ")}`);
+					sections.push(""); // Add spacing between patterns
+				}
+			}
+
+			// Use CRLF for other platforms
+			const crlf = String.fromCharCode(0x0d, 0x0a);
+			return sections.join(crlf);
+		}
 	}
 
 	private positionDropdown() {
