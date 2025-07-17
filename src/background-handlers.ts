@@ -4,6 +4,7 @@
  */
 
 import { format } from "date-fns";
+import type { Result } from "neverthrow";
 import { match } from "ts-pattern";
 import { backgroundToOffscreenClient } from "./trpc/client";
 import type { AIStatus, AnalysisProgress, TRPCContext } from "./trpc/schemas";
@@ -21,7 +22,6 @@ import {
 import {
 	type AlarmAPI,
 	cancelAnalysisLogic,
-	checkAnalysisRunningLogic,
 	getAnalysisStateLogic,
 	handleAutoAnalysisToggleLogic,
 	handleStartupAlarmCheckLogic,
@@ -133,65 +133,34 @@ export async function handleToggleAutoAnalysis(
 
 export async function handleStartManualAnalysis(
 	input: {
-		historyItems: chrome.history.HistoryItem[];
-		customPrompts?: {
-			systemPrompt?: string;
-			chunkPrompt?: string;
-			mergePrompt?: string;
+		timeRange: {
+			startTime: number;
+			endTime: number;
 		};
-		memorySettings?: { storeWorkflowPatterns: boolean };
 	},
 	ctx?: TRPCContext,
 ): Promise<
 	{ success: true; analysisId: string } | { success: false; error: string }
 > {
-	const { historyItems, customPrompts, memorySettings } = input;
+	const { timeRange } = input;
 
 	console.log(`[Background] Manual analysis requested`, {
-		itemCount: historyItems.length,
+		timeRange,
 		sender: ctx?.sender?.tab?.id ? `tab:${ctx.sender.tab.id}` : "unknown",
 		timestamp: ctx?.timestamp,
 	});
 
-	// Check if analysis is already running
-	const { canStart, error } = checkAnalysisRunningLogic(isAnalysisRunning);
-	if (!canStart) {
-		return {
-			success: false,
-			error: error || "Cannot start analysis",
-		};
-	}
-
-	isAnalysisRunning = true;
-	const analysisId = `manual-${Date.now()}`;
-	currentAnalysisId = analysisId;
-
-	broadcast.analysisStatus({
-		status: "running",
-		message: `Starting manual analysis of ${historyItems.length} items...`,
-	});
-
 	try {
-		console.log(
-			`[Background] Starting manual analysis with ${historyItems.length} items`,
-		);
-		await runAnalysis(
-			historyItems,
-			analysisId,
-			customPrompts,
-			"manual",
-			memorySettings,
-		);
+		// Use triggerAnalysis with the time range
+		await triggerAnalysis("manual", timeRange);
 
+		// triggerAnalysis sets currentAnalysisId
 		return {
 			success: true,
-			analysisId: analysisId,
+			analysisId: currentAnalysisId || `manual-${Date.now()}`,
 		};
 	} catch (error) {
 		console.error("[Background] Manual analysis failed:", error);
-		isAnalysisRunning = false;
-		currentAnalysisId = null;
-
 		return {
 			success: false,
 			error: error instanceof Error ? error.message : "Unknown error",
@@ -394,21 +363,26 @@ export async function handleAIStatusReport(
 async function runAnalysis(
 	historyItems: chrome.history.HistoryItem[],
 	analysisId: string,
-	customPrompts?: {
-		systemPrompt?: string;
-		chunkPrompt?: string;
-		mergePrompt?: string;
-	},
-	trigger: "manual" | "alarm" = "manual",
-	memorySettings?: { storeWorkflowPatterns: boolean },
 ): Promise<void> {
 	console.log(
-		`[Background] Starting analysis for ${historyItems.length} items with ID: ${analysisId} (triggered by: ${trigger})`,
+		`[Background] Starting analysis for ${historyItems.length} items with ID: ${analysisId}`,
 	);
 
 	activeAnalyses.set(analysisId, true);
 
 	try {
+		// Load prompts and memory settings from storage
+		const storage = createChromeStorage();
+		let customPrompts: CustomPrompts | undefined;
+		if (storage) {
+			const promptsResult = await getStorageData(storage, CUSTOM_PROMPTS_KEY);
+			if (promptsResult.isOk() && promptsResult.value) {
+				customPrompts = promptsResult.value;
+			}
+		}
+
+		const memorySettings = await loadMemorySettings();
+
 		// Ensure offscreen document exists
 		const offscreenResult = await chromeAPI.ensureOffscreenDocument();
 		if (offscreenResult.isErr()) {
@@ -509,33 +483,31 @@ async function runAnalysis(
 }
 
 // Export functions needed by background.ts
-export async function triggerAnalysis(trigger: "manual" | "alarm") {
+export async function triggerAnalysis(
+	trigger: "manual" | "alarm",
+	timeRange?: { startTime: number; endTime: number },
+) {
 	console.log(`[Analysis] Triggered by: ${trigger}`);
 
 	// Check if analysis is already running
 	if (isAnalysisRunning) {
 		console.log("[Analysis] Analysis already in progress, skipping.");
 
-		// For alarm triggers, reschedule to try again in 60 minutes
-		if (trigger === "alarm") {
-			const settings = await loadAutoAnalysisSettings();
-			if (settings.enabled) {
-				await chromeAlarmAPI.clear(ALARM_NAME);
-				await chromeAlarmAPI.create(ALARM_NAME, {
-					delayInMinutes: 60,
-				});
-				console.log("[Analysis] Rescheduled alarm for next hour");
-			}
+		// Reschedule to try again in 60 minutes
+		const settings = await loadAutoAnalysisSettings();
+		if (settings.enabled) {
+			await chromeAlarmAPI.clear(ALARM_NAME);
+			await chromeAlarmAPI.create(ALARM_NAME, {
+				delayInMinutes: 60,
+			});
+			console.log("[Analysis] Rescheduled alarm for next hour");
 		}
 
-		if (trigger === "manual") {
-			// For manual triggers, notify the user
-			await broadcast.analysisStatus({
-				status: "skipped",
-				reason: "analysis-already-running",
-				message: "Analysis is already in progress",
-			});
-		}
+		await broadcast.analysisStatus({
+			status: "skipped",
+			reason: "analysis-already-running",
+			message: "Analysis is already in progress",
+		});
 		return;
 	}
 
@@ -557,21 +529,19 @@ export async function triggerAnalysis(trigger: "manual" | "alarm") {
 
 	try {
 		// Determine time range based on trigger
-		let historyItems: chrome.history.HistoryItem[];
+		let historyResult: Result<chrome.history.HistoryItem[], Error>;
 
 		if (trigger === "manual") {
-			// For manual trigger, get last hour of history
-			const searchStartTime = Date.now() - 60 * 60 * 1000; // 1 hour ago
-			const historyResult = await chromeAPI.searchHistory({
+			// For manual trigger, use provided time range or default to last hour
+			if (!timeRange) {
+				throw new Error("Time range is required for manual trigger");
+			}
+			historyResult = await chromeAPI.searchHistory({
 				text: "",
-				startTime: searchStartTime,
-				endTime: Date.now(),
+				startTime: timeRange.startTime,
+				endTime: timeRange.endTime,
 				maxResults: 5000,
 			});
-			if (historyResult.isErr()) {
-				throw historyResult.error;
-			}
-			historyItems = historyResult.value;
 		} else {
 			// For alarm trigger, get history since last analysis
 			const memory = await loadMemoryFromStorage();
@@ -588,26 +558,33 @@ export async function triggerAnalysis(trigger: "manual" | "alarm") {
 			const searchStartTime =
 				lastTimestamp > 0 ? lastTimestamp + 1 : Date.now() - 60 * 60 * 1000;
 
-			const historyResult = await chromeAPI.searchHistory({
+			historyResult = await chromeAPI.searchHistory({
 				text: "",
 				startTime: searchStartTime,
 				endTime: Date.now(),
 				maxResults: 5000,
 			});
-			if (historyResult.isErr()) {
-				throw historyResult.error;
-			}
-			historyItems = historyResult.value;
 		}
+
+		if (historyResult.isErr()) {
+			throw historyResult.error;
+		}
+		const historyItems = historyResult.value;
 
 		console.log(
 			`[Analysis] Found ${historyItems.length} history items to analyze`,
 		);
 
+		// Check minimum history items
 		if (historyItems.length < MIN_HISTORY_ITEMS_FOR_ANALYSIS) {
 			console.log(
 				`[Analysis] Insufficient history items (${historyItems.length} < ${MIN_HISTORY_ITEMS_FOR_ANALYSIS})`,
 			);
+
+			const message =
+				historyItems.length === 0
+					? "No browsing history to analyze"
+					: `Need at least ${MIN_HISTORY_ITEMS_FOR_ANALYSIS} history items for meaningful analysis (found ${historyItems.length})`;
 
 			await saveAutoAnalysisSettings({
 				...settings,
@@ -620,10 +597,7 @@ export async function triggerAnalysis(trigger: "manual" | "alarm") {
 				status: "skipped",
 				reason:
 					historyItems.length === 0 ? "no-new-history" : "insufficient-history",
-				message:
-					historyItems.length === 0
-						? "No browsing history to analyze"
-						: `Need at least ${MIN_HISTORY_ITEMS_FOR_ANALYSIS} history items for meaningful analysis (found ${historyItems.length})`,
+				message,
 			});
 			return;
 		}
@@ -631,27 +605,9 @@ export async function triggerAnalysis(trigger: "manual" | "alarm") {
 		// Run analysis in service worker
 		console.log("[Analysis] Running analysis in service worker");
 
-		const storage = createChromeStorage();
-		let customPrompts: CustomPrompts | undefined;
-		if (storage) {
-			const promptsResult = await getStorageData(storage, CUSTOM_PROMPTS_KEY);
-			if (promptsResult.isOk() && promptsResult.value) {
-				customPrompts = promptsResult.value;
-			}
-		}
-
-		// Load memory settings for alarm trigger as well
-		const memorySettings = await loadMemorySettings();
-
 		const analysisId = `analysis-${Date.now()}`;
 		currentAnalysisId = analysisId;
-		await runAnalysis(
-			historyItems,
-			analysisId,
-			customPrompts,
-			trigger,
-			memorySettings,
-		);
+		await runAnalysis(historyItems, analysisId);
 	} catch (error) {
 		// Error already handled and logged by runAnalysis
 		console.error("[Analysis] Error in triggerAnalysis:", error);

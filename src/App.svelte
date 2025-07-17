@@ -14,11 +14,7 @@ import { disableAmbientAnalysis } from "./state/ambient-settings.svelte";
 import { createTRPCMessageHandler } from "./trpc/chrome-adapter";
 import { sidepanelToBackgroundClient } from "./trpc/client";
 import { createSidepanelRouter } from "./trpc/sidepanel-router";
-import type {
-	CustomPrompts,
-	FullAnalysisResult,
-	MemorySettings,
-} from "./types";
+import type { FullAnalysisResult, MemorySettings } from "./types";
 import type { AIProviderStatus, AnalysisStatus } from "./types/ui-types";
 import { loadAIConfigFromStorage } from "./utils/ai-config";
 import type { AIProviderType } from "./utils/ai-interface";
@@ -36,7 +32,6 @@ import {
 let analysisResult: FullAnalysisResult | null = $state(null);
 let memoryAutoExpand = $state(false);
 let memorySettings = $state<MemorySettings>({ storeWorkflowPatterns: false });
-let customPrompts = $state<CustomPrompts>({});
 let currentAIStatus = $state<AIProviderStatus>("unavailable");
 let currentProvider = $state<AIProviderType>("chrome");
 
@@ -66,10 +61,12 @@ let isAmbientAnalysisRunning = $derived(
 );
 let isAnyAnalysisRunning = $derived(analysisStatus.status === "running");
 
-async function handleAnalysis(data: { items: chrome.history.HistoryItem[] }) {
-	const { items } = data;
+async function handleAnalysis(data: {
+	timeRange: { startTime: number; endTime: number };
+}) {
+	const { timeRange } = data;
 
-	console.log("[App] Starting manual analysis for", items.length, "items");
+	console.log("[App] Starting manual analysis for time range", timeRange);
 
 	analysisResult = null;
 
@@ -81,7 +78,7 @@ async function handleAnalysis(data: { items: chrome.history.HistoryItem[] }) {
 	// Update unified status
 	analysisStatus = {
 		status: "running",
-		message: `Analyzing ${items.length} history items...`,
+		message: "Analyzing browsing history...",
 	};
 	analysisPhase = "calculating";
 
@@ -89,9 +86,7 @@ async function handleAnalysis(data: { items: chrome.history.HistoryItem[] }) {
 		// Send analysis request to background script
 		const response =
 			await sidepanelToBackgroundClient.analysis.startManual.mutate({
-				historyItems: items,
-				customPrompts: customPrompts,
-				memorySettings: memorySettings,
+				timeRange,
 			});
 
 		if (!response.success) {
@@ -125,20 +120,6 @@ async function handleAnalysis(data: { items: chrome.history.HistoryItem[] }) {
 		currentAnalysisId = null;
 		alert(error instanceof Error ? error.message : "Failed to start analysis");
 	}
-}
-
-function handlePromptsChange(prompts: {
-	system: string;
-	workflow: string;
-	chunk: string;
-	merge: string;
-}) {
-	customPrompts = {
-		userProfilePrompt: prompts.system || undefined,
-		workflowPatternsPrompt: prompts.workflow || undefined,
-		chunkPrompt: prompts.chunk || undefined,
-		mergePrompt: prompts.merge || undefined,
-	};
 }
 
 // Track previous AI status to detect transitions
@@ -584,7 +565,6 @@ onMount(() => {
 		<!-- Advanced Settings -->
 		<div class="mt-4">
 			<AdvancedSettings 
-				onPromptsChange={handlePromptsChange}
 				onProviderChange={checkInitialAIStatus}
 				aiStatus={currentAIStatus}
 				currentProviderType={currentProvider}

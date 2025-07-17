@@ -10,7 +10,9 @@ import { loadMemoryFromStorage } from "../utils/memory";
 type Props = {
 	isAnalyzing?: boolean;
 	isAmbientAnalysisRunning?: boolean;
-	onAnalysisRequest?: (data: { items: chrome.history.HistoryItem[] }) => void;
+	onAnalysisRequest?: (data: {
+		timeRange: { startTime: number; endTime: number };
+	}) => void;
 	aiStatus?: AIProviderStatus;
 	provider?: AIProviderType;
 };
@@ -129,9 +131,9 @@ async function fetchHistory() {
 		// Store raw data for display
 		rawHistoryData = results;
 
-		// Call the callback prop with the history data
+		// Call the callback prop with the time range
 		onAnalysisRequest({
-			items: results,
+			timeRange: { startTime, endTime },
 		});
 	} catch (err) {
 		console.error("Failed to fetch history:", err);

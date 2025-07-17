@@ -71,9 +71,10 @@ export const startAnalysisInputSchema = z.object({
 });
 
 export const startManualAnalysisInputSchema = z.object({
-	historyItems: z.array(historyItemSchema),
-	customPrompts: customPromptsSchema.optional(),
-	memorySettings: memorySettingsSchema.optional(),
+	timeRange: z.object({
+		startTime: z.number(),
+		endTime: z.number(),
+	}),
 });
 
 // Status update schema for broadcasts
