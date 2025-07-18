@@ -1702,7 +1702,7 @@ class ContextButtonInjector {
 
 				// Split text by newlines and create proper paragraph structure
 				const lines = text.split(/\r?\n/);
-				lines.forEach((line, index) => {
+				lines.forEach((line, _index) => {
 					if (line.trim() === "") {
 						// Empty line - add an empty paragraph for spacing
 						const p = document.createElement("p");
