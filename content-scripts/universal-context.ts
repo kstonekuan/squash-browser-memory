@@ -870,9 +870,9 @@ class SimpleContextMatcher {
 			.filter((suggestion) => suggestion.relevanceScore >= 0.1) // Minimum 10% match
 			.sort((a, b) => b.relevanceScore - a.relevanceScore);
 
-		// Dynamic limit: include all high-relevance matches (>30%)
+		// Dynamic limit: include all high-relevance matches (>40%)
 		// and fill up to 8 total with lower relevance matches
-		const highRelevanceThreshold = 0.3;
+		const highRelevanceThreshold = 0.4;
 		const minSuggestions = 8;
 
 		// Get all high relevance suggestions (no limit)
