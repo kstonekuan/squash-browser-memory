@@ -464,15 +464,71 @@ class SimplePlatformAdapter {
 	}
 }
 
-// Simple string similarity function
+// Enhanced string similarity function with word-level matching
 function compareTwoStrings(str1: string, str2: string): number {
 	if (str1 === str2) return 1;
 	if (str1.length === 0 || str2.length === 0) return 0;
 
-	const a = str1.toLowerCase();
-	const b = str2.toLowerCase();
+	const a = str1.toLowerCase().trim();
+	const b = str2.toLowerCase().trim();
 
-	// Get bigrams
+	// Exact match after normalization
+	if (a === b) return 0.95;
+
+	// Check if one string contains the other (substring match)
+	if (a.includes(b) || b.includes(a)) {
+		const lengthRatio =
+			Math.min(a.length, b.length) / Math.max(a.length, b.length);
+		return 0.7 + 0.2 * lengthRatio;
+	}
+
+	// Word-level matching for better accuracy
+	const words1 = new Set(a.split(/\s+/).filter((w) => w.length > 2));
+	const words2 = new Set(b.split(/\s+/).filter((w) => w.length > 2));
+
+	if (words1.size > 0 && words2.size > 0) {
+		const intersection = new Set([...words1].filter((w) => words2.has(w)));
+		const wordSimilarity =
+			(2 * intersection.size) / (words1.size + words2.size);
+
+		// If we have significant word overlap, prefer word-based score
+		if (wordSimilarity > 0.3) {
+			// Get bigram similarity as well
+			const bigrams1: string[] = [];
+			const bigrams2: string[] = [];
+
+			for (let i = 0; i < a.length - 1; i++) {
+				bigrams1.push(a.substring(i, i + 2));
+			}
+
+			for (let i = 0; i < b.length - 1; i++) {
+				bigrams2.push(b.substring(i, i + 2));
+			}
+
+			// Calculate intersection
+			let bigramIntersection = 0;
+			const bigrams2Copy = [...bigrams2];
+
+			for (const bigram of bigrams1) {
+				const index = bigrams2Copy.indexOf(bigram);
+				if (index >= 0) {
+					bigramIntersection++;
+					bigrams2Copy.splice(index, 1);
+				}
+			}
+
+			const bigramSimilarity =
+				(2.0 * bigramIntersection) / (bigrams1.length + bigrams2.length);
+
+			// Combine word and bigram similarities
+			return Math.max(
+				wordSimilarity * 0.7 + bigramSimilarity * 0.3,
+				bigramSimilarity,
+			);
+		}
+	}
+
+	// Original bigram logic as fallback
 	const bigrams1: string[] = [];
 	const bigrams2: string[] = [];
 
@@ -511,31 +567,44 @@ const domainKeywords: DomainKeywords = {
 	travel: [
 		"trip",
 		"travel",
+		"traveling",
+		"travelling",
 		"vacation",
 		"visit",
+		"visiting",
 		"destination",
 		"journey",
 		"flight",
+		"flights",
+		"flying",
 		"hotel",
+		"hotels",
+		"accommodation",
+		"accommodations",
 		"explore",
+		"exploring",
 		"adventure",
 		"tourism",
+		"tourist",
 		"country",
 		"city",
 		"abroad",
 		"international",
 		"itinerary",
 		"booking",
+		"bookings",
 		"passport",
 		"visa",
 		"luggage",
 		"sightseeing",
 		"culture",
 		"local",
-		// "guide", // Removed - too ambiguous, matches "guidelines"
 		"travel guide",
 		"tour guide",
-		"tourist",
+		"backpack",
+		"backpacking",
+		"departure",
+		"arrival",
 		"map",
 		"transportation",
 		"airport",
@@ -545,19 +614,28 @@ const domainKeywords: DomainKeywords = {
 	],
 	tech: [
 		"code",
+		"coding",
 		"develop",
+		"developer",
+		"development",
 		"build",
+		"building",
 		"program",
+		"programming",
+		"programmer",
 		"system",
 		"software",
 		"app",
+		"application",
 		"website",
 		"ai",
+		"ml",
 		"machine learning",
 		"algorithm",
 		"data",
 		"database",
 		"api",
+		"apis",
 		"framework",
 		"library",
 		"javascript",
@@ -569,10 +647,25 @@ const domainKeywords: DomainKeywords = {
 		"optimization",
 		"performance",
 		"debug",
+		"debugging",
 		"deploy",
+		"deployment",
 		"server",
 		"cloud",
 		"architecture",
+		"frontend",
+		"backend",
+		"fullstack",
+		"tech",
+		"technical",
+		"bug",
+		"bugs",
+		"issue",
+		"issues",
+		"repo",
+		"repository",
+		"git",
+		"github",
 	],
 	food: [
 		"eat",
@@ -736,6 +829,22 @@ class SimpleContextMatcher {
 					finalScore = finalScore * 1.3; // 30% boost for identities
 				}
 
+				// Boost for exact word matches (important keywords)
+				const contextWords = new Set(context.text.toLowerCase().split(/\s+/));
+				const inputWords = inputLower.split(/\s+/).filter((w) => w.length > 3);
+				const exactMatches = inputWords.filter((w) =>
+					contextWords.has(w),
+				).length;
+
+				if (exactMatches > 0 && inputWords.length > 0) {
+					// Add up to 10% bonus for exact word matches
+					const wordMatchBonus = Math.min(
+						0.1,
+						0.05 * (exactMatches / inputWords.length),
+					);
+					finalScore = Math.min(1.0, finalScore + wordMatchBonus);
+				}
+
 				// Dynamic threshold based on category
 				const threshold = isIdentity ? 0.08 : 0.15; // Lower threshold for identities
 				const stringThreshold = isIdentity ? 0.12 : 0.2; // Lower string threshold for identities
@@ -756,27 +865,65 @@ class SimpleContextMatcher {
 			}
 		}
 
-		// Filter out suggestions below 10% relevance and sort by relevance, limit to 8
-		return suggestions
-			.filter((suggestion) => suggestion.relevanceScore >= 0.1) // Minimum 20% match
-			.sort((a, b) => b.relevanceScore - a.relevanceScore)
-			.slice(0, 8); // Increased from 5 to 8
+		// Sort all suggestions by relevance first
+		const sortedSuggestions = suggestions
+			.filter((suggestion) => suggestion.relevanceScore >= 0.1) // Minimum 10% match
+			.sort((a, b) => b.relevanceScore - a.relevanceScore);
+
+		// Dynamic limit: include all high-relevance matches (>30%)
+		// and fill up to 8 total with lower relevance matches
+		const highRelevanceThreshold = 0.3;
+		const minSuggestions = 8;
+
+		// Get all high relevance suggestions (no limit)
+		const highRelevanceSuggestions = sortedSuggestions.filter(
+			(s) => s.relevanceScore >= highRelevanceThreshold,
+		);
+
+		// If we have fewer than 8 high relevance matches,
+		// fill with lower relevance ones (between 10-25%)
+		if (highRelevanceSuggestions.length < minSuggestions) {
+			const lowerRelevanceSuggestions = sortedSuggestions
+				.filter((s) => s.relevanceScore < highRelevanceThreshold)
+				.slice(0, minSuggestions - highRelevanceSuggestions.length);
+
+			return [...highRelevanceSuggestions, ...lowerRelevanceSuggestions];
+		}
+
+		// If we have 8 or more high relevance matches, return all of them
+		return highRelevanceSuggestions;
 	}
 
 	private detectInputDomains(inputLower: string): string[] {
-		const detectedDomains: string[] = [];
+		const detectedDomains = new Set<string>();
+		const inputWords = new Set(inputLower.split(/\s+/));
 
 		for (const [domain, keywords] of Object.entries(domainKeywords)) {
 			for (const keyword of keywords) {
-				if (inputLower.includes(keyword.toLowerCase())) {
-					if (!detectedDomains.includes(domain)) {
-						detectedDomains.push(domain);
+				const keywordLower = keyword.toLowerCase();
+
+				// Check for exact word match first (fastest)
+				if (inputWords.has(keywordLower)) {
+					detectedDomains.add(domain);
+					continue;
+				}
+
+				// For multi-word keywords, check substring
+				if (keyword.includes(" ")) {
+					if (inputLower.includes(keywordLower)) {
+						detectedDomains.add(domain);
+					}
+				} else if (keywordLower.length > 3) {
+					// For single words > 3 chars, use word boundary check
+					const regex = new RegExp(`\\b${keywordLower}\\b`, "i");
+					if (regex.test(inputLower)) {
+						detectedDomains.add(domain);
 					}
 				}
 			}
 		}
 
-		return detectedDomains;
+		return Array.from(detectedDomains);
 	}
 
 	private calculateDomainRelevance(
@@ -796,63 +943,12 @@ class SimpleContextMatcher {
 		);
 	}
 
-	private shouldExcludeFromDomain(text: string, domain: string): boolean {
-		const exclusions: Record<string, string[]> = {
-			travel: [
-				"documentation",
-				"development",
-				"security guidelines",
-				"best practices",
-				"API",
-				"chrome extension",
-				"debugging",
-				"json",
-				"formatting",
-				"tools",
-				"programming",
-				"code",
-				"software",
-			],
-			work: [
-				"chrome extension",
-				"json formatter",
-				"json formatting",
-				"json processing",
-				"prettifier",
-				"debugging tools",
-				"development documentation",
-				"data processing and debugging",
-			],
-			tech: [], // No exclusions for tech domain
-			food: [
-				"json",
-				"formatter",
-				"debugging",
-				"chrome",
-				"extension",
-				"documentation",
-			],
-		};
-
-		const textLower = text.toLowerCase();
-		const domainExclusions = exclusions[domain] || [];
-
-		return domainExclusions.some((term) =>
-			textLower.includes(term.toLowerCase()),
-		);
-	}
-
 	private assignDomainsToContext(text: string, category: string): string[] {
 		const domains: string[] = [];
 		const textLower = text.toLowerCase();
 
 		// Check each domain's keywords against the context text
 		for (const [domain, keywords] of Object.entries(domainKeywords)) {
-			// Skip if this context should be excluded from this domain
-			if (this.shouldExcludeFromDomain(text, domain)) {
-				continue;
-			}
-
 			for (const keyword of keywords) {
 				// Use word boundary matching for better precision
 				const keywordLower = keyword.toLowerCase();
