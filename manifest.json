@@ -1,6 +1,6 @@
 {
 	"manifest_version": 3,
-	"name": "Squash",
+	"name": "Squash - Browser Memory for AI Tools",
 	"version": "1.1.0",
 	"description": "Squash adds an invisible memory layer to your browser, compressing every click into portable context for any AI agent",
 	"minimum_chrome_version": "138",
