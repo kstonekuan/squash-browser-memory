@@ -12,7 +12,6 @@
 		"notifications",
 		"offscreen"
 	],
-	"host_permissions": ["https://api.anthropic.com/*"],
 	"background": {
 		"service_worker": "src/background.ts"
 	},
