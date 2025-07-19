@@ -28,8 +28,6 @@ let {
 let error = $state("");
 type DateRange = "1hour" | "3hours" | "day" | "week" | "all";
 let dateRange = $state<DateRange>("1hour");
-let fetchProgress = $state(0);
-let isFetching = $state(false);
 let rawHistoryData = $state<chrome.history.HistoryItem[] | null>(null);
 let showRawData = $state(false);
 let onlyNewHistory = $state(false);
@@ -87,11 +85,9 @@ function getStartTime(): number {
 }
 
 async function fetchHistory() {
-	if (isFetching || isAnalyzing || isAmbientAnalysisRunning) return;
+	if (isAnalyzing || isAmbientAnalysisRunning) return;
 
 	error = "";
-	isFetching = true;
-	fetchProgress = 0;
 
 	try {
 		const startTime = getStartTime();
@@ -139,9 +135,6 @@ async function fetchHistory() {
 		console.error("Failed to fetch history:", err);
 		error =
 			err instanceof Error ? err.message : "Failed to fetch browsing history";
-	} finally {
-		isFetching = false;
-		fetchProgress = 100;
 	}
 }
 </script>
@@ -156,7 +149,7 @@ async function fetchHistory() {
 					bind:group={dateRange}
 					value="1hour"
 					class="mr-2 text-blue-600 focus:ring-blue-500"
-					disabled={isFetching || isAnalyzing}
+					disabled={isAnalyzing}
 				/>
 				<span class="text-sm">1 hour</span>
 			</label>
@@ -166,7 +159,7 @@ async function fetchHistory() {
 					bind:group={dateRange}
 					value="3hours"
 					class="mr-2 text-blue-600 focus:ring-blue-500"
-					disabled={isFetching || isAnalyzing}
+					disabled={isAnalyzing}
 				/>
 				<span class="text-sm">3 hours</span>
 			</label>
@@ -176,7 +169,7 @@ async function fetchHistory() {
 					bind:group={dateRange}
 					value="day"
 					class="mr-2 text-blue-600 focus:ring-blue-500"
-					disabled={isFetching || isAnalyzing}
+					disabled={isAnalyzing}
 				/>
 				<span class="text-sm">24 hours</span>
 			</label>
@@ -186,7 +179,7 @@ async function fetchHistory() {
 					bind:group={dateRange}
 					value="week"
 					class="mr-2 text-blue-600 focus:ring-blue-500"
-					disabled={isFetching || isAnalyzing}
+					disabled={isAnalyzing}
 				/>
 				<span class="text-sm">7 days</span>
 			</label>
@@ -196,7 +189,7 @@ async function fetchHistory() {
 					bind:group={dateRange}
 					value="all"
 					class="mr-2 text-blue-600 focus:ring-blue-500"
-					disabled={isFetching || isAnalyzing}
+					disabled={isAnalyzing}
 				/>
 				<span class="text-sm">90 days</span>
 			</label>
@@ -211,7 +204,7 @@ async function fetchHistory() {
 				type="checkbox"
 				bind:checked={onlyNewHistory}
 				class="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-				disabled={isFetching || isAnalyzing}
+				disabled={isAnalyzing}
 			/>
 			<label for="only-new-history" class="text-sm text-gray-700">
 				Only analyze new history since {format(new Date(lastHistoryTimestamp), 'PPpp')}
@@ -219,31 +212,14 @@ async function fetchHistory() {
 		</div>
 	{/if}
 
-	{#if isFetching}
-		<div class="space-y-1">
-			<div class="flex justify-between text-sm text-gray-600">
-				<span>Fetching history...</span>
-				<span>{fetchProgress}%</span>
-			</div>
-			<div class="w-full bg-gray-200 rounded-full h-2">
-				<div
-					class="bg-blue-600 h-2 rounded-full transition-all duration-300"
-					style="width: {fetchProgress}%"
-				></div>
-			</div>
-		</div>
-	{/if}
-
 	<button
 		onclick={fetchHistory}
-		disabled={isFetching || isAnalyzing || isAmbientAnalysisRunning || aiStatus !== 'available'}
+		disabled={isAnalyzing || isAmbientAnalysisRunning || aiStatus !== 'available'}
 		class="w-full py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
 		title={aiStatus !== 'available' ? "AI is not available. Please check AI provider status above." : isAmbientAnalysisRunning ? "Cannot run manual analysis while ambient analysis is in progress" : ""}
 	>
 		{#if aiStatus !== 'available'}
 			AI Not Available
-		{:else if isFetching}
-			Fetching...
 		{:else if isAnalyzing}
 			Analyzing...
 		{:else if isAmbientAnalysisRunning}

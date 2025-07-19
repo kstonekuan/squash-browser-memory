@@ -521,12 +521,6 @@ export async function triggerAnalysis(
 		return;
 	}
 
-	isAnalysisRunning = true;
-	broadcast.analysisStatus({
-		status: "running",
-		message: "Checking for new browsing history...",
-	});
-
 	try {
 		// Determine time range based on trigger
 		let historyResult: Result<chrome.history.HistoryItem[], Error>;
@@ -601,6 +595,12 @@ export async function triggerAnalysis(
 			});
 			return;
 		}
+
+		isAnalysisRunning = true;
+		broadcast.analysisStatus({
+			status: "running",
+			message: "Analyzing new browsing history...",
+		});
 
 		// Run analysis in service worker
 		console.log("[Analysis] Running analysis in service worker");

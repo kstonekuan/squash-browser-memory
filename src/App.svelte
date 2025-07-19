@@ -75,13 +75,6 @@ async function handleAnalysis(data: {
 	const tempAnalysisId = `manual-${Date.now()}`;
 	currentAnalysisId = tempAnalysisId;
 
-	// Update unified status
-	analysisStatus = {
-		status: "running",
-		message: "Analyzing browsing history...",
-	};
-	analysisPhase = "calculating";
-
 	try {
 		// Send analysis request to background script
 		const response =
