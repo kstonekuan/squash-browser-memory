@@ -27,7 +27,8 @@ Squash studies your browsing patterns, learns how you work, and automatically pr
 
 3. Choose your AI provider (in extension settings):
    - **Chrome AI (Local)**: Private, on-device analysis
-   - **Claude API**: More powerful, requires API key
+   - **Claude API**: Remote, requires API key
+   - **Gemini API**: Remote, requires API key
 
 ## Key Features
 
@@ -66,7 +67,7 @@ Squash studies your browsing patterns, learns how you work, and automatically pr
 ## Planned Features
 
 - **MCP Server Integration**: Expose your browsing patterns and profile as an MCP (Model Context Protocol) server for other AI tools
-- **More AI Providers**: Support for additional LLM providers beyond Chrome AI and Claude
+- **More AI Providers**: Support for additional LLM providers beyond Chrome AI, Claude and Gemini
 - **Enhanced Context Matching**: Smarter relevance algorithms for context suggestions
 - **Workflow Automation**: Detect and suggest automation for repetitive tasks
 
