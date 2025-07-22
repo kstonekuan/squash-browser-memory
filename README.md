@@ -94,4 +94,4 @@ See [ARCHITECTURE.md](./ARCHITECTURE.md) for technical details.
 - [Mem0 Chrome Extension](https://github.com/mem0ai/mem0-chrome-extension/) - Inspiration for context injection UX
 - [Chrome AI Prompt API](https://developer.chrome.com/docs/ai/prompt-api) - Official documentation for Chrome's built-in AI
 - [Anthropic TypeScript SDK](https://docs.anthropic.com/en/api/client-sdks#typescript) - Official SDK for Claude API integration
-- [Gemini SDK](https://googleapis.github.io/js-genai/release_docs/index.html)
+- [Gemini SDK](https://googleapis.github.io/js-genai/release_docs/index.html) - Official SDK for Gemini API integration
