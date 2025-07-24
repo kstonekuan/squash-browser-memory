@@ -2,6 +2,10 @@
 
 Squash adds an invisible memory layer to your browser, compressing every click into portable context for any AI agent.
 
+<a href="https://chromewebstore.google.com/detail/squash-browser-memory-for/cbemgpconhoibnbbgjbeengcojcoeimh">
+  Now available in the Chrome Web Store
+</a>
+
 ## What it does
 
 Squash studies your browsing patterns, learns how you work, and automatically provides relevant context when you use AI tools like ChatGPT or Claude. No more re-explaining yourself to every new AI conversation.
