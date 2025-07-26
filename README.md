@@ -2,6 +2,10 @@
 
 Squash adds an invisible memory layer to your browser, compressing every click into portable context for any AI agent.
 
+<a href="https://chromewebstore.google.com/detail/squash-browser-memory-for/cbemgpconhoibnbbgjbeengcojcoeimh">
+  Now available in the Chrome Web Store
+</a>
+
 ## What it does
 
 Squash studies your browsing patterns, learns how you work, and automatically provides relevant context when you use AI tools like ChatGPT or Claude. No more re-explaining yourself to every new AI conversation.
@@ -94,4 +98,4 @@ See [ARCHITECTURE.md](./ARCHITECTURE.md) for technical details.
 - [Mem0 Chrome Extension](https://github.com/mem0ai/mem0-chrome-extension/) - Inspiration for context injection UX
 - [Chrome AI Prompt API](https://developer.chrome.com/docs/ai/prompt-api) - Official documentation for Chrome's built-in AI
 - [Anthropic TypeScript SDK](https://docs.anthropic.com/en/api/client-sdks#typescript) - Official SDK for Claude API integration
-- [Gemini SDK](https://googleapis.github.io/js-genai/release_docs/index.html)
+- [Gemini SDK](https://googleapis.github.io/js-genai/release_docs/index.html) - Official SDK for Gemini API integration
