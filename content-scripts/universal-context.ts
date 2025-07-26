@@ -846,8 +846,8 @@ class SimpleContextMatcher {
 				}
 
 				// Dynamic threshold based on category
-				const threshold = isIdentity ? 0.08 : 0.15; // Lower threshold for identities
-				const stringThreshold = isIdentity ? 0.12 : 0.2; // Lower string threshold for identities
+				const threshold = isIdentity ? 0.15 : 0.2; // Lower threshold for identities
+				const stringThreshold = isIdentity ? 0.2 : 0.3; // Lower string threshold for identities
 
 				if (finalScore >= threshold || stringSimilarity >= stringThreshold) {
 					const matchType = domainRelevance > 0.5 ? "semantic" : "string";

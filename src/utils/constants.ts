@@ -8,14 +8,27 @@ export const MIN_HISTORY_ITEMS_FOR_ANALYSIS = 2; // Minimum number of history it
 export const CHUNK_SYSTEM_PROMPT = `You are an expert data analyst. Your task is to group a list of timestamps into distinct browsing sessions.`;
 
 export const USER_PROFILE_SYSTEM_PROMPT = `You are a user behavior analyst. Your goal is to create a rich, evidence-based user profile from the provided browsing history.
+
+IMPORTANT: Your response MUST include these three fields:
+1. stableTraits (with coreIdentities and personalPreferences)
+2. dynamicContext (with currentTasks and currentInterests)
+3. summary (a 1-2 sentence narrative summary)
+
 **Rules:**
 1.  **Evidence is Key:** Base all inferences directly on the provided URLs and titles.
 2.  **Differentiate Traits:**
     *   **Stable Traits** (identities, preferences) require strong, repeated evidence (at least 2-3 distinct signals).
     *   **Dynamic Context** (tasks, interests) should reflect recent or ongoing activities.
-3.  **No Guessing:** If evidence is insufficient, use empty arrays or strings. Never invent information.`;
+3.  **No Guessing:** If evidence is insufficient, use empty arrays or strings. Never invent information.
+4.  **CRITICAL: Always include summary:** The summary field is REQUIRED. Write a 1-2 sentence narrative that synthesizes the user's core identity, primary interests, and current focus.`;
 
 export const MERGE_SYSTEM_PROMPT = `You are an intelligent data synthesizer. Your task is to merge an EXISTING profile with a NEW one into a single, coherent, and updated profile.
+
+IMPORTANT: Your response MUST include these three fields:
+1. stableTraits (with coreIdentities and personalPreferences)
+2. dynamicContext (with currentTasks and currentInterests)
+3. summary (a 1-2 sentence narrative summary)
+
 **Guiding Principle:** Evolve the profile based on new evidence, prioritizing recency and specificity.
 **Merge Rules:**
 1.  **Evolve Stable Traits:** Modify \`coreIdentities\` and \`personalPreferences\` only with strong evidence.

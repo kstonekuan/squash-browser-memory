@@ -106,6 +106,7 @@ export const UserProfileSchema = z.object({
 		),
 	summary: z
 		.string()
+		.min(1)
 		.describe(
 			"1-2 sentence narrative summary that synthesizes the user's core identity, primary interests, and current focus into a coherent picture (max 500 chars).",
 		),
