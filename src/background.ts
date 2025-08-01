@@ -5,6 +5,7 @@ import {
 	handleStartupAlarmCheck,
 	triggerAnalysis,
 } from "./background-handlers";
+import { handleSDKMessage } from "./sdk-background-handlers";
 import { backgroundRouter } from "./trpc/background-router";
 import { createTRPCMessageHandler } from "./trpc/chrome-adapter";
 import { loadAutoAnalysisSettings } from "./utils/ambient";
@@ -105,10 +106,18 @@ const messageHandler = createTRPCMessageHandler(
 	},
 );
 
-// Handle tRPC messages via sendMessage
-chrome.runtime.onMessage.addListener(messageHandler);
+// Combined message handler for tRPC and SDK messages
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+	// First try SDK message handler
+	if (message.type?.startsWith('SDK_') || message.type === 'PERMISSION_RESPONSE') {
+		return handleSDKMessage(message, sender, sendResponse);
+	}
+	
+	// Otherwise use tRPC handler
+	return messageHandler(message, sender, sendResponse);
+});
 
-console.log("[Background] tRPC message handler initialized");
+console.log("[Background] Message handlers initialized (tRPC + SDK)");
 
 // Initialize offscreen document immediately on service worker start
 // This ensures it's available for all operations

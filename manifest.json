@@ -10,7 +10,8 @@
 		"sidePanel",
 		"alarms",
 		"notifications",
-		"offscreen"
+		"offscreen",
+		"tabs"
 	],
 	"background": {
 		"service_worker": "src/background.ts"
@@ -22,6 +23,12 @@
 		"default_title": "Open Squash in side panel"
 	},
 	"content_scripts": [
+		{
+			"matches": ["<all_urls>"],
+			"js": ["content-scripts/sdk-injection.ts"],
+			"run_at": "document_start",
+			"all_frames": false
+		},
 		{
 			"matches": [
 				"https://chatgpt.com/*",
@@ -41,7 +48,7 @@
 	},
 	"web_accessible_resources": [
 		{
-			"resources": ["icon-48.png"],
+			"resources": ["icon-48.png", "permission-dialog.html", "permission-dialog.js"],
 			"matches": ["<all_urls>"]
 		}
 	]
