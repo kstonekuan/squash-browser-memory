@@ -19,14 +19,14 @@ async function showPermissionDialog(
 	domain: string,
 ): Promise<boolean> {
 	return new Promise((resolve) => {
-		const requestId = Math.random().toString(36).substr(2, 9);
+		const requestId = Math.random().toString(36).substring(2, 11);
 		pendingPermissionRequests.set(requestId, resolve);
 
 		// Create a new window with the permission dialog
 		const width = 520;
 		const height = 480;
 		const url = chrome.runtime.getURL(
-			`permission-dialog.html?appName=${encodeURIComponent(appInfo.appName)}&domain=${encodeURIComponent(domain)}&requestId=${requestId}`,
+			`src/permission-dialog/permission-dialog.html?appName=${encodeURIComponent(appInfo.appName)}&domain=${encodeURIComponent(domain)}&requestId=${requestId}`,
 		);
 
 		chrome.windows.create({

@@ -49,9 +49,9 @@
 	"web_accessible_resources": [
 		{
 			"resources": [
-				"icon-48.png",
-				"permission-dialog.html",
-				"permission-dialog.js"
+				"public/icon-48.png",
+				"src/permission-dialog/permission-dialog.html",
+				"src/permission-dialog/permission-dialog.ts"
 			],
 			"matches": ["<all_urls>"]
 		}

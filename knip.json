@@ -4,7 +4,8 @@
 		"src/sidepanel.ts",
 		"src/background.ts",
 		"src/offscreen.ts",
-		"content-scripts/**/*.ts"
+		"content-scripts/**/*.ts",
+		"src/permission-dialog/permission-dialog.ts"
 	],
 	"project": ["src/**/*.{ts,js,svelte}", "content-scripts/**/*.ts"],
 	"ignoreDependencies": ["@tailwindcss/forms", "tailwindcss"]

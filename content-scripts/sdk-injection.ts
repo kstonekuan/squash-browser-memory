@@ -125,7 +125,7 @@ function injectAPI() {
       window.__squashExtension = {
         requestPermission: async (appInfo) => {
           return new Promise((resolve) => {
-            const id = Math.random().toString(36).substr(2, 9);
+            const id = Math.random().toString(36).substring(2, 11);
             window.postMessage({ type: 'SQUASH_REQUEST_PERMISSION', id, appInfo }, '*');
             
             const handler = (event) => {
@@ -140,7 +140,7 @@ function injectAPI() {
         
         getContext: async (options) => {
           return new Promise((resolve) => {
-            const id = Math.random().toString(36).substr(2, 9);
+            const id = Math.random().toString(36).substring(2, 11);
             window.postMessage({ type: 'SQUASH_GET_CONTEXT', id, options }, '*');
             
             const handler = (event) => {
