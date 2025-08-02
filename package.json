@@ -40,7 +40,7 @@
 		"svelte": "5.36.13",
 		"svelte-check": "4.3.0",
 		"tailwindcss": "4.1.11",
-		"typescript": "5.8.3",
+		"typescript": "5.9.2",
 		"vite": "7.0.5",
 		"vitest": "3.2.4"
 	}
