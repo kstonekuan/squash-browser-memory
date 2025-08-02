@@ -48,7 +48,11 @@
 	},
 	"web_accessible_resources": [
 		{
-			"resources": ["icon-48.png", "permission-dialog.html", "permission-dialog.js"],
+			"resources": [
+				"icon-48.png",
+				"permission-dialog.html",
+				"permission-dialog.js"
+			],
 			"matches": ["<all_urls>"]
 		}
 	]

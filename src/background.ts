@@ -109,10 +109,13 @@ const messageHandler = createTRPCMessageHandler(
 // Combined message handler for tRPC and SDK messages
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 	// First try SDK message handler
-	if (message.type?.startsWith('SDK_') || message.type === 'PERMISSION_RESPONSE') {
+	if (
+		message.type?.startsWith("SDK_") ||
+		message.type === "PERMISSION_RESPONSE"
+	) {
 		return handleSDKMessage(message, sender, sendResponse);
 	}
-	
+
 	// Otherwise use tRPC handler
 	return messageHandler(message, sender, sendResponse);
 });
