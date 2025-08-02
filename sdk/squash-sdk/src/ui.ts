@@ -3,46 +3,48 @@
  */
 
 export interface InstallPromptOptions {
-  title?: string;
-  message?: string;
-  theme?: 'light' | 'dark' | 'auto';
-  position?: 'top' | 'bottom' | 'center';
+	title?: string;
+	message?: string;
+	theme?: "light" | "dark" | "auto";
+	position?: "top" | "bottom" | "center";
 }
 
 export class UIManager {
-  private promptElement: HTMLElement | null = null;
+	private promptElement: HTMLElement | null = null;
 
-  showInstallPrompt(options: InstallPromptOptions = {}): void {
-    // Don't show multiple prompts
-    if (this.promptElement) return;
+	showInstallPrompt(options: InstallPromptOptions = {}): void {
+		// Don't show multiple prompts
+		if (this.promptElement) return;
 
-    const {
-      title = 'Enhance Your AI Experience',
-      message = 'Install Squash to give AI assistants context about your work',
-      theme = 'auto',
-      position = 'bottom'
-    } = options;
+		const {
+			title = "Enhance Your AI Experience",
+			message = "Install Squash to give AI assistants context about your work",
+			theme = "auto",
+			position = "bottom",
+		} = options;
 
-    // Create prompt element
-    const prompt = document.createElement('div');
-    prompt.id = 'squash-install-prompt';
-    
-    // Detect theme
-    const isDark = theme === 'dark' || 
-      (theme === 'auto' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+		// Create prompt element
+		const prompt = document.createElement("div");
+		prompt.id = "squash-install-prompt";
 
-    prompt.innerHTML = `
+		// Detect theme
+		const isDark =
+			theme === "dark" ||
+			(theme === "auto" &&
+				window.matchMedia("(prefers-color-scheme: dark)").matches);
+
+		prompt.innerHTML = `
       <style>
         #squash-install-prompt {
           position: fixed;
-          ${position === 'top' ? 'top: 20px;' : position === 'bottom' ? 'bottom: 20px;' : 'top: 50%; transform: translateY(-50%);'}
+          ${position === "top" ? "top: 20px;" : position === "bottom" ? "bottom: 20px;" : "top: 50%; transform: translateY(-50%);"}
           right: 20px;
           max-width: 380px;
           padding: 20px;
-          background: ${isDark ? '#1e1e1e' : '#ffffff'};
-          color: ${isDark ? '#ffffff' : '#1a1a1a'};
+          background: ${isDark ? "#1e1e1e" : "#ffffff"};
+          color: ${isDark ? "#ffffff" : "#1a1a1a"};
           border-radius: 12px;
-          box-shadow: 0 4px 24px rgba(0, 0, 0, ${isDark ? '0.3' : '0.1'});
+          box-shadow: 0 4px 24px rgba(0, 0, 0, ${isDark ? "0.3" : "0.1"});
           font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
           z-index: 9999;
           animation: slideIn 0.3s ease-out;
@@ -69,7 +71,7 @@ export class UIManager {
           margin: 0 0 16px 0;
           font-size: 14px;
           line-height: 1.5;
-          color: ${isDark ? '#b0b0b0' : '#666666'};
+          color: ${isDark ? "#b0b0b0" : "#666666"};
         }
         
         #squash-install-prompt .buttons {
@@ -98,12 +100,12 @@ export class UIManager {
         }
         
         #squash-install-prompt .dismiss-btn {
-          background: ${isDark ? '#333333' : '#f1f3f4'};
-          color: ${isDark ? '#ffffff' : '#5f6368'};
+          background: ${isDark ? "#333333" : "#f1f3f4"};
+          color: ${isDark ? "#ffffff" : "#5f6368"};
         }
         
         #squash-install-prompt .dismiss-btn:hover {
-          background: ${isDark ? '#444444' : '#e8eaed'};
+          background: ${isDark ? "#444444" : "#e8eaed"};
         }
         
         #squash-install-prompt .close-btn {
@@ -126,7 +128,7 @@ export class UIManager {
         #squash-install-prompt .close-btn svg {
           width: 100%;
           height: 100%;
-          fill: ${isDark ? '#ffffff' : '#5f6368'};
+          fill: ${isDark ? "#ffffff" : "#5f6368"};
         }
       </style>
       
@@ -145,39 +147,46 @@ export class UIManager {
       </div>
     `;
 
-    // Add event listeners
-    const installBtn = prompt.querySelector('.install-btn') as HTMLButtonElement;
-    const dismissBtn = prompt.querySelector('.dismiss-btn') as HTMLButtonElement;
-    const closeBtn = prompt.querySelector('.close-btn') as HTMLButtonElement;
+		// Add event listeners
+		const installBtn = prompt.querySelector(
+			".install-btn",
+		) as HTMLButtonElement;
+		const dismissBtn = prompt.querySelector(
+			".dismiss-btn",
+		) as HTMLButtonElement;
+		const closeBtn = prompt.querySelector(".close-btn") as HTMLButtonElement;
 
-    installBtn.addEventListener('click', () => {
-      window.open('https://chromewebstore.google.com/detail/squash-browser-memory-for/cbemgpconhoibnbbgjbeengcojcoeimh', '_blank');
-      this.hideInstallPrompt();
-    });
+		installBtn.addEventListener("click", () => {
+			window.open(
+				"https://chromewebstore.google.com/detail/squash-browser-memory-for/cbemgpconhoibnbbgjbeengcojcoeimh",
+				"_blank",
+			);
+			this.hideInstallPrompt();
+		});
 
-    dismissBtn.addEventListener('click', () => {
-      this.hideInstallPrompt();
-      // Remember dismissal for this session
-      sessionStorage.setItem('squash-prompt-dismissed', 'true');
-    });
+		dismissBtn.addEventListener("click", () => {
+			this.hideInstallPrompt();
+			// Remember dismissal for this session
+			sessionStorage.setItem("squash-prompt-dismissed", "true");
+		});
 
-    closeBtn.addEventListener('click', () => {
-      this.hideInstallPrompt();
-    });
+		closeBtn.addEventListener("click", () => {
+			this.hideInstallPrompt();
+		});
 
-    // Add to page
-    document.body.appendChild(prompt);
-    this.promptElement = prompt;
-  }
+		// Add to page
+		document.body.appendChild(prompt);
+		this.promptElement = prompt;
+	}
 
-  hideInstallPrompt(): void {
-    if (this.promptElement) {
-      this.promptElement.remove();
-      this.promptElement = null;
-    }
-  }
+	hideInstallPrompt(): void {
+		if (this.promptElement) {
+			this.promptElement.remove();
+			this.promptElement = null;
+		}
+	}
 
-  isPromptDismissed(): boolean {
-    return sessionStorage.getItem('squash-prompt-dismissed') === 'true';
-  }
+	isPromptDismissed(): boolean {
+		return sessionStorage.getItem("squash-prompt-dismissed") === "true";
+	}
 }
