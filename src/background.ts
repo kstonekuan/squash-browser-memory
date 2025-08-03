@@ -14,15 +14,9 @@ import { clearCorruptedStorage } from "./utils/clear-corrupted-storage";
 
 const ALARM_NAME = "hourly-analysis";
 
-// Handle extension icon click to open side panel
-chrome.action.onClicked.addListener((tab) => {
-	chrome.sidePanel.open({ windowId: tab.windowId });
-});
+// Note: Extension icon click now shows popup.html instead of opening side panel directly
 
-// Set up side panel behavior
-chrome.sidePanel
-	.setPanelBehavior({ openPanelOnActionClick: true })
-	.catch((error) => console.error("Failed to set panel behavior:", error));
+// Side panel is now opened via popup.html, not on action click
 
 // Listen for installation
 chrome.runtime.onInstalled.addListener(async () => {
@@ -108,11 +102,14 @@ const messageHandler = createTRPCMessageHandler(
 
 // Combined message handler for tRPC and SDK messages
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+	console.log("[Background] Received message:", message.type);
+
 	// First try SDK message handler
 	if (
 		message.type?.startsWith("SDK_") ||
 		message.type === "PERMISSION_RESPONSE"
 	) {
+		console.log("[Background] Routing to SDK handler");
 		return handleSDKMessage(message, sender, sendResponse);
 	}
 

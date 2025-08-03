@@ -22,26 +22,71 @@ async function showPermissionDialog(
 		const requestId = Math.random().toString(36).substring(2, 11);
 		pendingPermissionRequests.set(requestId, resolve);
 
-		// Create a new window with the permission dialog
-		const width = 520;
-		const height = 480;
-		const url = chrome.runtime.getURL(
-			`src/permission-dialog/permission-dialog.html?appName=${encodeURIComponent(appInfo.appName)}&domain=${encodeURIComponent(domain)}&requestId=${requestId}`,
-		);
+		// First, try to use the popup approach
+		chrome.storage.local.set(
+			{
+				pendingPermissionRequest: {
+					requestId,
+					appName: appInfo.appName,
+					appId: appInfo.appId,
+					domain,
+					timestamp: Date.now(),
+				},
+			},
+			() => {
+				// Try to open the extension popup (requires Chrome 127+)
+				if (chrome.action.openPopup) {
+					chrome.action.openPopup().catch(() => {
+						// If opening popup fails, fall back to new window approach
+						openPermissionWindow();
+					});
+				} else {
+					// If openPopup API not available, use new window approach
+					openPermissionWindow();
+				}
 
-		chrome.windows.create({
-			url,
-			type: "popup",
-			width,
-			height,
-			left: Math.round((screen.width - width) / 2),
-			top: Math.round((screen.height - height) / 2),
-		});
+				function openPermissionWindow() {
+					const width = 520;
+					const height = 480;
+					const url = chrome.runtime.getURL(
+						`src/permission-dialog/permission-dialog.html?appName=${encodeURIComponent(appInfo.appName)}&domain=${encodeURIComponent(domain)}&requestId=${requestId}`,
+					);
+
+					// Get the current window to center the popup
+					chrome.windows.getCurrent((currentWindow) => {
+						const left = currentWindow.left
+							? Math.round(
+									currentWindow.left +
+										(currentWindow.width || 800) / 2 -
+										width / 2,
+								)
+							: 100;
+						const top = currentWindow.top
+							? Math.round(
+									currentWindow.top +
+										(currentWindow.height || 600) / 2 -
+										height / 2,
+								)
+							: 100;
+
+						chrome.windows.create({
+							url,
+							type: "popup",
+							width,
+							height,
+							left,
+							top,
+						});
+					});
+				}
+			},
+		);
 
 		// Set a timeout in case the window is closed without a response
 		setTimeout(() => {
 			if (pendingPermissionRequests.has(requestId)) {
 				pendingPermissionRequests.delete(requestId);
+				chrome.storage.local.remove(["pendingPermissionRequest"]);
 				resolve(false);
 			}
 		}, 60000); // 1 minute timeout
@@ -53,6 +98,11 @@ async function getContextForSDK(
 	options: ContextOptions = {},
 ): Promise<Context | null> {
 	try {
+		console.log(
+			"[SDK Background] getContextForSDK called with options:",
+			options,
+		);
+
 		// Get memory from storage
 		const storage = createChromeStorage();
 		if (!storage) {
@@ -70,8 +120,10 @@ async function getContextForSDK(
 		}
 
 		const memory = memoryResult.value;
+		console.log("[SDK Background] Memory retrieved:", !!memory);
 
 		if (!memory) {
+			console.log("[SDK Background] No memory found, returning null");
 			return null;
 		}
 
@@ -156,92 +208,140 @@ interface SDKMessage {
 	options?: ContextOptions;
 	requestId?: string;
 	granted?: boolean;
+	test?: boolean;
 }
 
-export async function handleSDKMessage(
+export function handleSDKMessage(
 	message: SDKMessage,
 	_sender: chrome.runtime.MessageSender,
 	sendResponse: (response: Record<string, unknown>) => void,
-): Promise<boolean> {
+): boolean {
+	console.log("[SDK Background] Received message:", message.type);
+
 	switch (message.type) {
 		case "SDK_REQUEST_PERMISSION":
-			try {
-				// Check if permission already exists
-				const storage = createChromeStorage();
-				if (!storage || !message.domain) {
+			// Handle async operation
+			(async () => {
+				try {
+					// Check if permission already exists
+					const storage = createChromeStorage();
+					if (!storage || !message.domain) {
+						sendResponse({ granted: false });
+						return;
+					}
+
+					// Use a simple key-value approach for permissions
+					const permissionKey = `permission_${message.domain}`;
+					const existingResult = await new Promise<{ [key: string]: boolean }>(
+						(resolve) => {
+							storage.get(permissionKey, (result) => resolve(result));
+						},
+					);
+
+					if (existingResult[permissionKey] !== undefined) {
+						sendResponse({ granted: existingResult[permissionKey] === true });
+						return;
+					}
+
+					// Show permission dialog
+					if (!message.appInfo) {
+						sendResponse({ granted: false });
+						return;
+					}
+
+					const granted = await showPermissionDialog(
+						message.appInfo,
+						message.domain,
+					);
+					await new Promise<void>((resolve) => {
+						storage.set({ [permissionKey]: granted }, resolve);
+					});
+
+					sendResponse({ granted });
+				} catch (error) {
+					console.error("Error handling permission request:", error);
 					sendResponse({ granted: false });
-					return true;
 				}
-
-				// Use a simple key-value approach for permissions
-				const permissionKey = `permission_${message.domain}`;
-				const existingResult = await new Promise<{ [key: string]: boolean }>(
-					(resolve) => {
-						storage.get(permissionKey, (result) => resolve(result));
-					},
-				);
-
-				if (existingResult[permissionKey] !== undefined) {
-					sendResponse({ granted: existingResult[permissionKey] === true });
-					return true;
-				}
-
-				// Show permission dialog
-				if (!message.appInfo) {
-					sendResponse({ granted: false });
-					return true;
-				}
-
-				const granted = await showPermissionDialog(
-					message.appInfo,
-					message.domain,
-				);
-				await new Promise<void>((resolve) => {
-					storage.set({ [permissionKey]: granted }, resolve);
-				});
-
-				sendResponse({ granted });
-			} catch (error) {
-				console.error("Error handling permission request:", error);
-				sendResponse({ granted: false });
-			}
+			})();
 			return true;
 
 		case "SDK_GET_CONTEXT":
-			try {
-				// Verify permission first
-				const storage = createChromeStorage();
-				if (!storage || !message.domain) {
-					sendResponse({ success: false, error: "Storage not available" });
-					return true;
-				}
-
-				const permissionKey = `permission_${message.domain}`;
-				const permissionResult = await new Promise<{ [key: string]: boolean }>(
-					(resolve) => {
-						storage.get(permissionKey, (result) => resolve(result));
-					},
-				);
-				const hasPermission = permissionResult[permissionKey] === true;
-
-				if (!hasPermission) {
-					sendResponse({ success: false, error: "Permission not granted" });
-					return true;
-				}
-
-				// Get context data
-				const context = await getContextForSDK(message.options);
-
-				if (context) {
-					sendResponse({ success: true, data: context });
-				} else {
-					sendResponse({ success: false, error: "No context available" });
-				}
-			} catch (error) {
-				console.error("Error getting context:", error);
-				sendResponse({ success: false, error: "Failed to get context" });
+			// Test with immediate response first
+			if (message.test) {
+				console.log("[SDK Background] Test mode - sending immediate response");
+				sendResponse({ success: true, test: true, message: "Test response" });
+				return true;
 			}
-			return true;
+
+			// Handle async operation
+			(async () => {
+				try {
+					console.log("[SDK Background] Processing SDK_GET_CONTEXT");
+
+					// Verify permission first
+					const storage = createChromeStorage();
+					if (!storage || !message.domain) {
+						sendResponse({ success: false, error: "Storage not available" });
+						return;
+					}
+
+					const permissionKey = `permission_${message.domain}`;
+					const permissionResult = await new Promise<{
+						[key: string]: boolean;
+					}>((resolve) => {
+						storage.get(permissionKey, (result) => resolve(result));
+					});
+					const hasPermission = permissionResult[permissionKey] === true;
+
+					console.log("[SDK Background] Permission check:", hasPermission);
+
+					if (!hasPermission) {
+						sendResponse({ success: false, error: "Permission not granted" });
+						return;
+					}
+
+					// Get context data
+					console.log("[SDK Background] Getting context data");
+					const context = await getContextForSDK(message.options);
+
+					if (context) {
+						console.log("[SDK Background] Sending context response with data");
+						const responseData = { success: true, data: context };
+						console.log(
+							"[SDK Background] Response data prepared:",
+							responseData,
+						);
+						try {
+							sendResponse(responseData);
+							console.log("[SDK Background] Response sent successfully");
+						} catch (err) {
+							console.error("[SDK Background] Error sending response:", err);
+						}
+					} else {
+						console.log("[SDK Background] No context available");
+						try {
+							sendResponse({ success: false, error: "No context available" });
+							console.log("[SDK Background] Error response sent");
+						} catch (err) {
+							console.error(
+								"[SDK Background] Error sending error response:",
+								err,
+							);
+						}
+					}
+				} catch (error) {
+					console.error("[SDK Background] Error getting context:", error);
+					try {
+						sendResponse({ success: false, error: "Failed to get context" });
+					} catch (err) {
+						console.error(
+							"[SDK Background] Error sending error response:",
+							err,
+						);
+					}
+				}
+			})();
+			return true; // Indicates we'll call sendResponse asynchronously
 
 		case "PERMISSION_RESPONSE":
 			// Handle response from permission dialog

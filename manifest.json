@@ -20,7 +20,8 @@
 		"default_path": "sidepanel.html"
 	},
 	"action": {
-		"default_title": "Open Squash in side panel"
+		"default_title": "Open Squash",
+		"default_popup": "popup.html"
 	},
 	"content_scripts": [
 		{
@@ -51,7 +52,8 @@
 			"resources": [
 				"public/icon-48.png",
 				"src/permission-dialog/permission-dialog.html",
-				"src/permission-dialog/permission-dialog.ts"
+				"src/permission-dialog/permission-dialog.ts",
+				"content-scripts/injected-api.js"
 			],
 			"matches": ["<all_urls>"]
 		}

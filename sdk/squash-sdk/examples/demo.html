@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Squash SDK - Demo</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      max-width: 600px;
+      margin: 40px auto;
+      padding: 20px;
+    }
+    button {
+      padding: 10px 20px;
+      margin: 10px 0;
+      cursor: pointer;
+    }
+    .status {
+      margin: 10px 0;
+      padding: 10px;
+      border-radius: 4px;
+    }
+    .success { background: #e6f4ea; color: #1e8e3e; }
+    .error { background: #fce8e6; color: #d33b29; }
+    .info { background: #f0f7ff; color: #1a73e8; }
+    .warning { background: #fef7e0; color: #f9ab00; }
+    pre {
+      background: #f5f5f5;
+      padding: 10px;
+      border-radius: 4px;
+      overflow-x: auto;
+    }
+    .button-group {
+      margin: 20px 0;
+    }
+    button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+  </style>
+</head>
+<body>
+  <h1>Squash SDK Demo</h1>
+  <p>This page demonstrates how to use the Squash SDK to enhance your web app with browsing context.</p>
+  <p><small>Make sure the Squash extension is installed and this page is served via HTTP (not file://) for best results.</small></p>
+  
+  <div id="status"></div>
+  
+  <div class="button-group">
+    <button onclick="initializeSDK()">1. Initialize SDK</button>
+    <button onclick="getContext()" id="getContextBtn" disabled>2. Get Context</button>
+    <button onclick="checkInstallation()">Check Installation</button>
+    <button onclick="enableMockMode()">Enable Mock Mode</button>
+    <button onclick="clearPermissions()">Clear Permissions</button>
+  </div>
+  
+  <h3>Results:</h3>
+  <pre id="results">Click "Initialize SDK" to start...</pre>
+  
+  <div id="context-usage" style="display: none; margin-top: 20px;">
+    <h3>Example: Using Context in Your App</h3>
+    <p>Once you have the context, you can use it to personalize your app:</p>
+    <div id="context-example" style="background: #f0f7ff; padding: 15px; border-radius: 4px;"></div>
+  </div>
+
+  <!-- Include the built Squash SDK -->
+  <script src="../dist/squash-sdk.min.js"></script>
+  
+  <script>
+    // Wait for SDK to load
+    let squashSDK = null;
+    let initialized = false;
+    
+    // Check for SDK availability
+    function checkSDK() {
+      if (typeof squash !== 'undefined') {
+        console.log('Found squash object:', squash);
+        console.log('squash properties:', Object.keys(squash));
+        console.log('squash.default:', squash.default);
+        console.log('squash.squash:', squash.squash);
+        
+        // The SDK might export as default or as a named export
+        squashSDK = squash.default || squash.squash || squash;
+        
+        console.log('Using squashSDK:', squashSDK);
+        console.log('squashSDK.init:', squashSDK.init);
+        return true;
+      } else if (typeof window.squash !== 'undefined') {
+        console.log('Found window.squash:', window.squash);
+        squashSDK = window.squash.default || window.squash.squash || window.squash;
+        console.log('Using squashSDK from window:', squashSDK);
+        return true;
+      }
+      return false;
+    }
+    
+    function showStatus(message, type = 'info') {
+      const status = document.getElementById('status');
+      status.className = `status ${type}`;
+      status.textContent = message;
+    }
+    
+    function showResults(data) {
+      document.getElementById('results').textContent = JSON.stringify(data, null, 2);
+    }
+    
+    async function initializeSDK() {
+      try {
+        showStatus('Initializing Squash SDK...', 'info');
+        
+        // Check if SDK is loaded
+        if (!checkSDK()) {
+          // Try the injected API as fallback
+          if (window.__squashExtension) {
+            showStatus('Using injected API directly (SDK file not loaded)', 'warning');
+            
+            // Create a minimal wrapper
+            squashSDK = {
+              init: async (config) => {
+                const result = await window.__squashExtension.requestPermission({
+                  appName: config.appName,
+                  appId: config.appId
+                });
+                initialized = true;
+                document.getElementById('getContextBtn').disabled = false;
+                return {
+                  initialized: true,
+                  extensionInstalled: true,
+                  permissionGranted: result.granted,
+                  version: window.__squashExtension.version,
+                  isFirstTime: result.isFirstTime
+                };
+              },
+              getContext: async (options) => {
+                const result = await window.__squashExtension.getContext(options);
+                return {
+                  status: result.success ? 'success' : 'error',
+                  context: result.data,
+                  error: result.error,
+                  metadata: {
+                    generatedAt: Date.now(),
+                    version: window.__squashExtension.version,
+                    tokenCount: result.data ? JSON.stringify(result.data).length / 4 : 0
+                  }
+                };
+              },
+              isExtensionInstalled: async () => true,
+              enableMockMode: () => console.log('Mock mode not available with injected API'),
+              trackEvent: () => {}
+            };
+          } else {
+            showStatus('Error: Neither SDK nor extension API found', 'error');
+            showResults({ 
+              error: 'Squash SDK not loaded and extension not installed',
+              help: 'Make sure the Squash extension is installed or the SDK file is accessible'
+            });
+            return;
+          }
+        }
+        
+        // Initialize the SDK
+        const result = await squashSDK.init({
+          appName: 'SDK Demo App',
+          appId: 'sdk-demo',
+          installPrompt: true,
+          mockMode: false,
+          analytics: true
+        });
+        
+        // Show initialization results
+        showResults({
+          ...result,
+          timestamp: new Date().toISOString()
+        });
+        
+        // Update status based on result
+        if (!result.extensionInstalled) {
+          showStatus('Extension not installed. Please install the Squash extension.', 'warning');
+          return;
+        }
+        
+        if (!result.permissionGranted) {
+          showStatus('Permission denied. Click "Initialize SDK" again to retry.', 'error');
+          return;
+        }
+        
+        initialized = true;
+        document.getElementById('getContextBtn').disabled = false;
+        showStatus('✓ SDK initialized successfully!', 'success');
+        
+        // Track initialization event
+        if (squashSDK.trackEvent) {
+          squashSDK.trackEvent('sdk_demo_initialized', {
+            version: result.version,
+            firstTime: result.isFirstTime
+          });
+        }
+        
+      } catch (error) {
+        showStatus('Error: ' + error.message, 'error');
+        showResults({ 
+          error: error.message,
+          stack: error.stack
+        });
+      }
+    }
+    
+    async function getContext() {
+      if (!initialized || !squashSDK) {
+        showStatus('Please initialize the SDK first', 'warning');
+        return;
+      }
+      
+      try {
+        showStatus('Getting browsing context...', 'info');
+        
+        // Get context with options
+        const result = await squashSDK.getContext({
+          relevanceQuery: 'coding, development, javascript',
+          timeRange: '7d',
+          maxTokens: 1000,
+          format: 'structured'
+        });
+        
+        // Handle different result statuses
+        switch (result.status) {
+          case 'success':
+            showStatus('✓ Context retrieved successfully!', 'success');
+            showResults({
+              status: result.status,
+              context: result.context,
+              metadata: result.metadata
+            });
+            
+            // Show example usage
+            if (result.context) {
+              const exampleEl = document.getElementById('context-example');
+              const topics = result.context.topics?.map(t => t.topic).join(', ') || 'general topics';
+              exampleEl.innerHTML = `
+                <strong>Personalized for you:</strong><br>
+                Based on your interests in <em>${topics}</em>, here are some recommendations...<br><br>
+                <strong>Your work pattern:</strong><br>
+                ${result.context.summary || 'No patterns detected yet.'}
+              `;
+              document.getElementById('context-usage').style.display = 'block';
+            }
+            break;
+            
+          case 'not_initialized':
+            showStatus('SDK not initialized', 'error');
+            initialized = false;
+            document.getElementById('getContextBtn').disabled = true;
+            break;
+            
+          case 'not_installed':
+            showStatus('Extension not installed', 'error');
+            showResults({
+              status: result.status,
+              installUrl: result.installUrl
+            });
+            break;
+            
+          case 'permission_denied':
+            showStatus('Permission denied. Re-initialize to request permission.', 'error');
+            break;
+            
+          case 'error':
+            showStatus('Error: ' + result.error, 'error');
+            break;
+        }
+        
+        // Track context retrieval
+        if (squashSDK.trackEvent) {
+          squashSDK.trackEvent('sdk_demo_context_retrieved', {
+            status: result.status,
+            tokenCount: result.metadata?.tokenCount
+          });
+        }
+        
+      } catch (error) {
+        showStatus('Error: ' + error.message, 'error');
+        showResults({ 
+          error: error.message,
+          stack: error.stack
+        });
+      }
+    }
+    
+    async function checkInstallation() {
+      try {
+        if (!checkSDK() && !window.__squashExtension) {
+          showStatus('SDK not loaded and extension not detected', 'error');
+          showResults({ 
+            sdkLoaded: false,
+            extensionAPI: false
+          });
+          return;
+        }
+        
+        const isInstalled = squashSDK ? 
+          await squashSDK.isExtensionInstalled() : 
+          !!window.__squashExtension;
+          
+        showStatus(
+          isInstalled ? '✓ Extension is installed' : '✗ Extension not installed',
+          isInstalled ? 'success' : 'warning'
+        );
+        showResults({ 
+          extensionInstalled: isInstalled,
+          sdkLoaded: !!squashSDK,
+          usingFallback: !checkSDK() && !!window.__squashExtension
+        });
+      } catch (error) {
+        showStatus('Error: ' + error.message, 'error');
+      }
+    }
+    
+    function enableMockMode() {
+      if (!checkSDK()) {
+        showStatus('SDK not loaded - cannot enable mock mode', 'error');
+        return;
+      }
+      
+      squashSDK.enableMockMode();
+      showStatus('Mock mode enabled. SDK will return simulated data.', 'info');
+      showResults({ 
+        mockMode: true,
+        note: 'The SDK will now return mock data instead of real context'
+      });
+      
+      // Re-enable initialize button to test with mock data
+      initialized = false;
+      document.getElementById('getContextBtn').disabled = true;
+    }
+    
+    async function clearPermissions() {
+      try {
+        if (chrome?.storage?.local) {
+          // Clear permission for current domain
+          const domain = window.location.hostname;
+          await chrome.storage.local.remove(`permission_${domain}`);
+          showStatus('Permissions cleared for this domain', 'success');
+          showResults({ 
+            cleared: true,
+            domain: domain
+          });
+        } else {
+          showStatus('Cannot access Chrome storage API from this context', 'error');
+          showResults({ 
+            error: 'Chrome storage API not accessible',
+            help: 'Try clearing permissions from the extension options'
+          });
+        }
+      } catch (error) {
+        showStatus('Error clearing permissions: ' + error.message, 'error');
+        showResults({ error: error.message });
+      }
+    }
+    
+    // Show initial status
+    window.addEventListener('load', () => {
+      showStatus('Ready. Click "Initialize SDK" to begin.', 'info');
+      
+      // Debug info
+      console.log('Page loaded. Checking for Squash SDK...');
+      console.log('typeof squash:', typeof squash);
+      console.log('typeof window.squash:', typeof window.squash);
+      console.log('window.__squashExtension:', window.__squashExtension);
+      
+      if (!checkSDK() && !window.__squashExtension) {
+        showStatus('Warning: SDK not loaded and extension not detected', 'warning');
+      }
+    });
+  </script>
+</body>
+</html>

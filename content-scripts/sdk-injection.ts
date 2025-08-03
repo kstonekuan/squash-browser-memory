@@ -69,21 +69,54 @@ function createSquashAPI(): SquashExtensionAPI {
 
 		getContext: async (options = {}) => {
 			try {
+				console.log(
+					"[SDK Content Script] getContext called with options:",
+					options,
+				);
+
 				// Check permission first
 				if (permissionGranted === null) {
 					permissionGranted = await checkDomainPermission();
 				}
+
+				console.log(
+					"[SDK Content Script] Permission granted:",
+					permissionGranted,
+				);
 
 				if (!permissionGranted) {
 					return { success: false, error: "Permission not granted" };
 				}
 
 				// Request context from background script
+				console.log(
+					"[SDK Content Script] Sending SDK_GET_CONTEXT to background",
+				);
+
+				// First, test with a simple message
+				const testResponse = await chrome.runtime.sendMessage({
+					type: "SDK_GET_CONTEXT",
+					test: true,
+					domain: window.location.hostname,
+				});
+				console.log("[SDK Content Script] Test response:", testResponse);
+
+				// Now send the real request
 				const response = await chrome.runtime.sendMessage({
 					type: "SDK_GET_CONTEXT",
 					options,
 					domain: window.location.hostname,
 				});
+
+				console.log("[SDK Content Script] Received response:", response);
+
+				if (!response) {
+					return {
+						success: false,
+						error:
+							"No response from extension. Make sure the extension is properly loaded.",
+					};
+				}
 
 				if (response.success) {
 					return { success: true, data: response.data };
@@ -117,56 +150,17 @@ function createSquashAPI(): SquashExtensionAPI {
 
 // Inject the API into the page
 function injectAPI() {
-	// Create a script element to inject the API into the page context
+	// Create a script element to load the external API script
 	const script = document.createElement("script");
-	script.textContent = `
-    (function() {
-      // Message passing bridge between page and content script
-      window.__squashExtension = {
-        requestPermission: async (appInfo) => {
-          return new Promise((resolve) => {
-            const id = Math.random().toString(36).substring(2, 11);
-            window.postMessage({ type: 'SQUASH_REQUEST_PERMISSION', id, appInfo }, '*');
-            
-            const handler = (event) => {
-              if (event.data.type === 'SQUASH_PERMISSION_RESPONSE' && event.data.id === id) {
-                window.removeEventListener('message', handler);
-                resolve(event.data.result);
-              }
-            };
-            window.addEventListener('message', handler);
-          });
-        },
-        
-        getContext: async (options) => {
-          return new Promise((resolve) => {
-            const id = Math.random().toString(36).substring(2, 11);
-            window.postMessage({ type: 'SQUASH_GET_CONTEXT', id, options }, '*');
-            
-            const handler = (event) => {
-              if (event.data.type === 'SQUASH_CONTEXT_RESPONSE' && event.data.id === id) {
-                window.removeEventListener('message', handler);
-                resolve(event.data.result);
-              }
-            };
-            window.addEventListener('message', handler);
-          });
-        },
-        
-        isPermissionGranted: () => {
-          // This will be updated by the content script
-          return window.__squashPermissionGranted || false;
-        },
-        
-        version: '1.0.0'
-      };
-    })();
-  `;
+	script.src = chrome.runtime.getURL("content-scripts/injected-api.js");
+	script.onload = () => {
+		// Remove the script element after loading
+		script.remove();
+	};
 
 	// Inject at the very beginning of the document
 	if (document.documentElement) {
 		document.documentElement.appendChild(script);
-		script.remove();
 	}
 }
 
@@ -176,6 +170,11 @@ const api = createSquashAPI();
 window.addEventListener("message", async (event) => {
 	// Only accept messages from the same window
 	if (event.source !== window) return;
+
+	console.log(
+		"[SDK Content Script] Received message from page:",
+		event.data.type,
+	);
 
 	switch (event.data.type) {
 		case "SQUASH_REQUEST_PERMISSION": {
@@ -189,11 +188,14 @@ window.addEventListener("message", async (event) => {
 				"*",
 			);
 
-			// Update the permission status in page context
-			const updateScript = document.createElement("script");
-			updateScript.textContent = `window.__squashPermissionGranted = ${permResult.granted};`;
-			document.documentElement.appendChild(updateScript);
-			updateScript.remove();
+			// Update the permission status in page context using postMessage
+			window.postMessage(
+				{
+					type: "SQUASH_UPDATE_PERMISSION",
+					granted: permResult.granted,
+				},
+				"*",
+			);
 			break;
 		}
 
