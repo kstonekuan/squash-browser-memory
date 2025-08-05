@@ -4,247 +4,14 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Squash SDK - Demo</title>
-  <style>
-    * {
-      box-sizing: border-box;
-    }
-    html, body {
-      height: 100%;
-      overflow: hidden;
-    }
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      margin: 0;
-      padding: 0;
-      background-color: #f5f5f5;
-      color: #333;
-      display: flex;
-      flex-direction: column;
-    }
-    .header {
-      background-color: #fff;
-      border-bottom: 1px solid #e0e0e0;
-      padding: 20px 40px;
-      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-      flex-shrink: 0;
-    }
-    .header h1 {
-      margin: 0 0 8px 0;
-      font-size: 28px;
-      font-weight: 600;
-    }
-    .header p {
-      margin: 0;
-      color: #666;
-      font-size: 16px;
-    }
-    .container {
-      display: flex;
-      flex: 1;
-      max-width: 1400px;
-      margin: 0 auto;
-      width: 100%;
-      overflow: hidden;
-    }
-    .sidebar {
-      width: 33.33%;
-      background-color: #fff;
-      border-right: 1px solid #e0e0e0;
-      padding: 30px;
-      overflow-y: auto;
-      overflow-x: hidden;
-    }
-    #status {
-      margin-bottom: 20px;
-    }
-    .main-content {
-      flex: 1;
-      padding: 30px;
-      overflow-y: auto;
-      overflow-x: hidden;
-    }
-    .section {
-      background-color: #fff;
-      border-radius: 8px;
-      padding: 24px;
-      margin-bottom: 20px;
-      box-shadow: 0 1px 3px rgba(0,0,0,0.08);
-    }
-    .section h3 {
-      margin: 0 0 16px 0;
-      font-size: 18px;
-      font-weight: 600;
-      color: #1a1a1a;
-    }
-    .status {
-      padding: 12px 16px;
-      margin-bottom: 20px;
-      border-radius: 6px;
-      font-size: 14px;
-      border: 1px solid;
-    }
-    .status.info {
-      background-color: #e3f2fd;
-      color: #1565c0;
-      border-color: #90caf9;
-    }
-    .status.success {
-      background-color: #e8f5e9;
-      color: #2e7d32;
-      border-color: #81c784;
-    }
-    .status.warning {
-      background-color: #fff3e0;
-      color: #e65100;
-      border-color: #ffb74d;
-    }
-    .status.error {
-      background-color: #ffebee;
-      color: #c62828;
-      border-color: #ef5350;
-    }
-    pre {
-      background-color: #f8f9fa;
-      padding: 16px;
-      border-radius: 6px;
-      overflow-x: auto;
-      margin: 0;
-      font-size: 13px;
-      line-height: 1.5;
-      border: 1px solid #e9ecef;
-      max-height: 400px;
-      overflow-y: auto;
-      font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
-    }
-    pre.language-javascript {
-      background-color: #1e1e1e;
-      color: #d4d4d4;
-      border-color: #333;
-    }
-    pre.language-json {
-      background-color: #f6f8fa;
-      color: #24292e;
-    }
-    /* Syntax highlighting for JavaScript */
-    .keyword { color: #569cd6; }
-    .function { color: #dcdcaa; }
-    .string { color: #ce9178; }
-    .comment { color: #6a9955; }
-    .property { color: #9cdcfe; }
-    .number { color: #b5cea8; }
-    button {
-      width: 100%;
-      margin-bottom: 12px;
-      padding: 12px 20px;
-      font-size: 15px;
-      font-weight: 500;
-      cursor: pointer;
-      background-color: #fff;
-      border: 2px solid #e0e0e0;
-      border-radius: 6px;
-      transition: all 0.2s;
-      text-align: left;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-    }
-    button:hover:not(:disabled) {
-      background-color: #f5f5f5;
-      border-color: #1976d2;
-    }
-    button:active:not(:disabled) {
-      background-color: #eeeeee;
-    }
-    button:disabled {
-      opacity: 0.5;
-      cursor: not-allowed;
-    }
-    button::after {
-      content: '→';
-      opacity: 0.5;
-    }
-    .button-section {
-      margin-bottom: 30px;
-    }
-    .button-section h4 {
-      font-size: 12px;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-      color: #666;
-      margin: 0 0 12px 0;
-    }
-    .context-section {
-      margin: 20px 0;
-      padding: 20px;
-      background-color: #f9fafb;
-      border-radius: 8px;
-      border: 1px solid #e5e7eb;
-    }
-    .context-section h4 {
-      margin: 0 0 12px 0;
-      color: #374151;
-      font-size: 16px;
-      font-weight: 600;
-    }
-    .context-content {
-      line-height: 1.6;
-      color: #4b5563;
-    }
-    .context-list {
-      margin: 8px 0;
-      padding-left: 20px;
-    }
-    .context-list li {
-      margin: 6px 0;
-      color: #4b5563;
-    }
-    small {
-      display: block;
-      margin-top: 8px;
-      color: #666;
-      font-size: 12px;
-    }
-    /* Custom scrollbar styles */
-    .sidebar::-webkit-scrollbar,
-    .main-content::-webkit-scrollbar {
-      width: 8px;
-    }
-    .sidebar::-webkit-scrollbar-track,
-    .main-content::-webkit-scrollbar-track {
-      background: #f1f1f1;
-    }
-    .sidebar::-webkit-scrollbar-thumb,
-    .main-content::-webkit-scrollbar-thumb {
-      background: #c1c1c1;
-      border-radius: 4px;
-    }
-    .sidebar::-webkit-scrollbar-thumb:hover,
-    .main-content::-webkit-scrollbar-thumb:hover {
-      background: #a8a8a8;
-    }
-    @media (max-width: 768px) {
-      .container {
-        flex-direction: column;
-        height: calc(100vh - 80px);
-      }
-      .sidebar {
-        width: 100%;
-        border-right: none;
-        border-bottom: 1px solid #e0e0e0;
-        height: 40%;
-        flex-shrink: 0;
-      }
-      .main-content {
-        height: 60%;
-      }
-    }
-  </style>
 </head>
 <body>
   <div class="header">
     <h1>Squash SDK Demo</h1>
     <p>Interactive documentation for the Squash SDK - enhance your web app with browsing context</p>
+    <div style="margin-top: 12px; padding: 12px; background-color: #f0f9ff; border: 1px solid #e0f2fe; border-radius: 6px; font-size: 14px;">
+      <strong>Note:</strong> This demo uses the SDK via script tag. For production apps, install via npm: <code style="background: #e0e0e0; padding: 2px 6px; border-radius: 3px;">npm install squash-sdk</code>
+    </div>
   </div>
   
   <div class="container">
@@ -709,5 +476,242 @@
       }
     });
   </script>
+  
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+    html, body {
+      height: 100%;
+      overflow: hidden;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      margin: 0;
+      padding: 0;
+      background-color: #f5f5f5;
+      color: #333;
+      display: flex;
+      flex-direction: column;
+    }
+    .header {
+      background-color: #fff;
+      border-bottom: 1px solid #e0e0e0;
+      padding: 20px 40px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+      flex-shrink: 0;
+    }
+    .header h1 {
+      margin: 0 0 8px 0;
+      font-size: 28px;
+      font-weight: 600;
+    }
+    .header p {
+      margin: 0;
+      color: #666;
+      font-size: 16px;
+    }
+    .container {
+      display: flex;
+      flex: 1;
+      max-width: 1400px;
+      margin: 0 auto;
+      width: 100%;
+      overflow: hidden;
+    }
+    .sidebar {
+      width: 33.33%;
+      background-color: #fff;
+      border-right: 1px solid #e0e0e0;
+      padding: 30px;
+      overflow-y: auto;
+      overflow-x: hidden;
+    }
+    #status {
+      margin-bottom: 20px;
+    }
+    .main-content {
+      flex: 1;
+      padding: 30px;
+      overflow-y: auto;
+      overflow-x: hidden;
+    }
+    .section {
+      background-color: #fff;
+      border-radius: 8px;
+      padding: 24px;
+      margin-bottom: 20px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+    }
+    .section h3 {
+      margin: 0 0 16px 0;
+      font-size: 18px;
+      font-weight: 600;
+      color: #1a1a1a;
+    }
+    .status {
+      padding: 12px 16px;
+      margin-bottom: 20px;
+      border-radius: 6px;
+      font-size: 14px;
+      border: 1px solid;
+    }
+    .status.info {
+      background-color: #e3f2fd;
+      color: #1565c0;
+      border-color: #90caf9;
+    }
+    .status.success {
+      background-color: #e8f5e9;
+      color: #2e7d32;
+      border-color: #81c784;
+    }
+    .status.warning {
+      background-color: #fff3e0;
+      color: #e65100;
+      border-color: #ffb74d;
+    }
+    .status.error {
+      background-color: #ffebee;
+      color: #c62828;
+      border-color: #ef5350;
+    }
+    pre {
+      background-color: #f8f9fa;
+      padding: 16px;
+      border-radius: 6px;
+      overflow-x: auto;
+      margin: 0;
+      font-size: 13px;
+      line-height: 1.5;
+      border: 1px solid #e9ecef;
+      max-height: 400px;
+      overflow-y: auto;
+      font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+    }
+    pre.language-javascript {
+      background-color: #1e1e1e;
+      color: #d4d4d4;
+      border-color: #333;
+    }
+    pre.language-json {
+      background-color: #f6f8fa;
+      color: #24292e;
+    }
+    /* Syntax highlighting for JavaScript */
+    .keyword { color: #569cd6; }
+    .function { color: #dcdcaa; }
+    .string { color: #ce9178; }
+    .comment { color: #6a9955; }
+    .property { color: #9cdcfe; }
+    .number { color: #b5cea8; }
+    button {
+      width: 100%;
+      margin-bottom: 12px;
+      padding: 12px 20px;
+      font-size: 15px;
+      font-weight: 500;
+      cursor: pointer;
+      background-color: #fff;
+      border: 2px solid #e0e0e0;
+      border-radius: 6px;
+      transition: all 0.2s;
+      text-align: left;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    button:hover:not(:disabled) {
+      background-color: #f5f5f5;
+      border-color: #1976d2;
+    }
+    button:active:not(:disabled) {
+      background-color: #eeeeee;
+    }
+    button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+    button::after {
+      content: '→';
+      opacity: 0.5;
+    }
+    .button-section {
+      margin-bottom: 30px;
+    }
+    .button-section h4 {
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: #666;
+      margin: 0 0 12px 0;
+    }
+    .context-section {
+      margin: 20px 0;
+      padding: 20px;
+      background-color: #f9fafb;
+      border-radius: 8px;
+      border: 1px solid #e5e7eb;
+    }
+    .context-section h4 {
+      margin: 0 0 12px 0;
+      color: #374151;
+      font-size: 16px;
+      font-weight: 600;
+    }
+    .context-content {
+      line-height: 1.6;
+      color: #4b5563;
+    }
+    .context-list {
+      margin: 8px 0;
+      padding-left: 20px;
+    }
+    .context-list li {
+      margin: 6px 0;
+      color: #4b5563;
+    }
+    small {
+      display: block;
+      margin-top: 8px;
+      color: #666;
+      font-size: 12px;
+    }
+    /* Custom scrollbar styles */
+    .sidebar::-webkit-scrollbar,
+    .main-content::-webkit-scrollbar {
+      width: 8px;
+    }
+    .sidebar::-webkit-scrollbar-track,
+    .main-content::-webkit-scrollbar-track {
+      background: #f1f1f1;
+    }
+    .sidebar::-webkit-scrollbar-thumb,
+    .main-content::-webkit-scrollbar-thumb {
+      background: #c1c1c1;
+      border-radius: 4px;
+    }
+    .sidebar::-webkit-scrollbar-thumb:hover,
+    .main-content::-webkit-scrollbar-thumb:hover {
+      background: #a8a8a8;
+    }
+    @media (max-width: 768px) {
+      .container {
+        flex-direction: column;
+        height: calc(100vh - 80px);
+      }
+      .sidebar {
+        width: 100%;
+        border-right: none;
+        border-bottom: 1px solid #e0e0e0;
+        height: 40%;
+        flex-shrink: 0;
+      }
+      .main-content {
+        height: 60%;
+      }
+    }
+  </style>
 </body>
 </html>
