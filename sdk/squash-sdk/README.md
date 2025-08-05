@@ -8,8 +8,6 @@ Official JavaScript/TypeScript SDK for integrating with the Squash browser exten
 ## Prerequisites
 
 - Users must have the [Squash Chrome Extension](https://chromewebstore.google.com/detail/squash-browser-memory-for/cbemgpconhoibnbbgjbeengcojcoeimh) installed
-- Your web app must be served over HTTPS (localhost allowed for development)
-- Chrome 90+ or Edge 90+
 
 ## Installation
 
