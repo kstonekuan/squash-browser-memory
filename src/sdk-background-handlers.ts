@@ -253,8 +253,18 @@ export function handleSDKMessage(
 						message.appInfo,
 						message.domain,
 					);
+
+					// Store permission with timestamp
+					const updates: { [key: string]: any } = {
+						[permissionKey]: granted,
+					};
+
+					if (granted) {
+						updates[`permission_time_${message.domain}`] = Date.now();
+					}
+
 					await new Promise<void>((resolve) => {
-						storage.set({ [permissionKey]: granted }, resolve);
+						storage.set(updates, resolve);
 					});
 
 					sendResponse({ granted });

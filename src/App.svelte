@@ -1,6 +1,7 @@
 <script lang="ts">
 import { onMount } from "svelte";
 import { match } from "ts-pattern";
+import SitePermissions from "./components/site-permissions.svelte";
 import AdvancedSettings from "./lib/AdvancedSettings.svelte";
 import AIProviderStatusComponent from "./lib/AIProviderStatus.svelte";
 import AmbientAnalysisCard from "./lib/AmbientAnalysisCard.svelte";
@@ -554,6 +555,11 @@ onMount(() => {
 				</div>
 			</div>
 		</CollapsibleSection>
+
+		<!-- Site Permissions -->
+		<div class="mt-4">
+			<SitePermissions />
+		</div>
 
 		<!-- Advanced Settings -->
 		<div class="mt-4">

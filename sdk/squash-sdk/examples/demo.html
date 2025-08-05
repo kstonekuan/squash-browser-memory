@@ -31,6 +31,29 @@
       border-radius: 4px;
       overflow-x: auto;
     }
+    .context-section {
+      margin: 10px 0;
+      padding: 10px;
+      border-radius: 4px;
+      background: #f8f9fa;
+    }
+    .context-section h4 {
+      margin: 0 0 8px 0;
+      color: #1a73e8;
+      font-size: 14px;
+      font-weight: 600;
+    }
+    .context-content {
+      margin: 0;
+      line-height: 1.4;
+    }
+    .context-list {
+      margin: 0;
+      padding-left: 16px;
+    }
+    .context-list li {
+      margin: 4px 0;
+    }
     .button-group {
       margin: 20px 0;
     }
@@ -52,10 +75,12 @@
     <button onclick="getContext()" id="getContextBtn" disabled>2. Get Context</button>
     <button onclick="checkInstallation()">Check Installation</button>
     <button onclick="enableMockMode()">Enable Mock Mode</button>
-    <button onclick="clearPermissions()">Clear Permissions</button>
   </div>
   
-  <h3>Results:</h3>
+  <h3>Request:</h3>
+  <pre id="request" style="background-color: #f5f5f5; padding: 10px; border-radius: 4px; margin-bottom: 20px;">No request sent yet...</pre>
+  
+  <h3>Response:</h3>
   <pre id="results">Click "Initialize SDK" to start...</pre>
   
   <div id="context-usage" style="display: none; margin-top: 20px;">
@@ -105,9 +130,107 @@
       document.getElementById('results').textContent = JSON.stringify(data, null, 2);
     }
     
+    function showRequest(method, params) {
+      const requestData = {
+        method: method,
+        params: params || {}
+      };
+      document.getElementById('request').textContent = JSON.stringify(requestData, null, 2);
+    }
+    
+    function formatContextDisplay(context) {
+      let html = '<strong>Personalized Context:</strong><br><br>';
+      
+      // Display profile summary
+      if (context.summary) {
+        html += `
+          <div class="context-section">
+            <h4>About You:</h4>
+            <p class="context-content">${context.summary}</p>
+          </div>
+        `;
+      }
+      
+      // Display work patterns
+      if (context.patterns && context.patterns.length > 0) {
+        html += `
+          <div class="context-section">
+            <h4>Your Work Patterns:</h4>
+            <ul class="context-list">
+        `;
+        context.patterns.forEach(pattern => {
+          const patternText = pattern.pattern || pattern.description || pattern.title || JSON.stringify(pattern);
+          html += `<li>${patternText}</li>`;
+        });
+        html += `
+            </ul>
+          </div>
+        `;
+      }
+      
+      // Display interests/topics
+      if (context.topics && context.topics.length > 0) {
+        html += `
+          <div class="context-section">
+            <h4>Your Interests:</h4>
+            <ul class="context-list">
+        `;
+        context.topics.forEach(topic => {
+          const topicText = topic.topic || topic.name || topic.title || JSON.stringify(topic);
+          html += `<li>${topicText}</li>`;
+        });
+        html += `
+            </ul>
+          </div>
+        `;
+      }
+      
+      // Display recent activities
+      if (context.recentActivities && context.recentActivities.length > 0) {
+        html += `
+          <div class="context-section">
+            <h4>Recent Activities:</h4>
+            <ul class="context-list">
+        `;
+        context.recentActivities.forEach(activity => {
+          const activityText = activity.activity || activity.description || activity.title || JSON.stringify(activity);
+          html += `<li>${activityText}</li>`;
+        });
+        html += `
+            </ul>
+          </div>
+        `;
+      }
+      
+      // Show message if no data available
+      if (!context.summary && (!context.patterns || context.patterns.length === 0) && 
+          (!context.topics || context.topics.length === 0) && 
+          (!context.recentActivities || context.recentActivities.length === 0)) {
+        html += `
+          <div class="context-section">
+            <p class="context-content"><em>No context data available yet. Browse more to build your profile!</em></p>
+          </div>
+        `;
+      }
+      
+      return html;
+    }
+    
     async function initializeSDK() {
       try {
         showStatus('Initializing Squash SDK...', 'info');
+        
+        // Hide the context usage example
+        document.getElementById('context-usage').style.display = 'none';
+        
+        // Show the request being sent
+        const initConfig = {
+          appName: 'My Demo App',
+          appId: 'demo-app-123',
+          installPrompt: true,
+          theme: 'auto'
+        };
+        showRequest('squashSDK.init', initConfig);
         
         // Check if SDK is loaded
         if (!checkSDK()) {
@@ -159,14 +282,15 @@
           }
         }
         
+        // Update init config to match what we're showing
+        initConfig.appName = 'SDK Demo App';
+        initConfig.appId = 'sdk-demo';
+        initConfig.mockMode = false;
+        initConfig.analytics = true;
+        showRequest('squashSDK.init', initConfig);
+        
         // Initialize the SDK
-        const result = await squashSDK.init({
-          appName: 'SDK Demo App',
-          appId: 'sdk-demo',
-          installPrompt: true,
-          mockMode: false,
-          analytics: true
-        });
+        const result = await squashSDK.init(initConfig);
         
         // Show initialization results
         showResults({
@@ -215,13 +339,17 @@
       try {
         showStatus('Getting browsing context...', 'info');
         
-        // Get context with options
-        const result = await squashSDK.getContext({
+        // Show the request being sent
+        const contextOptions = {
           relevanceQuery: 'coding, development, javascript',
           timeRange: '7d',
           maxTokens: 1000,
           format: 'structured'
-        });
+        };
+        showRequest('squashSDK.getContext', contextOptions);
+        
+        // Get context with predefined options
+        const result = await squashSDK.getContext(contextOptions);
         
         // Handle different result statuses
         switch (result.status) {
@@ -236,13 +364,7 @@
             // Show example usage
             if (result.context) {
               const exampleEl = document.getElementById('context-example');
-              const topics = result.context.topics?.map(t => t.topic).join(', ') || 'general topics';
-              exampleEl.innerHTML = `
-                <strong>Personalized for you:</strong><br>
-                Based on your interests in <em>${topics}</em>, here are some recommendations...<br><br>
-                <strong>Your work pattern:</strong><br>
-                ${result.context.summary || 'No patterns detected yet.'}
-              `;
+              exampleEl.innerHTML = formatContextDisplay(result.context);
               document.getElementById('context-usage').style.display = 'block';
             }
             break;
@@ -289,6 +411,11 @@
     
     async function checkInstallation() {
       try {
+        // Hide the context usage example
+        document.getElementById('context-usage').style.display = 'none';
+        
+        showRequest('squashSDK.isExtensionInstalled', {});
+        
         if (!checkSDK() && !window.__squashExtension) {
           showStatus('SDK not loaded and extension not detected', 'error');
           showResults({ 
@@ -322,6 +449,11 @@
         return;
       }
       
+      // Hide the context usage example
+      document.getElementById('context-usage').style.display = 'none';
+      
+      showRequest('squashSDK.enableMockMode', {});
+      
       squashSDK.enableMockMode();
       showStatus('Mock mode enabled. SDK will return simulated data.', 'info');
       showResults({ 
@@ -334,29 +466,6 @@
       document.getElementById('getContextBtn').disabled = true;
     }
     
-    async function clearPermissions() {
-      try {
-        if (chrome?.storage?.local) {
-          // Clear permission for current domain
-          const domain = window.location.hostname;
-          await chrome.storage.local.remove(`permission_${domain}`);
-          showStatus('Permissions cleared for this domain', 'success');
-          showResults({ 
-            cleared: true,
-            domain: domain
-          });
-        } else {
-          showStatus('Cannot access Chrome storage API from this context', 'error');
-          showResults({ 
-            error: 'Chrome storage API not accessible',
-            help: 'Try clearing permissions from the extension options'
-          });
-        }
-      } catch (error) {
-        showStatus('Error clearing permissions: ' + error.message, 'error');
-        showResults({ error: error.message });
-      }
-    }
     
     // Show initial status
     window.addEventListener('load', () => {
