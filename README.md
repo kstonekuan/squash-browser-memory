@@ -77,6 +77,8 @@ Squash studies your browsing patterns, learns how you work, and automatically pr
 
 ## For Developers
 
+### Building the Extension
+
 ```bash
 pnpm dev     # Development with hot reload
 pnpm build   # Build extension
@@ -85,6 +87,24 @@ pnpm test    # Run tests
 ```
 
 See [ARCHITECTURE.md](./ARCHITECTURE.md) for technical details.
+
+### Squash SDK
+
+Want to integrate browsing context into your web application? The Squash SDK allows developers to build context-aware applications that can request and use browsing insights with user permission.
+
+```javascript
+import squash from 'squash-sdk';
+
+// Initialize and request permission
+await squash.init({ appName: 'My App' });
+
+// Get user context
+const context = await squash.getContext();
+```
+
+**[📚 View SDK Documentation →](./sdk/squash-sdk/)**
+
+Available on npm: `npm install squash-sdk`
 
 ## Privacy
 

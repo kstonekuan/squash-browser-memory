@@ -1,8 +1,19 @@
 # Squash SDK
 
-Official JavaScript/TypeScript SDK for integrating with the Squash browser extension. Enable your AI-powered applications to access rich browsing context with a single function call.
+[![npm version](https://badge.fury.io/js/squash-sdk.svg)](https://www.npmjs.com/package/squash-sdk)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
+Official JavaScript/TypeScript SDK for integrating with the Squash browser extension. Enable your web applications to access rich browsing context and build personalized experiences with user permission.
+
+## Prerequisites
+
+- Users must have the [Squash Chrome Extension](https://chromewebstore.google.com/detail/squash-browser-memory-for/cbemgpconhoibnbbgjbeengcojcoeimh) installed
+- Your web app must be served over HTTPS (localhost allowed for development)
+- Chrome 90+ or Edge 90+
 
 ## Installation
+
+### For Modern Applications (Recommended)
 
 ```bash
 npm install squash-sdk
@@ -12,22 +23,49 @@ yarn add squash-sdk
 pnpm add squash-sdk
 ```
 
+Then import in your React/Vue/Angular app:
+```javascript
+import squash from 'squash-sdk';
+// or
+import { squash } from 'squash-sdk';
+```
+
+### For Simple HTML Sites
+
+If you're not using a build tool, you can include via CDN:
+
+```html
+<script src="https://unpkg.com/squash-sdk/dist/squash-sdk.min.js"></script>
+<script>
+  // SDK available as window.squash
+  squash.init({ appName: 'My App' });
+</script>
+```
+
+**Note:** The CDN method is only recommended for simple sites without build tools. For React, Next.js, or any modern framework, use npm.
+
 ## Quick Start
 
 ```javascript
 import squash from 'squash-sdk';
 
-// Initialize the SDK
-await squash.init({
-  appName: 'My AI Assistant',
-  appId: 'my-ai-assistant'
+// Initialize the SDK and request permission
+const initResult = await squash.init({
+  appName: 'My App',
+  appId: 'my-app-unique-id'
 });
 
-// Get browsing context
-const result = await squash.getContext();
-
-if (result.status === 'success') {
-  console.log('User context:', result.context.summary);
+if (initResult.permissionGranted) {
+  // Get browsing context
+  const result = await squash.getContext({
+    relevanceQuery: 'coding, development',
+    timeRange: '7d'
+  });
+  
+  if (result.status === 'success') {
+    console.log('User context:', result.context.summary);
+    // Use context to personalize your app
+  }
 }
 ```
 
@@ -39,6 +77,41 @@ if (result.status === 'success') {
 - 📦 **TypeScript Support** - Full type definitions included
 - 🎨 **UI Components** - Beautiful install prompts and permission dialogs
 - 📊 **Analytics Ready** - Track usage and adoption
+
+## Core Concepts
+
+### User Context Structure
+
+The SDK provides structured data about user browsing patterns:
+
+```typescript
+interface Context {
+  summary: string;              // AI-generated user profile summary
+  patterns: Pattern[];          // Detected behavioral patterns
+  topics: Topic[];              // User interests and topics
+  recentActivities: Activity[]; // Recent browsing activities
+}
+
+interface Pattern {
+  name: string;
+  description: string;
+  frequency: number;
+  lastSeen: number;
+}
+
+interface Topic {
+  topic: string;
+  relevance: number;
+  keywords: string[];
+}
+```
+
+### Permission Model
+
+- Users must explicitly grant permission to each domain
+- Permissions are stored per-domain and can be revoked anytime
+- The SDK handles the permission flow automatically
+- First-time users see a permission dialog with your app name
 
 ## API Reference
 
@@ -108,15 +181,15 @@ const isInstalled = await squash.isExtensionInstalled();
 
 // Show custom install prompt
 await squash.showInstallPrompt({
-  title: 'Enhance Your Experience',
-  message: 'Install Squash for smarter AI interactions',
-  theme: 'dark'
+  title: 'Custom title',     // Optional
+  message: 'Custom message', // Optional  
+  theme: 'dark'             // Optional: 'light', 'dark', or 'auto'
 });
 
 // Enable mock mode for development
 squash.enableMockMode();
 
-// Track custom events
+// Track custom events (if analytics enabled)
 squash.trackEvent('feature_used', { feature: 'context_enhancement' });
 ```
 
@@ -219,11 +292,39 @@ if (result.status === 'success') {
 }
 ```
 
-## Browser Support
+## Framework Examples
 
-- Chrome 90+ (requires Squash extension)
-- Edge 90+ (requires Squash extension)
-- Other browsers: Returns mock data or shows install prompt
+### React Integration
+
+See [examples/npm-usage-example.js](./examples/npm-usage-example.js) for a complete React example.
+
+### Next.js Integration
+
+See [examples/next-js-example.tsx](./examples/next-js-example.tsx) for Next.js with TypeScript.
+
+### Vanilla JavaScript
+
+See [examples/vanilla-npm-example.js](./examples/vanilla-npm-example.js) for plain JavaScript usage.
+
+### Interactive Demo
+
+Try the SDK in your browser: [examples/demo.html](./examples/demo.html)
+
+## Best Practices
+
+1. **Initialize Once**: Call `init()` once when your app loads, not on every context request
+2. **Cache Context**: Store context data to minimize API calls
+3. **Handle All States**: Always handle the different status responses
+4. **Progressive Enhancement**: Your app should work without the extension
+5. **Respect Privacy**: Only request context when needed for functionality
+
+## TypeScript Support
+
+The SDK includes full TypeScript definitions. Import types as needed:
+
+```typescript
+import squash, { Context, Pattern, Topic, InitConfig, ContextOptions } from 'squash-sdk';
+```
 
 ## Error Handling
 
@@ -252,6 +353,37 @@ switch (result.status) {
 }
 ```
 
+## Troubleshooting
+
+### Extension Not Detected
+
+```javascript
+if (!await squash.isExtensionInstalled()) {
+  // Direct user to install page
+  window.open('https://chrome.google.com/webstore/detail/squash/...');
+}
+```
+
+### Permission Denied
+
+Users may deny permission on first request. Handle gracefully:
+
+```javascript
+if (result.status === 'permission_denied') {
+  // Use fallback behavior
+  // Can retry init() later if needed
+}
+```
+
+### Development Mode
+
+Use mock mode during development to avoid requiring the extension:
+
+```javascript
+if (process.env.NODE_ENV === 'development') {
+  squash.enableMockMode();
+}
+```
 ## Privacy & Security
 
 - All data access is controlled by the Squash extension
@@ -259,16 +391,12 @@ switch (result.status) {
 - No data is stored by the SDK
 - Context is filtered to remove sensitive information
 
-## Contributing
-
-See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup and guidelines.
-
 ## License
 
-MIT License - see [LICENSE](LICENSE) for details.
+MIT License - see [LICENSE](../../LICENSE) for details.
 
 ## Support
 
-- Issues: [GitHub Issues](https://github.com/squash/squash-sdk/issues)
-- Discord: [Join our community](https://discord.gg/squash)
-- Email: sdk@squash.dev
+- **Issues**: [GitHub Issues](https://github.com/kstonekuan/squash-browser-memory/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/kstonekuan/squash-browser-memory/discussions)
+- **Extension**: [Chrome Web Store](https://chromewebstore.google.com/detail/squash-browser-memory-for/cbemgpconhoibnbbgjbeengcojcoeimh)

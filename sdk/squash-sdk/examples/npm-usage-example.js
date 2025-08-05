@@ -2,7 +2,7 @@
 // npm install squash-sdk
 
 import { useEffect, useState } from "react";
-import { squashSDK } from "squash-sdk";
+import squash from "squash-sdk";
 
 function MyApp() {
 	const [isInitialized, setIsInitialized] = useState(false);
@@ -12,7 +12,7 @@ function MyApp() {
 		// Initialize the SDK when your app loads
 		async function initializeSquash() {
 			try {
-				const result = await squashSDK.init({
+				const result = await squash.init({
 					appName: "My Awesome App",
 					appId: "my-app-unique-id",
 					installPrompt: true,
@@ -38,7 +38,7 @@ function MyApp() {
 		}
 
 		try {
-			const result = await squashSDK.getContext({
+			const result = await squash.getContext({
 				relevanceQuery: "javascript, react, frontend",
 				timeRange: "7d",
 				maxTokens: 1000,

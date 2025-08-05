@@ -1,13 +1,13 @@
 // Example: Using Squash SDK in vanilla JavaScript after npm install
 // npm install squash-sdk
 
-import { squashSDK } from "squash-sdk";
+import squash from "squash-sdk";
 
 // Initialize on page load
 document.addEventListener("DOMContentLoaded", async () => {
 	try {
 		// Initialize the SDK
-		const initResult = await squashSDK.init({
+		const initResult = await squash.init({
 			appName: "My Web App",
 			appId: "my-web-app",
 			installPrompt: true,
@@ -31,7 +31,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 // Get user context when requested
 window.personalizeContent = async () => {
 	try {
-		const result = await squashSDK.getContext({
+		const result = await squash.getContext({
 			relevanceQuery: "shopping, e-commerce, products",
 			timeRange: "30d",
 			maxTokens: 2000,

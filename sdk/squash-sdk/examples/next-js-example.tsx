@@ -4,7 +4,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { squashSDK } from "squash-sdk";
+import squash from "squash-sdk";
 
 // Custom hook for Squash SDK
 function useSquashContext() {
@@ -18,7 +18,7 @@ function useSquashContext() {
 
 		const initSDK = async () => {
 			try {
-				const result = await squashSDK.init({
+				const result = await squash.init({
 					appName: "My Next.js App",
 					appId: "nextjs-app-example",
 					installPrompt: true,
@@ -39,7 +39,7 @@ function useSquashContext() {
 
 		setLoading(true);
 		try {
-			const result = await squashSDK.getContext({
+			const result = await squash.getContext({
 				relevanceQuery: query || "web development, nextjs, react",
 				timeRange: "7d",
 				maxTokens: 1500,
