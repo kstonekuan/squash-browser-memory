@@ -255,7 +255,7 @@ export function handleSDKMessage(
 					);
 
 					// Store permission with timestamp
-					const updates: { [key: string]: any } = {
+					const updates: { [key: string]: boolean | number } = {
 						[permissionKey]: granted,
 					};
 

@@ -38,7 +38,7 @@ async function loadPermissions() {
 		}
 
 		// Get all storage items
-		const items = await new Promise<{ [key: string]: any }>((resolve) => {
+		const items = await new Promise<{ [key: string]: unknown }>((resolve) => {
 			storage.get(null, (result) => resolve(result));
 		});
 
@@ -50,7 +50,7 @@ async function loadPermissions() {
 				permissionList.push({
 					domain,
 					granted: value,
-					grantedAt: items[`permission_time_${domain}`] || undefined,
+					grantedAt: items[`permission_time_${domain}`] as number | undefined,
 				});
 			}
 		}
