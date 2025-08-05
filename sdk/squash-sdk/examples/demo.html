@@ -114,7 +114,24 @@
       border: 1px solid #e9ecef;
       max-height: 400px;
       overflow-y: auto;
+      font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
     }
+    pre.language-javascript {
+      background-color: #1e1e1e;
+      color: #d4d4d4;
+      border-color: #333;
+    }
+    pre.language-json {
+      background-color: #f6f8fa;
+      color: #24292e;
+    }
+    /* Syntax highlighting for JavaScript */
+    .keyword { color: #569cd6; }
+    .function { color: #dcdcaa; }
+    .string { color: #ce9178; }
+    .comment { color: #6a9955; }
+    .property { color: #9cdcfe; }
+    .number { color: #b5cea8; }
     button {
       width: 100%;
       margin-bottom: 12px;
@@ -251,13 +268,13 @@
     
     <div class="main-content">
       <div class="section">
-        <h3>Request</h3>
-        <pre id="request">No request sent yet...</pre>
+        <h3>Code</h3>
+        <pre id="request" class="language-javascript"><span class="comment">// Click a button to see example code</span></pre>
       </div>
       
       <div class="section">
-        <h3>Response</h3>
-        <pre id="results">Click "Initialize SDK" to start...</pre>
+        <h3>Result</h3>
+        <pre id="results" class="language-json"><span class="comment">// Results will appear here</span></pre>
       </div>
       
       <div id="context-usage" style="display: none;">
@@ -308,15 +325,40 @@
     }
     
     function showResults(data) {
-      document.getElementById('results').textContent = JSON.stringify(data, null, 2);
+      const resultsEl = document.getElementById('results');
+      
+      // Format the response with a comment header
+      let formattedResult = '<span class="comment">// Response:</span>\n';
+      formattedResult += JSON.stringify(data, null, 2)
+        .replace(/"([^"]+)":/g, '  "$1":')
+        .replace(/("[^"]+")/g, '<span class="string">$1</span>')
+        .replace(/(\d+)/g, '<span class="number">$1</span>')
+        .replace(/(true|false|null)/g, '<span class="keyword">$1</span>');
+      
+      resultsEl.innerHTML = formattedResult;
     }
     
     function showRequest(method, params) {
-      const requestData = {
-        method: method,
-        params: params || {}
-      };
-      document.getElementById('request').textContent = JSON.stringify(requestData, null, 2);
+      let code = '';
+      
+      // Format as actual JavaScript code with syntax highlighting
+      if (method === 'squashSDK.init') {
+        const paramsStr = JSON.stringify(params, null, 2)
+          .replace(/"([^"]+)":/g, '  $1:')
+          .replace(/"/g, "'");
+        code = `<span class="keyword">await</span> <span class="property">squashSDK</span>.<span class="function">init</span>(${paramsStr});`;
+      } else if (method === 'squashSDK.getContext') {
+        const paramsStr = JSON.stringify(params, null, 2)
+          .replace(/"([^"]+)":/g, '  $1:')
+          .replace(/"/g, "'");
+        code = `<span class="keyword">const</span> result = <span class="keyword">await</span> <span class="property">squashSDK</span>.<span class="function">getContext</span>(${paramsStr});`;
+      } else if (method === 'squashSDK.isExtensionInstalled') {
+        code = `<span class="keyword">const</span> isInstalled = <span class="keyword">await</span> <span class="property">squashSDK</span>.<span class="function">isExtensionInstalled</span>();`;
+      } else if (method === 'squashSDK.enableMockMode') {
+        code = `<span class="property">squashSDK</span>.<span class="function">enableMockMode</span>();`;
+      }
+      
+      document.getElementById('request').innerHTML = code;
     }
     
     function formatContextDisplay(context) {
@@ -406,8 +448,8 @@
         
         // Show the request being sent
         const initConfig = {
-          appName: 'My Demo App',
-          appId: 'demo-app-123',
+          appName: 'SDK Demo App',
+          appId: 'sdk-demo',
           installPrompt: true,
           theme: 'auto'
         };
@@ -463,12 +505,13 @@
           }
         }
         
-        // Update init config to match what we're showing
-        initConfig.appName = 'SDK Demo App';
-        initConfig.appId = 'sdk-demo';
-        initConfig.mockMode = false;
-        initConfig.analytics = true;
-        showRequest('squashSDK.init', initConfig);
+        // Add additional config options for display
+        const displayConfig = {
+          ...initConfig,
+          mockMode: false,
+          analytics: true
+        };
+        showRequest('squashSDK.init', displayConfig);
         
         // Initialize the SDK
         const result = await squashSDK.init(initConfig);
@@ -651,6 +694,9 @@
     // Show initial status
     window.addEventListener('load', () => {
       showStatus('Ready. Click "Initialize SDK" to begin.', 'info');
+      
+      // Show initial code example
+      document.getElementById('request').innerHTML = '<span class="comment">// Click "Initialize SDK" to get started</span>';
       
       // Debug info
       console.log('Page loaded. Checking for Squash SDK...');
