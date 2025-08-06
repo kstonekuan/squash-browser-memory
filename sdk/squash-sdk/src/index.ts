@@ -298,4 +298,3 @@ const squash = new SquashSDK();
 // Export types and instance
 export * from "./types";
 export { squash };
-export default squash;
