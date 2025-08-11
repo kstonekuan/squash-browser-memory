@@ -21,7 +21,7 @@
 		"simple-chromium-ai": "0.1.2",
 		"superjson": "2.2.2",
 		"ts-pattern": "5.8.0",
-		"zod": "4.0.14"
+		"zod": "4.0.17"
 	},
 	"devDependencies": {
 		"@biomejs/biome": "2.1.3",
