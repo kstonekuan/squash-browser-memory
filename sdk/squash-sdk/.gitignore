@@ -24,3 +24,9 @@ coverage/
 # Temporary files
 *.tmp
 *.temp
+
+# Package files
+*.tgz
+
+# Test integration
+test-integration/

@@ -23,8 +23,6 @@ pnpm add squash-sdk
 
 Then import in your React/Vue/Angular app:
 ```javascript
-import squash from 'squash-sdk';
-// or
 import { squash } from 'squash-sdk';
 ```
 
@@ -33,10 +31,15 @@ import { squash } from 'squash-sdk';
 If you're not using a build tool, you can include via CDN:
 
 ```html
-<script src="https://unpkg.com/squash-sdk/dist/squash-sdk.min.js"></script>
+<script src="https://unpkg.com/squash-sdk@latest/dist/squash-sdk.min.js"></script>
 <script>
   // SDK available as window.squash
-  squash.init({ appName: 'My App' });
+  window.addEventListener('load', async () => {
+    await squash.init({ 
+      appName: 'My App',
+      appId: 'my-app'
+    });
+  });
 </script>
 ```
 
@@ -45,7 +48,7 @@ If you're not using a build tool, you can include via CDN:
 ## Quick Start
 
 ```javascript
-import squash from 'squash-sdk';
+import { squash } from 'squash-sdk';
 
 // Initialize the SDK and request permission
 const initResult = await squash.init({
@@ -196,7 +199,7 @@ squash.trackEvent('feature_used', { feature: 'context_enhancement' });
 ### Basic Integration
 
 ```javascript
-import squash from 'squash-sdk';
+import { squash } from 'squash-sdk';
 
 async function enhanceAIPrompt(userInput) {
   // Initialize once when your app loads
@@ -260,7 +263,7 @@ function useSquashContext() {
 ### Development with Mock Data
 
 ```javascript
-import squash from 'squash-sdk';
+import { squash } from 'squash-sdk';
 
 // Enable mock mode in development
 if (process.env.NODE_ENV === 'development') {
@@ -321,7 +324,7 @@ Try the SDK in your browser: [examples/demo.html](./examples/demo.html)
 The SDK includes full TypeScript definitions. Import types as needed:
 
 ```typescript
-import squash, { Context, Pattern, Topic, InitConfig, ContextOptions } from 'squash-sdk';
+import { squash, Context, Pattern, Topic, SquashConfig, ContextOptions } from 'squash-sdk';
 ```
 
 ## Error Handling
@@ -357,8 +360,11 @@ switch (result.status) {
 
 ```javascript
 if (!await squash.isExtensionInstalled()) {
-  // Direct user to install page
-  window.open('https://chrome.google.com/webstore/detail/squash/...');
+  // Show built-in install prompt
+  await squash.showInstallPrompt();
+  
+  // Or direct user to install page
+  window.open('https://chromewebstore.google.com/detail/squash-browser-memory-for/cbemgpconhoibnbbgjbeengcojcoeimh');
 }
 ```
 
@@ -378,9 +384,16 @@ if (result.status === 'permission_denied') {
 Use mock mode during development to avoid requiring the extension:
 
 ```javascript
+// Enable mock mode before initializing
+squash.enableMockMode();
+
+// Or conditionally in development
 if (process.env.NODE_ENV === 'development') {
   squash.enableMockMode();
 }
+
+// Then initialize normally
+await squash.init({ appName: 'My App', appId: 'my-app' });
 ```
 ## Privacy & Security
 
@@ -395,6 +408,7 @@ MIT License - see [LICENSE](../../LICENSE) for details.
 
 ## Support
 
-- **Issues**: [GitHub Issues](https://github.com/kstonekuan/squash-browser-memory/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/kstonekuan/squash-browser-memory/discussions)
+- **Issues**: [GitHub Issues](https://github.com/kstonekuan/history-checker/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/kstonekuan/history-checker/discussions)
+- **NPM Package**: [squash-sdk on npm](https://www.npmjs.com/package/squash-sdk)
 - **Extension**: [Chrome Web Store](https://chromewebstore.google.com/detail/squash-browser-memory-for/cbemgpconhoibnbbgjbeengcojcoeimh)
