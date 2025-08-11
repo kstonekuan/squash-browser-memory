@@ -11,7 +11,7 @@
 		"test:ui": "vitest --ui"
 	},
 	"dependencies": {
-		"@anthropic-ai/sdk": "0.57.0",
+		"@anthropic-ai/sdk": "0.59.0",
 		"@google/genai": "1.13.0",
 		"@trpc/client": "11.4.3",
 		"@trpc/server": "11.4.3",
