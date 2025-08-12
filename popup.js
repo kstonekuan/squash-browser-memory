@@ -32,9 +32,9 @@ function showDefaultView() {
 	// Handle open sidepanel button
 	document.getElementById("openSidepanelBtn").addEventListener("click", (e) => {
 		e.preventDefault();
-		chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-			if (tabs[0]) {
-				chrome.sidePanel.open({ windowId: tabs[0].windowId });
+		chrome.windows.getCurrent((window) => {
+			if (window) {
+				chrome.sidePanel.open({ windowId: window.id });
 				window.close();
 			}
 		});

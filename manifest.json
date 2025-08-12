@@ -10,8 +10,7 @@
 		"sidePanel",
 		"alarms",
 		"notifications",
-		"offscreen",
-		"tabs"
+		"offscreen"
 	],
 	"background": {
 		"service_worker": "src/background.ts"
