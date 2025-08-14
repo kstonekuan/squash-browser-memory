@@ -3,7 +3,7 @@
  * Injects the __squashExtension API into all web pages
  */
 
-import type { Context, ContextOptions } from "../sdk/squash-sdk/src/types";
+import type { Context, ContextOptions } from "../src/types/sdk-types";
 
 // Type definitions for the injected API
 interface SquashExtensionAPI {

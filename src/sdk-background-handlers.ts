@@ -7,7 +7,7 @@ import type {
 	ContextOptions,
 	Pattern,
 	Topic,
-} from "../sdk/squash-sdk/src/types";
+} from "./types/sdk-types";
 import { createChromeStorage, getStorageData } from "./utils/storage";
 
 // Track pending permission requests
