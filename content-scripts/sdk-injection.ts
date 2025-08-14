@@ -2,8 +2,9 @@
  * SDK API Injection Content Script
  * Injects the __squashExtension API into all web pages
  */
+/// <reference types="chrome" />
 
-import type { Context, ContextOptions } from "../src/types/sdk-types";
+import type { Context, ContextOptions } from "squash-sdk";
 
 // Type definitions for the injected API
 interface SquashExtensionAPI {

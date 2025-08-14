@@ -2,12 +2,7 @@
  * Background handlers for SDK API requests
  */
 
-import type {
-	Context,
-	ContextOptions,
-	Pattern,
-	Topic,
-} from "./types/sdk-types";
+import type { Context, ContextOptions, Pattern, Topic } from "squash-sdk";
 import { createChromeStorage, getStorageData } from "./utils/storage";
 
 // Track pending permission requests
