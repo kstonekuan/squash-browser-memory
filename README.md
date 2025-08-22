@@ -31,6 +31,7 @@ Squash studies your browsing patterns, learns how you work, and automatically pr
 
 3. Choose your AI provider (in extension settings):
    - **Chrome AI (Local)**: Private, on-device analysis
+   - **OpenAI-compatible APIs** (Recommended): Use local LLMs via Ollama, LM Studio, vLLM, or TGI
    - **Claude API**: Remote, requires API key
    - **Gemini API**: Remote, requires API key
 
@@ -42,6 +43,15 @@ Squash studies your browsing patterns, learns how you work, and automatically pr
 - **Context Injection**: Adds a "Context" button to ChatGPT and Claude that inserts relevant info from your browsing history
 
 ## AI Provider Setup
+
+### Recommended: Local LLMs via OpenAI-compatible APIs
+We strongly recommend using local LLMs for privacy and cost-effectiveness:
+- **[Ollama](https://ollama.ai/)**: Easy local model deployment (e.g., `ollama run llama3.2`)
+- **[LM Studio](https://lmstudio.ai/)**: User-friendly GUI for local models
+- **[vLLM](https://github.com/vllm-project/vllm)**: High-performance inference server
+- **[TGI](https://github.com/huggingface/text-generation-inference)**: Production-ready inference
+
+To use: Set the custom base URL in OpenAI provider settings (e.g., `http://localhost:11434/v1` for Ollama)
 
 ### Chrome AI (100% Local)
 - Chrome 138+ required
@@ -55,6 +65,11 @@ Squash studies your browsing patterns, learns how you work, and automatically pr
 ### Gemini API (Remote)
 - Get API key from [Google AI Studio](https://aistudio.google.com/apikey)
 - Enter in extension's Advanced Settings
+
+### OpenAI API (Local or Remote)
+- Run a local model or get API key from [OpenAI Platform](https://platform.openai.com/api-keys)
+- Enter in extension's Advanced Settings
+- Supports custom endpoints for Azure OpenAI or other OpenAI-compatible services
 
 ## Usage
 
@@ -71,7 +86,7 @@ Squash studies your browsing patterns, learns how you work, and automatically pr
 ## Planned Features
 
 - **MCP Server Integration**: Expose your browsing patterns and profile as an MCP (Model Context Protocol) server for other AI tools
-- **More AI Providers**: Support for additional LLM providers beyond Chrome AI, Claude and Gemini
+- **More AI Providers**: Support for additional LLM providers beyond current options
 - **Enhanced Context Matching**: Smarter relevance algorithms for context suggestions
 - **Workflow Automation**: Detect and suggest automation for repetitive tasks
 

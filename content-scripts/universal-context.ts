@@ -422,7 +422,10 @@ class SimplePlatformAdapter {
 		}
 
 		// Add icon and text - using smaller document icon
-		const iconSize = Math.max(14, parseInt(this.config.styling.iconSize) - 2); // Make it 2px smaller, minimum 14px
+		const iconSize = Math.max(
+			14,
+			parseInt(this.config.styling.iconSize, 10) - 2,
+		); // Make it 2px smaller, minimum 14px
 
 		button.innerHTML = `
 			<svg width="${iconSize}" height="${iconSize}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">

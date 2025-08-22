@@ -19,7 +19,9 @@ let providerName = $derived(
 		? "Chrome AI"
 		: providerType === "claude"
 			? "Claude"
-			: "Gemini",
+			: providerType === "gemini"
+				? "Gemini"
+				: "OpenAI",
 );
 let isRefreshing = $state(false);
 
@@ -142,6 +144,33 @@ function getStatusMessage(status: AIProviderStatus): string {
 			<p class="mt-2">
 				Get an API key from 
 				<a href="https://console.anthropic.com/" target="_blank" class="text-blue-600 hover:text-blue-800 underline" rel="noopener">Anthropic Console</a>
+			</p>
+			{#if onRefresh}
+				<button
+					onclick={handleRefresh}
+					class="mt-3 px-3 py-1.5 bg-blue-600 text-white text-xs font-medium rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 cursor-pointer transition-colors duration-150"
+				>
+					Check Status Again
+				</button>
+			{/if}
+		{:else}
+			<p class="text-gray-500">Checking {providerName} status...</p>
+		{/if}
+	</div>
+{:else if status === 'unavailable' && providerName === 'OpenAI'}
+	<div class="mt-2 text-xs text-gray-600">
+		{#if !isRefreshing}
+			<p>OpenAI API is not available. Please ensure:</p>
+			<ul class="mt-1 ml-4 list-disc">
+				<li>You have a valid OpenAI API key</li>
+				<li>Your API key is correctly entered in Advanced Settings</li>
+				<li>Your internet connection is working</li>
+				<li>You have sufficient API credits remaining</li>
+				<li>If using a custom endpoint, ensure the base URL is correct</li>
+			</ul>
+			<p class="mt-2">
+				Get an API key from 
+				<a href="https://platform.openai.com/api-keys" target="_blank" class="text-blue-600 hover:text-blue-800 underline" rel="noopener">OpenAI Platform</a>
 			</p>
 			{#if onRefresh}
 				<button

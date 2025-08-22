@@ -81,7 +81,7 @@ export type AIProviderStatus =
 	| "error"
 	| "loading";
 
-export type AIProviderType = "chrome" | "claude" | "gemini";
+export type AIProviderType = "chrome" | "claude" | "gemini" | "openai";
 
 /**
  * Configuration for AI providers
@@ -97,4 +97,10 @@ export type AIProviderConfig =
 	| {
 			provider: "gemini";
 			geminiApiKey?: string;
+	  }
+	| {
+			provider: "openai";
+			openaiApiKey?: string;
+			openaiBaseUrl?: string;
+			openaiModel?: string;
 	  };

@@ -54,7 +54,7 @@ export async function loadAIConfigFromStorage(): Promise<AIProviderConfig> {
 
 			if (
 				data?.provider &&
-				["chrome", "claude", "gemini"].includes(data.provider)
+				["chrome", "claude", "gemini", "openai"].includes(data.provider)
 			) {
 				console.log("Loaded AI config:", { provider: data.provider });
 				return data;
@@ -142,6 +142,92 @@ export async function getGeminiApiKey(): Promise<string | undefined> {
 	const config = await loadAIConfigFromStorage();
 	if (config.provider === "gemini") {
 		return config.geminiApiKey;
+	}
+	return undefined;
+}
+
+/**
+ * Set OpenAI API key
+ */
+export async function setOpenAIApiKey(apiKey: string | null): Promise<void> {
+	const config = await loadAIConfigFromStorage();
+
+	if (config.provider === "openai") {
+		if (apiKey) {
+			// Update the key
+			await saveAIConfigToStorage({ ...config, openaiApiKey: apiKey });
+		} else {
+			// Remove the key by saving config without it
+			await saveAIConfigToStorage({ provider: "openai" });
+		}
+	}
+}
+
+/**
+ * Get OpenAI API key
+ */
+export async function getOpenAIApiKey(): Promise<string | undefined> {
+	const config = await loadAIConfigFromStorage();
+	if (config.provider === "openai") {
+		return config.openaiApiKey;
+	}
+	return undefined;
+}
+
+/**
+ * Set OpenAI base URL
+ */
+export async function setOpenAIBaseUrl(baseUrl: string | null): Promise<void> {
+	const config = await loadAIConfigFromStorage();
+
+	if (config.provider === "openai") {
+		if (baseUrl) {
+			// Update the base URL
+			await saveAIConfigToStorage({ ...config, openaiBaseUrl: baseUrl });
+		} else {
+			// Remove the base URL by saving config without it
+			const { openaiBaseUrl: _unused, ...configWithoutUrl } = config;
+			await saveAIConfigToStorage(configWithoutUrl);
+		}
+	}
+}
+
+/**
+ * Get OpenAI base URL
+ */
+export async function getOpenAIBaseUrl(): Promise<string | undefined> {
+	const config = await loadAIConfigFromStorage();
+	if (config.provider === "openai") {
+		return config.openaiBaseUrl;
+	}
+	return undefined;
+}
+
+/**
+ * Set OpenAI model
+ */
+export async function setOpenAIModel(model: string | null): Promise<void> {
+	const config = await loadAIConfigFromStorage();
+
+	if (config.provider === "openai") {
+		if (model) {
+			// Update the model
+			await saveAIConfigToStorage({ ...config, openaiModel: model });
+		} else {
+			// Remove the model by saving config without it
+			const { openaiModel: _unused, ...configWithoutModel } = config;
+			await saveAIConfigToStorage(configWithoutModel);
+		}
+	}
+}
+
+/**
+ * Get OpenAI model
+ */
+export async function getOpenAIModel(): Promise<string | undefined> {
+	const config = await loadAIConfigFromStorage();
+	if (config.provider === "openai") {
+		return config.openaiModel;
 	}
 	return undefined;
 }

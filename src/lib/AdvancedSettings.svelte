@@ -10,10 +10,16 @@ import type { AIProviderStatus } from "../types/ui-types";
 import {
 	getClaudeApiKey,
 	getGeminiApiKey,
+	getOpenAIApiKey,
+	getOpenAIBaseUrl,
+	getOpenAIModel,
 	loadAIConfigFromStorage,
 	saveAIConfigToStorage,
 	setClaudeApiKey,
 	setGeminiApiKey,
+	setOpenAIApiKey,
+	setOpenAIBaseUrl,
+	setOpenAIModel,
 } from "../utils/ai-config";
 import type { AIProviderType } from "../utils/ai-interface";
 import {
@@ -37,11 +43,16 @@ import {
 	GEMINI_CONSOLE_URL,
 } from "../utils/gemini-provider";
 import {
+	OPENAI_CONSOLE_NAME,
+	OPENAI_CONSOLE_URL,
+} from "../utils/openai-provider";
+import {
 	ChunkSchema,
 	UserProfileSchema,
 	WorkflowPatternsOnlySchema,
 } from "../utils/schemas";
 import CollapsibleSection from "./CollapsibleSection.svelte";
+import OpenAIProviderSettings from "./OpenAIProviderSettings.svelte";
 import RemoteAIProviderSettings from "./RemoteAIProviderSettings.svelte";
 
 type Props = {
@@ -76,6 +87,9 @@ let showMergeSchema = $state(false);
 let currentProvider = $state<AIProviderType>(currentProviderType);
 let claudeApiKey = $state("");
 let geminiApiKey = $state("");
+let openaiApiKey = $state("");
+let openaiBaseUrl = $state("");
+let openaiModel = $state("");
 let showApiKey = $state(false);
 
 // Auto-analysis state
@@ -100,6 +114,16 @@ const remoteProviderConfigs = {
 		consoleUrl: GEMINI_CONSOLE_URL,
 		consoleName: GEMINI_CONSOLE_NAME,
 		colorClass: "bg-blue-50 border-blue-200",
+	},
+	openai: {
+		type: "openai" as AIProviderType,
+		name: "OpenAI",
+		apiKeyPlaceholder: "sk-...",
+		baseUrlPlaceholder: "https://api.openai.com/v1",
+		modelPlaceholder: "gpt-4o-mini",
+		consoleUrl: OPENAI_CONSOLE_URL,
+		consoleName: OPENAI_CONSOLE_NAME,
+		colorClass: "bg-green-50 border-green-200",
 	},
 };
 
@@ -138,6 +162,9 @@ $effect(() => {
 	(async () => {
 		claudeApiKey = (await getClaudeApiKey()) || "";
 		geminiApiKey = (await getGeminiApiKey()) || "";
+		openaiApiKey = (await getOpenAIApiKey()) || "";
+		openaiBaseUrl = (await getOpenAIBaseUrl()) || "";
+		openaiModel = (await getOpenAIModel()) || "";
 	})();
 });
 
@@ -152,6 +179,10 @@ async function handleProviderChange(provider: AIProviderType) {
 		claudeApiKey = (await getClaudeApiKey()) || "";
 	} else if (provider === "gemini") {
 		geminiApiKey = (await getGeminiApiKey()) || "";
+	} else if (provider === "openai") {
+		openaiApiKey = (await getOpenAIApiKey()) || "";
+		openaiBaseUrl = (await getOpenAIBaseUrl()) || "";
+		openaiModel = (await getOpenAIModel()) || "";
 	}
 
 	onProviderChange?.();
@@ -189,6 +220,60 @@ async function handleGeminiApiKeyChange() {
 
 	// If Gemini is the current provider, trigger provider change to update status
 	if (currentProvider === "gemini") {
+		onProviderChange?.();
+	}
+}
+
+async function handleOpenAIApiKeyChange() {
+	const newKey = openaiApiKey.trim() || null;
+	const oldKey = await getOpenAIApiKey();
+
+	// Only proceed if the key actually changed
+	if (newKey === oldKey) {
+		return;
+	}
+
+	// Save the key even if it's empty (to clear it)
+	await setOpenAIApiKey(newKey);
+
+	// If OpenAI is the current provider, trigger provider change to update status
+	if (currentProvider === "openai") {
+		onProviderChange?.();
+	}
+}
+
+async function handleOpenAIBaseUrlChange() {
+	const newUrl = openaiBaseUrl.trim() || null;
+	const oldUrl = await getOpenAIBaseUrl();
+
+	// Only proceed if the URL actually changed
+	if (newUrl === oldUrl) {
+		return;
+	}
+
+	// Save the URL even if it's empty (to clear it)
+	await setOpenAIBaseUrl(newUrl);
+
+	// If OpenAI is the current provider, trigger provider change to update status
+	if (currentProvider === "openai") {
+		onProviderChange?.();
+	}
+}
+
+async function handleOpenAIModelChange() {
+	const newModel = openaiModel.trim() || null;
+	const oldModel = await getOpenAIModel();
+
+	// Only proceed if the model actually changed
+	if (newModel === oldModel) {
+		return;
+	}
+
+	// Save the model even if it's empty (to clear it)
+	await setOpenAIModel(newModel);
+
+	// If OpenAI is the current provider, trigger provider change to update status
+	if (currentProvider === "openai") {
 		onProviderChange?.();
 	}
 }
@@ -283,6 +368,8 @@ function formatLastRunTime(): string {
 													Uses Anthropic's Claude API (remote, requires API key)
 												{:else if provider === "gemini"}
 													Uses Google's Gemini API (remote, requires API key)
+												{:else if provider === "openai"}
+													OpenAI-compatible API (supports local LLMs via Ollama, LM Studio, etc.)
 												{/if}
 											</div>
 										</div>
@@ -308,6 +395,19 @@ function formatLastRunTime(): string {
 							bind:apiKey={geminiApiKey}
 							bind:showApiKey
 							onApiKeyChange={handleGeminiApiKeyChange}
+						/>
+					{/if}
+
+					{#if currentProvider === "openai"}
+						<OpenAIProviderSettings
+							provider={remoteProviderConfigs.openai}
+							bind:apiKey={openaiApiKey}
+							bind:baseUrl={openaiBaseUrl}
+							bind:model={openaiModel}
+							bind:showApiKey
+							onApiKeyChange={handleOpenAIApiKeyChange}
+							onBaseUrlChange={handleOpenAIBaseUrlChange}
+							onModelChange={handleOpenAIModelChange}
 						/>
 					{/if}
 

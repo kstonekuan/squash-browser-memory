@@ -11,6 +11,7 @@ import type {
 import { ChromeAIProvider } from "./chrome-ai";
 import { ClaudeProvider } from "./claude-provider";
 import { GeminiProvider } from "./gemini-provider";
+import { OpenAIProvider } from "./openai-provider";
 
 /**
  * Create a new AI provider instance based on configuration
@@ -27,6 +28,13 @@ export function createProvider(config: AIProviderConfig): AIProvider {
 		.with({ provider: "gemini" }, (conf) => {
 			return new GeminiProvider(conf.geminiApiKey);
 		})
+		.with({ provider: "openai" }, (conf) => {
+			return new OpenAIProvider(
+				conf.openaiApiKey,
+				conf.openaiBaseUrl,
+				conf.openaiModel,
+			);
+		})
 		.exhaustive();
 }
 
@@ -34,7 +42,7 @@ export function createProvider(config: AIProviderConfig): AIProvider {
  * Get all available provider types
  */
 export function getAvailableProviders(): AIProviderType[] {
-	return ["chrome", "claude", "gemini"];
+	return ["chrome", "openai", "claude", "gemini"];
 }
 
 /**
@@ -45,5 +53,6 @@ export function getProviderDisplayName(type: AIProviderType): string {
 		.with("chrome", () => "Chrome AI (Local)")
 		.with("claude", () => "Claude API (Remote)")
 		.with("gemini", () => "Gemini API (Remote)")
+		.with("openai", () => "OpenAI API (Local/Remote)")
 		.exhaustive();
 }
