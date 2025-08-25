@@ -6,7 +6,7 @@ import {
 	setSeconds,
 	startOfDay,
 } from "date-fns";
-import { toJSONSchema, type z } from "zod/v4";
+import { prettifyError, toJSONSchema } from "zod/v4";
 import type { ChunkingResult, ChunkTimeRange } from "../types";
 import type { AIProviderConfig } from "./ai-interface";
 import { getInitializedProvider, promptAI } from "./ai-provider-utils";
@@ -146,14 +146,11 @@ async function processSingleBatch(
 			`Chunking LLM call completed in ${duration}s for ${timestamps.length} timestamps`,
 		);
 
-		let parsed: z.infer<typeof ChunkSchema>;
+		let rawParsed: object;
 		try {
 			// Clean the response to extract JSON from markdown if needed
 			const cleanedResponse = extractJSONFromResponse(response);
-			const rawParsed = JSON.parse(cleanedResponse);
-
-			// Validate with zod schema
-			parsed = ChunkSchema.parse(rawParsed);
+			rawParsed = JSON.parse(cleanedResponse);
 		} catch (parseError) {
 			return {
 				timeRanges: createHalfDayChunks(timestamps),
@@ -162,6 +159,19 @@ async function processSingleBatch(
 				isFallback: true,
 			};
 		}
+
+		// Validate with zod schema
+		const parseResult = await ChunkSchema.safeParseAsync(rawParsed);
+		if (!parseResult.success) {
+			const prettyError = prettifyError(parseResult.error);
+			return {
+				timeRanges: createHalfDayChunks(timestamps),
+				rawResponse: response,
+				error: `Schema validation failed: ${prettyError}`,
+				isFallback: true,
+			};
+		}
+		const parsed = parseResult.data;
 
 		// Convert indices to timestamps and validate
 		const validChunks: ChunkTimeRange[] = parsed

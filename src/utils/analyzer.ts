@@ -1,7 +1,7 @@
 /// <reference types="@types/dom-chromium-ai" />
 
 import { format } from "date-fns";
-import { prettifyError, toJSONSchema, ZodError, type ZodType } from "zod/v4";
+import { prettifyError, toJSONSchema, type ZodType } from "zod/v4";
 import type {
 	AnalysisMemory,
 	ChunkInfo,
@@ -461,17 +461,13 @@ async function mergeWithAI<T>(
 			throw error;
 		}
 
-		try {
-			const res = zodSchema.parse(parsed);
-			return res;
-		} catch (error) {
-			if (error instanceof ZodError) {
-				const pretty = prettifyError(error);
-				console.error(`Failed to parse ${mergeType} merge JSON to T:`, pretty);
-			}
-
-			console.error(`Failed to parse ${mergeType} merge JSON to T:`, error);
-			throw error;
+		const result = await zodSchema.safeParseAsync(parsed);
+		if (result.success) {
+			return result.data;
+		} else {
+			const pretty = prettifyError(result.error);
+			console.error(`Failed to parse ${mergeType} merge JSON to T:`, pretty);
+			throw result.error;
 		}
 	} catch (error) {
 		console.error(`Failed to merge ${mergeType}:`, error);
@@ -935,17 +931,13 @@ async function analyzeWithAI<T>(
 		throw error;
 	}
 
-	try {
-		const res = zodSchema.parse(parsed);
-		return res;
-	} catch (error) {
-		if (error instanceof ZodError) {
-			const pretty = prettifyError(error);
-			console.error(`Failed to parse ${analysisType} JSON to T:`, pretty);
-		}
-
-		console.error(`Failed to parse ${analysisType} JSON to T:`, error);
-		throw error;
+	const result = await zodSchema.safeParseAsync(parsed);
+	if (result.success) {
+		return result.data;
+	} else {
+		const pretty = prettifyError(result.error);
+		console.error(`Failed to parse ${analysisType} JSON to T:`, pretty);
+		throw result.error;
 	}
 }
 
