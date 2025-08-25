@@ -35,9 +35,6 @@ importers:
       simple-chromium-ai:
         specifier: 0.1.2
         version: 0.1.2
-      squash-sdk:
-        specifier: 1.0.0
-        version: 1.0.0
       superjson:
         specifier: 2.2.2
         version: 2.2.2
@@ -1463,10 +1460,6 @@ packages:
   source-map-js@1.2.1:
     resolution: {integrity: sha512-UXWMKhLOwVKb728IUtQPXxfYU+usdybtUrK/8uGE8CQMvrhOpwvzDBwj0QhSL7MQc7vIsISBG8VQ8+IDQxpfQA==}
     engines: {node: '>=0.10.0'}
-
-  squash-sdk@1.0.0:
-    resolution: {integrity: sha512-iKuNvXZJwC45wm1OgXUMdVd8yycGroUzaTIKReCBSf+rutxIOmAlmpbPq4C4x8nvubRlUf7PbWLG60osNagnRg==}
-    engines: {node: '>=14.0.0'}
 
   stackback@0.0.2:
     resolution: {integrity: sha512-1XMJE5fQo1jGH6Y/7ebnwPOBEkIEnT4QF32d5R1+VXdXveM0IBMJt8zfaxX1P3QhVwrYe+576+jkANtSS2mBbw==}
@@ -2985,8 +2978,6 @@ snapshots:
   smol-toml@1.4.1: {}
 
   source-map-js@1.2.1: {}
-
-  squash-sdk@1.0.0: {}
 
   stackback@0.0.2: {}
 

@@ -5,7 +5,6 @@ import {
 	handleStartupAlarmCheck,
 	triggerAnalysis,
 } from "./background-handlers";
-import { handleSDKMessage } from "./sdk-background-handlers";
 import { backgroundRouter } from "./trpc/background-router";
 import { createTRPCMessageHandler } from "./trpc/chrome-adapter";
 import { loadAutoAnalysisSettings } from "./utils/ambient";
@@ -14,9 +13,16 @@ import { clearCorruptedStorage } from "./utils/clear-corrupted-storage";
 
 const ALARM_NAME = "hourly-analysis";
 
-// Note: Extension icon click now shows popup.html instead of opening side panel directly
-
-// Side panel is now opened via popup.html, not on action click
+// Handle extension icon click to open sidepanel directly
+chrome.action.onClicked.addListener(async (tab) => {
+	if (tab.windowId) {
+		try {
+			await chrome.sidePanel.open({ windowId: tab.windowId });
+		} catch (error) {
+			console.error("Failed to open sidepanel:", error);
+		}
+	}
+});
 
 // Listen for installation
 chrome.runtime.onInstalled.addListener(async () => {
@@ -100,24 +106,10 @@ const messageHandler = createTRPCMessageHandler(
 	},
 );
 
-// Combined message handler for tRPC and SDK messages
-chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-	console.log("[Background] Received message:", message.type);
+// Set up tRPC message handler
+chrome.runtime.onMessage.addListener(messageHandler);
 
-	// First try SDK message handler
-	if (
-		message.type?.startsWith("SDK_") ||
-		message.type === "PERMISSION_RESPONSE"
-	) {
-		console.log("[Background] Routing to SDK handler");
-		return handleSDKMessage(message, sender, sendResponse);
-	}
-
-	// Otherwise use tRPC handler
-	return messageHandler(message, sender, sendResponse);
-});
-
-console.log("[Background] Message handlers initialized (tRPC + SDK)");
+console.log("[Background] Message handlers initialized (tRPC)");
 
 // Initialize offscreen document immediately on service worker start
 // This ensures it's available for all operations

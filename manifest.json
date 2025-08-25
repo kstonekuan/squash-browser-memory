@@ -19,16 +19,9 @@
 		"default_path": "sidepanel.html"
 	},
 	"action": {
-		"default_title": "Open Squash",
-		"default_popup": "popup.html"
+		"default_title": "Open Squash"
 	},
 	"content_scripts": [
-		{
-			"matches": ["<all_urls>"],
-			"js": ["content-scripts/sdk-injection.ts"],
-			"run_at": "document_start",
-			"all_frames": false
-		},
 		{
 			"matches": [
 				"https://chatgpt.com/*",
@@ -48,12 +41,7 @@
 	},
 	"web_accessible_resources": [
 		{
-			"resources": [
-				"public/icon-48.png",
-				"src/permission-dialog/permission-dialog.html",
-				"src/permission-dialog/permission-dialog.ts",
-				"content-scripts/injected-api.js"
-			],
+			"resources": ["public/icon-48.png"],
 			"matches": ["<all_urls>"]
 		}
 	]

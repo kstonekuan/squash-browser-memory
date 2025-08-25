@@ -20,7 +20,6 @@
 		"neverthrow": "8.2.0",
 		"openai": "5.15.0",
 		"simple-chromium-ai": "0.1.2",
-		"squash-sdk": "1.0.0",
 		"superjson": "2.2.2",
 		"ts-pattern": "5.8.0",
 		"zod": "4.1.1"
