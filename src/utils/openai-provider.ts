@@ -129,35 +129,80 @@ export class OpenAIProvider implements AIProvider {
 			});
 		}
 
-		// Handle JSON schema constraint
-		let userContent = text;
-		if (options?.responseConstraint) {
-			// Add instruction to return JSON matching the schema
-			userContent += `\n\nIMPORTANT: Respond with valid JSON only, matching this schema: ${JSON.stringify(options.responseConstraint)}`;
-		}
-
-		messages.push({
-			role: "user",
-			content: userContent,
-		});
-
 		try {
-			console.log("Request content:", `${userContent.substring(0, 100)}...`);
+			console.log("Request content:", `${text.substring(0, 100)}...`);
 
-			const completion = await this.client.chat.completions.create(
-				{
-					model: this.model,
-					messages: messages,
-					max_tokens: OPENAI_MAX_OUTPUT_TOKENS,
-					temperature: 0.7,
-					response_format: options?.responseConstraint
-						? { type: "json_object" }
-						: undefined,
-				},
-				{
+			// Determine if we're using the official OpenAI API or a compatible provider
+			const isOfficialOpenAI =
+				!this.baseUrl || this.baseUrl.includes("api.openai.com");
+
+			// Handle JSON schema constraint
+			let userContent = text;
+			if (options?.responseConstraint && !isOfficialOpenAI) {
+				// Only add detailed JSON instruction for third-party providers
+				// Official OpenAI API will use response_format instead
+				userContent += `\n\nIMPORTANT: Your response must be valid JSON that exactly matches this schema, and do not include the schema in the response: ${JSON.stringify(options.responseConstraint, null, 2)}`;
+			}
+
+			messages.push({
+				role: "user",
+				content: userContent,
+			});
+
+			// Build the completion request
+			const requestBody: OpenAI.Chat.ChatCompletionCreateParams & {
+				reasoning_effort?: string;
+			} = {
+				model: this.model,
+				messages: messages,
+				max_tokens: OPENAI_MAX_OUTPUT_TOKENS,
+				temperature: 0.5,
+			};
+
+			// Handle JSON response formatting based on provider capabilities
+			if (options?.responseConstraint) {
+				if (isOfficialOpenAI) {
+					// Use json_schema for official OpenAI API
+					requestBody.response_format = {
+						type: "json_schema",
+						json_schema: {
+							name: "response_schema",
+							schema: options.responseConstraint,
+						},
+					};
+				} else {
+					// For third-party providers, rely on prompt instruction only
+					// Don't set response_format to avoid compatibility issues
+					console.log(
+						"Using prompt-based JSON instruction for third-party provider",
+					);
+				}
+			}
+
+			// Add provider-specific parameters
+			if (!isOfficialOpenAI && this.model.includes("gpt-oss")) {
+				requestBody.reasoning_effort = "medium";
+			}
+
+			let completion: OpenAI.Chat.ChatCompletion;
+			try {
+				completion = await this.client.chat.completions.create(requestBody, {
 					signal: options?.signal,
-				},
-			);
+				});
+			} catch (error) {
+				// If json_schema fails, retry without response_format
+				if (options?.responseConstraint && requestBody.response_format) {
+					console.log(
+						"JSON schema failed, retrying with prompt instruction only",
+					);
+					delete requestBody.response_format;
+					completion = await this.client.chat.completions.create(requestBody, {
+						signal: options?.signal,
+					});
+				} else {
+					throw error;
+				}
+			}
 
 			const response = completion.choices[0]?.message?.content;
 
