@@ -106,7 +106,13 @@ export class OpenAIProvider implements AIProvider {
 			throw new Error("OpenAI API key is required");
 		}
 
-		this.systemPrompt = systemPrompt;
+		// Enhance system prompt with URL fetching instructions for browser history analysis
+		const urlFetchingInstructions =
+			"\n\nWhen analyzing browser history, if you encounter URLs that would be helpful to understand the user's browsing patterns, interests, or to provide better insights, use the fetch_url tool to retrieve and analyze the page content. This is especially useful for understanding what the user was reading, researching, or working on based on their visited pages.";
+
+		this.systemPrompt = systemPrompt
+			? systemPrompt + urlFetchingInstructions
+			: urlFetchingInstructions.trim();
 
 		// Ensure client is initialized
 		if (!this.client) {
