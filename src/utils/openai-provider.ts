@@ -17,6 +17,26 @@ const OPENAI_MAX_OUTPUT_TOKENS = 16384;
 export const OPENAI_CONSOLE_URL = "https://platform.openai.com/api-keys";
 export const OPENAI_CONSOLE_NAME = "OpenAI Platform";
 
+const FETCH_URL_TOOL: OpenAI.Chat.ChatCompletionTool = {
+	type: "function",
+	function: {
+		name: "fetch_url",
+		description: "Fetch and analyze HTML content from a URL",
+		parameters: {
+			type: "object",
+			properties: {
+				url: {
+					type: "string",
+					description: "The URL to fetch content from",
+				},
+			},
+			required: ["url"],
+			additionalProperties: false,
+		},
+		strict: true,
+	},
+};
+
 export class OpenAIProvider implements AIProvider {
 	private apiKey?: string;
 	private baseUrl?: string;
@@ -86,7 +106,13 @@ export class OpenAIProvider implements AIProvider {
 			throw new Error("OpenAI API key is required");
 		}
 
-		this.systemPrompt = systemPrompt;
+		// Enhance system prompt with URL fetching instructions for browser history analysis
+		const urlFetchingInstructions =
+			"\n\nWhen analyzing browser history, if you encounter URLs that would be helpful to understand the user's browsing patterns, interests, or to provide better insights, use the fetch_url tool to retrieve and analyze the page content. This is especially useful for understanding what the user was reading, researching, or working on based on their visited pages.";
+
+		this.systemPrompt = systemPrompt
+			? systemPrompt + urlFetchingInstructions
+			: urlFetchingInstructions.trim();
 
 		// Ensure client is initialized
 		if (!this.client) {
@@ -159,6 +185,10 @@ export class OpenAIProvider implements AIProvider {
 				temperature: 0.5,
 			};
 
+			// Always add tools for URL fetching capability
+			requestBody.tools = [FETCH_URL_TOOL];
+			requestBody.tool_choice = "auto";
+
 			// Handle JSON response formatting based on provider capabilities
 			if (options?.responseConstraint) {
 				if (isOfficialOpenAI) {
@@ -204,14 +234,88 @@ export class OpenAIProvider implements AIProvider {
 				}
 			}
 
-			const response = completion.choices[0]?.message?.content;
+			const assistantMessage = completion.choices[0]?.message;
+			if (!assistantMessage) {
+				throw new Error("No response from OpenAI API");
+			}
 
+			// Handle tool calls if present
+			if (
+				assistantMessage.tool_calls &&
+				assistantMessage.tool_calls.length > 0
+			) {
+				console.log(
+					"Processing tool calls:",
+					assistantMessage.tool_calls.length,
+				);
+
+				// Add the assistant's message with tool calls to the conversation
+				const messagesWithToolCalls: OpenAI.Chat.ChatCompletionMessageParam[] =
+					[...messages, assistantMessage];
+
+				// Process each tool call
+				for (const toolCall of assistantMessage.tool_calls) {
+					if (
+						toolCall.type === "function" &&
+						toolCall.function.name === "fetch_url"
+					) {
+						try {
+							const args = JSON.parse(toolCall.function.arguments);
+							const toolResult = await this.fetchUrlContent(args.url);
+
+							// Add the tool result to the conversation
+							const toolMessage: OpenAI.Chat.ChatCompletionToolMessageParam = {
+								role: "tool",
+								content: toolResult,
+								tool_call_id: toolCall.id,
+							};
+							messagesWithToolCalls.push(toolMessage);
+						} catch (error) {
+							console.error("Error processing tool call:", error);
+							// Add error message as tool result
+							const toolMessage: OpenAI.Chat.ChatCompletionToolMessageParam = {
+								role: "tool",
+								content: `Error: ${error instanceof Error ? error.message : "Unknown error"}`,
+								tool_call_id: toolCall.id,
+							};
+							messagesWithToolCalls.push(toolMessage);
+						}
+					}
+				}
+
+				// Make a second API call with the tool results
+				const finalRequestBody = {
+					...requestBody,
+					messages: messagesWithToolCalls,
+					tools: undefined, // Remove tools for the final call
+					tool_choice: undefined,
+				};
+
+				const finalCompletion = await this.client.chat.completions.create(
+					finalRequestBody,
+					{
+						signal: options?.signal,
+					},
+				);
+
+				const finalResponse = finalCompletion.choices[0]?.message?.content;
+				if (!finalResponse) {
+					throw new Error(
+						"No final response from OpenAI API after tool execution",
+					);
+				}
+
+				console.log("Final response received after tool execution");
+				return finalResponse;
+			}
+
+			// No tool calls, return the direct response
+			const response = assistantMessage.content;
 			if (!response) {
 				throw new Error("No response from OpenAI API");
 			}
 
 			console.log("Response received", response);
-
 			return response;
 		} catch (error) {
 			console.error("OpenAI API Error:", error);
@@ -280,5 +384,71 @@ export class OpenAIProvider implements AIProvider {
 			optimalChunkTokens: 50000,
 			supportsTokenMeasurement: true,
 		};
+	}
+
+	private async fetchUrlContent(url: string): Promise<string> {
+		try {
+			// Validate URL
+			const urlObj = new URL(url);
+			if (!["http:", "https:"].includes(urlObj.protocol)) {
+				throw new Error("Only HTTP and HTTPS URLs are supported");
+			}
+
+			// Create abort controller for timeout
+			const controller = new AbortController();
+			const timeout = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+
+			// Fetch the URL
+			const response = await fetch(url, {
+				signal: controller.signal,
+				headers: {
+					"User-Agent": "Mozilla/5.0 (compatible; AI-Assistant/1.0)",
+				},
+			});
+
+			clearTimeout(timeout);
+
+			if (!response.ok) {
+				throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+			}
+
+			// Get the content type
+			const contentType = response.headers.get("content-type") || "";
+
+			if (
+				!contentType.includes("text/html") &&
+				!contentType.includes("text/plain")
+			) {
+				throw new Error("URL must return HTML or plain text content");
+			}
+
+			// Get the text content
+			const html = await response.text();
+
+			// Basic HTML to text conversion
+			const textContent = html
+				.replace(/<script[^>]*>[\s\S]*?<\/script>/gi, "") // Remove scripts
+				.replace(/<style[^>]*>[\s\S]*?<\/style>/gi, "") // Remove styles
+				.replace(/<[^>]*>/g, " ") // Remove HTML tags
+				.replace(/\s+/g, " ") // Normalize whitespace
+				.trim();
+
+			// Limit content size to prevent context overflow
+			const maxLength = 8000;
+			const truncatedContent =
+				textContent.length > maxLength
+					? `${textContent.substring(0, maxLength)}...\n\n[Content truncated due to length]`
+					: textContent;
+
+			return `URL: ${url}\nContent:\n${truncatedContent}`;
+		} catch (error) {
+			if (error instanceof Error) {
+				if (error.name === "AbortError") {
+					return `Error fetching ${url}: Request timeout (10 seconds)`;
+				}
+				return `Error fetching ${url}: ${error.message}`;
+			}
+			return `Error fetching ${url}: Unknown error occurred`;
+		}
 	}
 }
