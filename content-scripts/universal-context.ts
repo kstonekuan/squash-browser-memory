@@ -11,7 +11,6 @@ interface PlatformConfig {
 	styling: {
 		buttonStyles: string;
 		iconSize: string;
-		textClass?: string;
 	};
 }
 
@@ -68,6 +67,11 @@ class SimplePlatformAdapter {
 		const configs: Record<PlatformType, PlatformConfig> = {
 			chatgpt: {
 				composerActions: [
+					// For logged-in state: target the voice/microphone buttons container
+					".ms-auto.flex.items-center.gap-1\\.5",
+					// For logged-out state: target the main action buttons container (Attach, Search, Study)
+					".flex.min-w-fit.items-center.gap-1\\.5.ps-0.pe-1\\.5",
+					// Fallback selectors
 					'[data-testid="composer-footer-actions"]',
 					'.flex.items-center[style*="margin-inline-end"]',
 					".absolute.end-2\\.5.bottom-0.flex.items-center",
@@ -85,7 +89,6 @@ class SimplePlatformAdapter {
 				styling: {
 					buttonStyles: "composer-btn",
 					iconSize: "20",
-					textClass: "ml-1.5 mr-0.5",
 				},
 			},
 			claude: {
@@ -109,7 +112,6 @@ class SimplePlatformAdapter {
 				styling: {
 					buttonStyles: "context-btn-claude",
 					iconSize: "16",
-					textClass: "sr-only",
 				},
 			},
 			discord: {
@@ -176,8 +178,29 @@ class SimplePlatformAdapter {
 	}
 
 	findComposerContainer(): HTMLElement | null {
-		// For ChatGPT, specifically look for the trailing actions div to inject inside it
+		// For ChatGPT, detect login state and choose appropriate container
 		if (this.currentPlatform === "chatgpt") {
+			// Check if user is logged in by looking for voice/microphone button container
+			const voiceButtonsContainer = document.querySelector(
+				".ms-auto.flex.items-center.gap-1\\.5",
+			) as HTMLElement;
+
+			if (voiceButtonsContainer) {
+				// User is logged in - place next to microphone button
+				console.log("Found ChatGPT voice buttons container (logged in)");
+				return voiceButtonsContainer;
+			}
+
+			// Check for logged-out action buttons container
+			const actionButtonsContainer = document.querySelector(
+				".flex.min-w-fit.items-center.gap-1\\.5.ps-0.pe-1\\.5",
+			) as HTMLElement;
+			if (actionButtonsContainer) {
+				console.log("Found ChatGPT action buttons container (logged out)");
+				return actionButtonsContainer;
+			}
+
+			// Fallback to trailing actions
 			const trailingActions = document.querySelector(
 				'[data-testid="composer-trailing-actions"]',
 			) as HTMLElement;
@@ -330,20 +353,13 @@ class SimplePlatformAdapter {
 
 		// Platform-specific styling
 		if (this.currentPlatform === "chatgpt") {
+			// Style to match other action buttons (Attach, Search, Study)
+			button.className =
+				"radix-state-open:bg-black/10 inline-flex h-9 rounded-full border text-[13px] font-medium text-token-text-secondary border-token-border-default hover:bg-token-main-surface-secondary focus-visible:outline-black dark:focus-visible:outline-white";
 			button.style.cssText = `
-				display: flex;
-				align-items: center;
-				justify-content: center;
-				height: 36px;
-				border-radius: 18px;
-				border: 1px solid var(--token-border-default, #d1d5db);
-				color: var(--token-text-secondary, #6b7280);
 				min-width: 32px;
 				width: auto;
 				padding: 8px;
-				font-size: 13px;
-				font-weight: 600;
-				background: transparent;
 				cursor: pointer;
 				transition: all 0.2s;
 				position: relative;
@@ -421,21 +437,18 @@ class SimplePlatformAdapter {
 			});
 		}
 
-		// Add icon and text - using smaller document icon
+		// Add Squash logo icon (no text)
 		const iconSize = Math.max(
 			14,
 			parseInt(this.config.styling.iconSize, 10) - 2,
 		); // Make it 2px smaller, minimum 14px
 
 		button.innerHTML = `
-			<svg width="${iconSize}" height="${iconSize}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-				<path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/>
-				<polyline points="14,2 14,8 20,8"/>
-				<line x1="16" y1="13" x2="8" y2="13"/>
-				<line x1="16" y1="17" x2="8" y2="17"/>
-				<polyline points="10,9 9,9 8,9"/>
+			<svg width="${iconSize}" height="${iconSize}" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+				<!-- Squash fruit logo in yellow -->
+				<path d="M12 5c-.5-1.5-2-2.5-2-2.5s-1.5 1-2 2.5c-.2 1 .2 2 1 2.5.5.4 1 .5 1.5.5s1-.1 1.5-.5c.8-.5 1.2-1.5 1-2.5z" fill="#EFBE7D" opacity="0.9" />
+				<path d="M14 8.5c-1.5-1.5-4-1.5-5.5 0-3 3-3 8 0 11s8 3 11 0-2.5-8-5.5-11z" fill="#EFBE7D" />
 			</svg>
-			${this.config.styling.textClass ? `<span class="${this.config.styling.textClass}">Context</span>` : ""}
 		`;
 
 		return button;
@@ -1288,16 +1301,50 @@ class ContextButtonInjector {
 
 			// Platform-specific injection logic
 			if (this.platformAdapter.getPlatform() === "chatgpt") {
-				// For ChatGPT, insert as first child inside trailing actions div
-				const firstChild = container.firstChild;
-				if (firstChild) {
-					container.insertBefore(this.buttonElement, firstChild);
-					console.log(
-						"Context button inserted as first child in trailing actions",
-					);
+				// Check if we're in the voice buttons container (logged in state)
+				if (
+					container.classList.contains("ms-auto") &&
+					container.classList.contains("flex") &&
+					container.classList.contains("items-center")
+				) {
+					// Insert as first child in the voice buttons container (before microphone)
+					const firstChild = container.firstChild;
+					if (firstChild) {
+						container.insertBefore(this.buttonElement, firstChild);
+						console.log(
+							"Context button inserted before microphone button (logged in)",
+						);
+					} else {
+						container.appendChild(this.buttonElement);
+						console.log("Context button added to voice buttons container");
+					}
+				} else if (
+					container.classList.contains("flex") &&
+					container.classList.contains("min-w-fit")
+				) {
+					// Insert as first child in the action buttons container (logged out state)
+					const firstChild = container.firstChild;
+					if (firstChild) {
+						container.insertBefore(this.buttonElement, firstChild);
+						console.log(
+							"Context button inserted as first child in action buttons container (logged out)",
+						);
+					} else {
+						container.appendChild(this.buttonElement);
+						console.log("Context button added to action buttons container");
+					}
 				} else {
-					container.appendChild(this.buttonElement);
-					console.log("Context button added to trailing actions (was empty)");
+					// Fallback: insert as first child inside trailing actions div
+					const firstChild = container.firstChild;
+					if (firstChild) {
+						container.insertBefore(this.buttonElement, firstChild);
+						console.log(
+							"Context button inserted as first child in trailing actions",
+						);
+					} else {
+						container.appendChild(this.buttonElement);
+						console.log("Context button added to trailing actions (was empty)");
+					}
 				}
 			} else if (this.platformAdapter.getPlatform() === "claude") {
 				// For Claude.ai, insert in the gap container (after existing buttons)

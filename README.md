@@ -40,7 +40,7 @@ Squash studies your browsing patterns, learns how you work, and automatically pr
 - **Ambient Analysis**: Runs in the background, building understanding over time
 - **Smart Memory**: Learns and refines patterns across sessions
 - **Privacy First**: Local analysis by default, explicit consent for remote services
-- **Context Injection**: Adds a "Context" button to ChatGPT and Claude that inserts relevant info from your browsing history
+- **Context Injection**: Adds a distinctive yellow Squash button to ChatGPT and Claude that inserts relevant info from your browsing history
 
 ## AI Provider Setup
 
@@ -75,7 +75,7 @@ To use: Set the custom base URL in OpenAI provider settings (e.g., `http://local
 
 1. **Ambient Mode**: Enable in Advanced Settings for automatic hourly analysis
 2. **Manual Analysis**: Click "Analyze History" in the side panel
-3. **Context Injection**: Type in ChatGPT/Claude → click "Context" → select relevant suggestions
+3. **Context Injection**: Type in ChatGPT/Claude → click the yellow Squash button → select relevant suggestions
 
 <p align="center">
   <img src="./images/sidepanel_ambient_analysis.png" alt="Ambient Analysis in Side Panel" width="600">
