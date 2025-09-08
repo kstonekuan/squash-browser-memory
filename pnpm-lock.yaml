@@ -33,8 +33,8 @@ importers:
         specifier: 5.19.1
         version: 5.19.1(ws@8.18.3)(zod@4.1.5)
       simple-chromium-ai:
-        specifier: 0.1.2
-        version: 0.1.2
+        specifier: 0.1.3
+        version: 0.1.3
       superjson:
         specifier: 2.2.2
         version: 2.2.2
@@ -1444,8 +1444,8 @@ packages:
   siginfo@2.0.0:
     resolution: {integrity: sha512-ybx0WO1/8bSBLEWXZvEd7gMW3Sn3JFlW3TvX1nREbDLRNQNaeNN8WK0meBwPdAaOI7TtRRRJn/Es1zhrrCHu7g==}
 
-  simple-chromium-ai@0.1.2:
-    resolution: {integrity: sha512-oF3U9VkPSpND/DeOjHY8uGltJKQTKhZYDWMdHmLNv+Elfla/Ox09ruXLb3ovDj4dvC1EYrsbJmfBtsBVSwZ6Yw==}
+  simple-chromium-ai@0.1.3:
+    resolution: {integrity: sha512-+8IoooTrmqxtVXZdGiDyMHbk3Uhlx5FBDt0DkUqM4r3WW6KFnYeUXTmkBvl259lEfn3nveoSby7FnmUoybtVRQ==}
     engines: {node: '>=14.0.0'}
 
   sirv@3.0.1:
@@ -2964,7 +2964,7 @@ snapshots:
 
   siginfo@2.0.0: {}
 
-  simple-chromium-ai@0.1.2:
+  simple-chromium-ai@0.1.3:
     dependencies:
       '@types/dom-chromium-ai': 0.0.9
       neverthrow: 8.2.0
